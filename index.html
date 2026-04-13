@@ -195,24 +195,38 @@ function App(){
     },0);
     const sent = Number(getMD(monthKey,"sent2000"))*2000+Number(getMD(monthKey,"sent1000"))*1000+Number(getMD(monthKey,"sentKeren"))*1000;
     const adjustment = Number(getMD(monthKey,"adjustment"))||0;
-    const net = donors - totalRounding + adjustment;
+    const net = income - sent + adjustment;
     return { donors, datot, keren, income, totalRounding, sent, adjustment, net };
   };
 
-  // Cumulative live balance = base + sum of months with actual activity
+  // Parse base balance date "D.M.YY" → "YYYY-MM"
+  const parseBaseMonthKey = (dateStr) => {
+    try {
+      const parts = (dateStr||"").split(".");
+      if(parts.length < 2) return "0000-00";
+      const m = parts[1].padStart(2,"0");
+      const y = parts[2] ? (parts[2].length===2 ? "20"+parts[2] : parts[2]) : String(now.getFullYear());
+      return `${y}-${m}`;
+    } catch(e){ return "0000-00"; }
+  };
+  const baseMonthKey = parseBaseMonthKey(baseBalance.date);
+
+  // Cumulative live balance = base + sum of months >= base month with activity
   const monthHasActivity = k => {
     const md = allMonths[k]||{};
     return (md.donors||[]).length > 0 ||
-      Number(md.datot||0)   > 0 ||
-      Number(md.keren||0)   > 0 ||
-      Number(md.sent2000||0)> 0 ||
-      Number(md.sent1000||0)> 0 ||
-      Number(md.sentKeren||0)>0 ||
+      Number(md.datot||0)    > 0 ||
+      Number(md.keren||0)    > 0 ||
+      Number(md.sent2000||0) > 0 ||
+      Number(md.sent1000||0) > 0 ||
+      Number(md.sentKeren||0)> 0 ||
       Number(md.adjustment||0)!==0;
   };
   const liveBalance = (() => {
     let sum = Number(baseBalance.amount||0);
-    allMonthKeys().forEach(k=>{ if(monthHasActivity(k)) sum += calcMonthTotals(k).net; });
+    allMonthKeys().forEach(k=>{
+      if(k >= baseMonthKey && monthHasActivity(k)) sum += calcMonthTotals(k).net;
+    });
     return sum;
   })();
 
@@ -412,7 +426,9 @@ function MainTab({ selKey, selYear, selMonth, baseBalance, setBaseBalance, liveB
       {/* MINI SUMMARY */}
       <div style={{...card,background:"#f0fdf4",border:"1.5px solid #22c55e"}}>
         <div style={{fontWeight:700,fontSize:14,marginBottom:8}}>📊 סיכום {mkMonthLabel(selYear,selMonth)}</div>
-        <MR l="סה״כ הכנסות"   v={curTotals.income} />
+        <MR l="תורמים"         v={curTotals.donors} />
+        <MR l="דתות"           v={curTotals.datot} />
+        <MR l="קרן"            v={curTotals.keren} />
         <MR l="נשלח לאברכים"  v={-curTotals.sent} neg />
         {curTotals.adjustment!==0 && <MR l={curTotals.adjustment>0?"התאמה ➕":"התאמה ➖"} v={curTotals.adjustment} color={curTotals.adjustment>0?"#16a34a":"#dc2626"} />}
         <div style={divider}/>
