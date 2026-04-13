@@ -199,10 +199,20 @@ function App(){
     return { donors, datot, keren, income, totalRounding, sent, adjustment, net };
   };
 
-  // Cumulative live balance = base + sum of all months net
+  // Cumulative live balance = base + sum of months with actual activity
+  const monthHasActivity = k => {
+    const md = allMonths[k]||{};
+    return (md.donors||[]).length > 0 ||
+      Number(md.datot||0)   > 0 ||
+      Number(md.keren||0)   > 0 ||
+      Number(md.sent2000||0)> 0 ||
+      Number(md.sent1000||0)> 0 ||
+      Number(md.sentKeren||0)>0 ||
+      Number(md.adjustment||0)!==0;
+  };
   const liveBalance = (() => {
     let sum = Number(baseBalance.amount||0);
-    allMonthKeys().forEach(k=>{ sum += calcMonthTotals(k).net; });
+    allMonthKeys().forEach(k=>{ if(monthHasActivity(k)) sum += calcMonthTotals(k).net; });
     return sum;
   })();
 
