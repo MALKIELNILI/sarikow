@@ -67,7 +67,7 @@ const defaultAvrechim = [
 
 const mkMonthKey = (y,m) => `${y}-${String(m+1).padStart(2,'0')}`;
 const mkMonthLabel = (y,m) => `${MONTHS_HE[m]} ${y}`;
-const emptyMonthData = () => ({ donors:[], datot:0, keren:0, sent2000:0, sent1000:0, sentKeren:0 });
+const emptyMonthData = () => ({ donors:[], datot:0, keren:0, sent2000:0, sent1000:0, sentKeren:0, adjustment:0, adjustmentNote:"" });
 
 // ── FIREBASE HELPERS ─────────────────────────────────────────
 function fbSet(path,val){ db.ref(path).set(val); }
@@ -194,8 +194,9 @@ function App(){
       return s+c.rounding;
     },0);
     const sent = Number(getMD(monthKey,"sent2000"))*2000+Number(getMD(monthKey,"sent1000"))*1000+Number(getMD(monthKey,"sentKeren"))*1000;
-    const net = income - totalRounding - sent;
-    return { donors, datot, keren, income, totalRounding, sent, net };
+    const adjustment = Number(getMD(monthKey,"adjustment"))||0;
+    const net = income - sent + adjustment;
+    return { donors, datot, keren, income, totalRounding, sent, adjustment, net };
   };
 
   // Cumulative live balance = base + sum of all months net
@@ -276,6 +277,7 @@ function MainTab({ selKey, selYear, selMonth, baseBalance, setBaseBalance, liveB
   const [tempBase,setTempBase]=useState(baseBalance.amount);
   const [showDonor,setShowDonor]=useState(false);
   const [newDonor,setNewDonor]=useState({name:"",amount:""});
+  const [showAdj,setShowAdj]=useState(false);
   const donors=(allMonths[selKey]?.donors)||[];
 
   return (
@@ -359,12 +361,50 @@ function MainTab({ selKey, selYear, selMonth, baseBalance, setBaseBalance, liveB
         </div>
       </div>
 
+      {/* ADJUSTMENT */}
+      <div style={{...card, border:"1.5px solid #f59e0b", background:"#fffbeb"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span style={{fontWeight:700,fontSize:14}}>⚖️ התאמה ידנית לקופה</span>
+          <button style={{...smallBtn, background: showAdj?"#f59e0b":"#fef3c7", color: showAdj?"#fff":"#92400e", border:"1px solid #f59e0b"}}
+            onClick={()=>setShowAdj(p=>!p)}>
+            {showAdj ? "סגור ✕" : "± פתח"}
+          </button>
+        </div>
+        {getMD(selKey,"adjustment")!==0 && !showAdj && (
+          <div style={{marginTop:6,fontSize:13,color:getMD(selKey,"adjustment")>0?"#16a34a":"#dc2626",fontWeight:700}}>
+            {getMD(selKey,"adjustment")>0?"הוספה":"גריעה"}: {fmtSigned(getMD(selKey,"adjustment"))} ₪
+            {getMD(selKey,"adjustmentNote") && <span style={{color:"#78716c",fontWeight:400,marginRight:6}}>— {getMD(selKey,"adjustmentNote")}</span>}
+          </div>
+        )}
+        {showAdj && (
+          <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:8}}>
+            <div style={{display:"flex",gap:8,alignItems:"center"}}>
+              <button style={{...smallBtn, background: getMD(selKey,"adjustment")>=0?"#16a34a":"#e2e8f0", color: getMD(selKey,"adjustment")>=0?"#fff":"#64748b", minWidth:36}}
+                onClick={()=>{ const cur=getMD(selKey,"adjustment"); if(cur<0) setMonthField(selKey,"adjustment",-cur); }}>+</button>
+              <input style={{...inp,flex:1,textAlign:"center"}} type="number"
+                value={Math.abs(getMD(selKey,"adjustment")||0)}
+                onChange={e=>{ const sign=getMD(selKey,"adjustment")<0?-1:1; setMonthField(selKey,"adjustment",sign*(Number(e.target.value)||0)); }}
+                placeholder="סכום..." />
+              <button style={{...smallBtn, background: getMD(selKey,"adjustment")<0?"#dc2626":"#e2e8f0", color: getMD(selKey,"adjustment")<0?"#fff":"#64748b", minWidth:36}}
+                onClick={()=>{ const cur=getMD(selKey,"adjustment"); if(cur>0) setMonthField(selKey,"adjustment",-cur); }}>−</button>
+            </div>
+            <input style={inp} placeholder="הערה (אופציונלי)..."
+              value={getMD(selKey,"adjustmentNote")||""}
+              onChange={e=>setMonthField(selKey,"adjustmentNote",e.target.value)} />
+            <div style={{fontSize:12,color:"#78716c",textAlign:"center"}}>
+              {getMD(selKey,"adjustment")>0 ? `מוסיף ${fmt(getMD(selKey,"adjustment"))} ₪ לקופה` :
+               getMD(selKey,"adjustment")<0 ? `גורע ${fmt(Math.abs(getMD(selKey,"adjustment")))} ₪ מהקופה` : "אין התאמה"}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* MINI SUMMARY */}
       <div style={{...card,background:"#f0fdf4",border:"1.5px solid #22c55e"}}>
         <div style={{fontWeight:700,fontSize:14,marginBottom:8}}>📊 סיכום {mkMonthLabel(selYear,selMonth)}</div>
-        <MR l="סה״כ הכנסות"        v={curTotals.income} />
-        <MR l="קיזוז עיגול"         v={-curTotals.totalRounding} neg />
-        <MR l="נשלח לאברכים"       v={-curTotals.sent} neg />
+        <MR l="סה״כ הכנסות"   v={curTotals.income} />
+        <MR l="נשלח לאברכים"  v={-curTotals.sent} neg />
+        {curTotals.adjustment!==0 && <MR l={curTotals.adjustment>0?"התאמה ➕":"התאמה ➖"} v={curTotals.adjustment} color={curTotals.adjustment>0?"#16a34a":"#dc2626"} />}
         <div style={divider}/>
         <MR l="נטו חודש זה" v={curTotals.net} bold color={curTotals.net>=0?"#16a34a":"#dc2626"} />
       </div>
