@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>סריקוב — מערכת ניהול כספים</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<style>
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:#f1f5f9; font-family:'Segoe UI',Arial,sans-serif; direction:rtl; }
+input,select,button { font-family:inherit; }
+@keyframes spin { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const firebaseConfig = {
+  apiKey:"AIzaSyCtTCUNeYzRMlSLe2VJs_ols818QI1ZuTA",
+  authDomain:"sarikow-3342b.firebaseapp.com",
+  databaseURL:"https://sarikow-3342b-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:"sarikow-3342b",
+  storageBucket:"sarikow-3342b.firebasestorage.app",
+  messagingSenderId:"95850039076",
+  appId:"1:95850039076:web:4149b5724c52fbdaa315b1"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+</script>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+// ── CONSTANTS ────────────────────────────────────────────────
+const MONTHS_HE = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
+const trackLabel = { "2000":"2,000 ₪", "1000":"1,000 ₪" };
+const trackColor = { "2000":"#2563eb", "1000":"#7c3aed" };
+const groupLabel = { datot:"זכאי דתות", keren:"מושהה קרן" };
+const groupColor = { datot:"#b45309", keren:"#059669" };
+const fmt = n => Number(n||0).toLocaleString("he-IL",{minimumFractionDigits:0,maximumFractionDigits:0});
+const fmtSigned = n => (n>0?"+":"")+fmt(n);
+const now = new Date();
+
+const defaultAvrechim = [
+  {id:1,  name:"עמנואל חיימוב", track:"1000", maxStipend:1600, active:true, incomeGroup:"datot"},
+  {id:2,  name:"משה קוסיוב",    track:"1000", maxStipend:1600, active:true, incomeGroup:"datot"},
+  {id:3,  name:"יהודה יגודיוב", track:"1000", maxStipend:1600, active:true, incomeGroup:"datot"},
+  {id:4,  name:"אליהו רדעי",    track:"1000", maxStipend:1600, active:true, incomeGroup:"datot"},
+  {id:5,  name:"אוריאל סבג",    track:"1000", maxStipend:1000, active:true, incomeGroup:"datot"},
+  {id:6,  name:"יונתן עובדיה",  track:"1000", maxStipend:1000, active:true, incomeGroup:"datot"},
+  {id:7,  name:"מאור",          track:"2000", maxStipend:2600, active:true, incomeGroup:"datot"},
+  {id:8,  name:"הרב חלו",       track:"2000", maxStipend:4300, active:true, incomeGroup:"datot"},
+  {id:9,  name:"חזקיה כהן",     track:"2000", maxStipend:1600, active:true, incomeGroup:"datot"},
+  {id:10, name:"אביתר אבייב",   track:"1000", maxStipend:1600, active:true, incomeGroup:"keren"},
+  {id:11, name:"אלחנן יצחקוב",  track:"1000", maxStipend:1600, active:true, incomeGroup:"keren"},
+  {id:12, name:"דניאל יוסופוב", track:"1000", maxStipend:1600, active:true, incomeGroup:"keren"},
+  {id:13, name:"רפאל חיימוב",   track:"1000", maxStipend:1600, active:true, incomeGroup:"keren"},
+  {id:14, name:"אוראל ג'רסי",   track:"1000", maxStipend:1600, active:true, incomeGroup:"keren"},
+  {id:15, name:"אברהם אליאב",   track:"1000", maxStipend:1600, active:true, incomeGroup:"keren"},
+];
+
+const mkMonthKey = (y,m) => `${y}-${String(m+1).padStart(2,'0')}`;
+const mkMonthLabel = (y,m) => `${MONTHS_HE[m]} ${y}`;
+const emptyMonthData = () => ({ donors:[], datot:0, keren:0, sent2000:0, sent1000:0, sentKeren:0 });
+
+// ── FIREBASE HELPERS ─────────────────────────────────────────
+function fbSet(path,val){ db.ref(path).set(val); }
+function fbListen(path,cb){
+  const ref=db.ref(path);
+  ref.on("value",snap=>cb(snap.val()));
+  return ()=>ref.off("value");
+}
+
+// ── MAIN APP ─────────────────────────────────────────────────
+function App(){
+  const [ready,setReady]         = useState(false);
+  const [tab,setTab]             = useState("main");
+  const [syncing,setSyncing]     = useState(false);
+  const [baseBalance,setBaseBS]  = useState({amount:191321,date:"29.1.26"});
+  const [avrechim,setAvrechimS]  = useState(defaultAvrechim);
+  // allMonths: { "2026-01": { donors, datot, keren, sent2000, sent1000, sentKeren }, ... }
+  const [allMonths,setAllMonthsS]= useState({});
+  // avAllMonths: { "2026-01": { avId: { monthlyStipend, datot, keren, roundingByFriend, exams } } }
+  const [avAllMonths,setAvAllMS] = useState({});
+  // current selected month
+  const [selYear,setSelYear]     = useState(now.getFullYear());
+  const [selMonth,setSelMonth]   = useState(now.getMonth());
+
+  const selKey = mkMonthKey(selYear,selMonth);
+
+  const local = useRef({baseBalance,avrechim,allMonths,avAllMonths});
+
+  useEffect(()=>{
+    let loaded={base:false,av:false,months:false,avmonths:false};
+    const check=()=>{ if(loaded.base&&loaded.av&&loaded.months&&loaded.avmonths) setReady(true); };
+    const u1=fbListen("baseBalance",v=>{ if(v){setBaseBS(v);local.current.baseBalance=v;} loaded.base=true;check(); });
+    const u2=fbListen("avrechim",v=>{ if(v&&Array.isArray(v)){setAvrechimS(v);local.current.avrechim=v;} loaded.av=true;check(); });
+    const u3=fbListen("allMonths",v=>{ const d=v||{}; setAllMonthsS(d);local.current.allMonths=d; loaded.months=true;check(); });
+    const u4=fbListen("avAllMonths",v=>{ const d=v||{}; setAvAllMS(d);local.current.avAllMonths=d; loaded.avmonths=true;check(); });
+    return()=>{ u1();u2();u3();u4(); };
+  },[]);
+
+  const sync = fn => { setSyncing(true); fn(); setTimeout(()=>setSyncing(false),1200); };
+  const setBaseBalance = v => { setBaseBS(v); sync(()=>fbSet("baseBalance",v)); };
+  const setAvrechim    = fn => { const n=typeof fn==="function"?fn(local.current.avrechim):fn; local.current.avrechim=n; setAvrechimS(n); sync(()=>fbSet("avrechim",n)); };
+
+  const setMonthField = (key,field,val) => {
+    const cur = local.current.allMonths;
+    const upd = {...cur,[key]:{...emptyMonthData(),...(cur[key]||{}),[field]:val}};
+    local.current.allMonths=upd; setAllMonthsS(upd); sync(()=>fbSet("allMonths",upd));
+  };
+  const setAvMonthField = (monthKey,avId,field,val) => {
+    const cur = local.current.avAllMonths;
+    const upd = {...cur,[monthKey]:{...(cur[monthKey]||{}),[avId]:{...(cur[monthKey]?.[avId]||{}),[field]:val}}};
+    local.current.avAllMonths=upd; setAvAllMS(upd); sync(()=>fbSet("avAllMonths",upd));
+  };
+
+  const getMD = (key,field,def=0) => allMonths[key]?.[field] ?? def;
+  const getAV = (monthKey,avId,field,def="") => avAllMonths[monthKey]?.[avId]?.[field] ?? def;
+
+  // ── MONTH CALCULATIONS ──
+  // Calculate per-avrech for a given month, carrying gap from previous month
+  const calcAvrechMonth = (av, monthKey, prevMonthKey) => {
+    const monthly  = Number(getAV(monthKey,av.id,"monthlyStipend"))||0;
+    const exams    = Number(getAV(monthKey,av.id,"exams"))||0;
+    // תמיכה בפורמט ישן: track:"keren" → incomeGroup:"keren", trackNum:1000
+    const incomeGroup = av.incomeGroup || (av.track==="keren" ? "keren" : "datot");
+    const trackNum = (av.track==="keren") ? 1000 : (Number(av.track)||1000);
+
+    // חלוקת דתות/קרן אוטומטית לפי קבוצה
+    const datotCount = avrechim.filter(a=>a.active && (a.incomeGroup||( a.track==="keren"?"keren":"datot"))==="datot").length;
+    const kerenCount = avrechim.filter(a=>a.active && (a.incomeGroup||(a.track==="keren"?"keren":"datot"))==="keren").length;
+    const totalDatot = Number(getMD(monthKey,"datot"))||0;
+    const totalKeren = Number(getMD(monthKey,"keren"))||0;
+    const autoDatot  = (incomeGroup==="datot" && datotCount>0) ? totalDatot/datotCount : 0;
+    const autoKeren  = (incomeGroup==="keren" && kerenCount>0) ? totalKeren/kerenCount : 0;
+
+    // ערך ידני עוקף אוטומטי (אם הוזן)
+    const datotRaw = getAV(monthKey,av.id,"datot");
+    const kerenRaw = getAV(monthKey,av.id,"keren");
+    const datot = datotRaw!==""?Number(datotRaw):autoDatot;
+    const keren = kerenRaw!==""?Number(kerenRaw):autoKeren;
+
+    // עיגול אוטומטי: מסלול − דתות − קרן
+    const rounding = Math.max(0, trackNum - datot - keren);
+    // בנק בסיסי: מגיע לו − עיגול + בחינות
+    const bank = monthly - rounding + exams;
+    // פער מחודש קודם
+    const prevBankGap = prevMonthKey ? (Number(getAV(prevMonthKey,av.id,"bankGap"))||0) : 0;
+    // לבנק החודש = בנק + פער מחודש קודם
+    const effectiveBank = bank + prevBankGap;
+    // מה הוכנס בפועל לבנק
+    const actualBankRaw = getAV(monthKey,av.id,"actualBank");
+    const actualBank = actualBankRaw!==""?Number(actualBankRaw):null;
+    // פער לחודש הבא
+    const bankGapRaw = getAV(monthKey,av.id,"bankGap");
+    const bankGapAuto = actualBank!==null ? effectiveBank - actualBank : 0;
+    const bankGap = bankGapRaw!==""?Number(bankGapRaw):bankGapAuto;
+
+    return { monthly, datot, keren, autoDatot, autoKeren, datotRaw, kerenRaw, rounding, exams, bank, prevBankGap, effectiveBank, actualBank, bankGapAuto, bankGap, trackNum, datotCount, kerenCount, incomeGroup, totalDatot, totalKeren };
+  };
+
+  // Get sorted month keys
+  const allMonthKeys = () => {
+    const keys = new Set();
+    Object.keys(allMonths).forEach(k=>keys.add(k));
+    Object.keys(avAllMonths).forEach(k=>keys.add(k));
+    // Add current selected
+    keys.add(selKey);
+    return Array.from(keys).sort();
+  };
+
+  const getPrevMonthKey = (key) => {
+    const sorted = allMonthKeys();
+    const idx = sorted.indexOf(key);
+    return idx>0 ? sorted[idx-1] : null;
+  };
+
+  // Calculate totals for a month
+  const calcMonthTotals = (monthKey) => {
+    const prevKey = getPrevMonthKey(monthKey);
+    const donors  = (allMonths[monthKey]?.donors||[]).reduce((s,d)=>s+Number(d.amount||0),0);
+    const datot   = Number(getMD(monthKey,"datot"));
+    const keren   = Number(getMD(monthKey,"keren"));
+    const income  = donors+datot+keren;
+    const totalRounding = avrechim.filter(a=>a.active).reduce((s,av)=>{
+      const c=calcAvrechMonth(av,monthKey,prevKey);
+      return s+c.rounding;
+    },0);
+    const sent = Number(getMD(monthKey,"sent2000"))*2000+Number(getMD(monthKey,"sent1000"))*1000+Number(getMD(monthKey,"sentKeren"))*1000;
+    const net = income - totalRounding - sent;
+    return { donors, datot, keren, income, totalRounding, sent, net };
+  };
+
+  // Cumulative live balance = base + sum of all months net
+  const liveBalance = (() => {
+    let sum = Number(baseBalance.amount||0);
+    allMonthKeys().forEach(k=>{ sum += calcMonthTotals(k).net; });
+    return sum;
+  })();
+
+  const curTotals = calcMonthTotals(selKey);
+  const prevKey   = getPrevMonthKey(selKey);
+
+  // שמות תורמים ידועים לצורך מילוי אוטומטי
+  const allDonorNames = [...new Set(
+    Object.values(allMonths).flatMap(m=>(m.donors||[]).map(d=>d.name).filter(Boolean))
+  )];
+
+  const totalOwed = avrechim.filter(a=>a.active).reduce((s,av)=>s+calcAvrechMonth(av,selKey,prevKey).effectiveBank,0);
+
+  if(!ready) return (
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100vh",gap:16,color:"#475569"}}>
+      <div style={{fontSize:32,fontWeight:800,color:"#1e3a5f"}}>סריקוב</div>
+      <div style={{fontSize:14,opacity:.7}}>מתחבר לענן...</div>
+      <div style={{width:40,height:40,border:"4px solid #e2e8f0",borderTop:"4px solid #2563eb",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+    </div>
+  );
+
+  const tabS = t => ({padding:"7px 11px",borderRadius:8,border:tab===t?"2px solid #1e3a5f":"2px solid #e2e8f0",background:tab===t?"#1e3a5f":"#f8fafc",cursor:"pointer",fontWeight:600,fontSize:12,color:tab===t?"#fff":"#64748b"});
+
+  return (
+    <div style={{minHeight:"100vh",background:"#f1f5f9"}}>
+      <header style={{background:"#fff",boxShadow:"0 2px 8px rgba(0,0,0,0.08)",position:"sticky",top:0,zIndex:100}}>
+        <div style={{maxWidth:720,margin:"0 auto",padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+          <div>
+            <div style={{fontSize:20,fontWeight:800,color:"#1e3a5f"}}>סריקוב</div>
+            <div style={{fontSize:10,color:"#94a3b8",display:"flex",alignItems:"center",gap:4}}>
+              מערכת ניהול כספים
+              <span style={{width:6,height:6,borderRadius:"50%",background:syncing?"#f59e0b":"#22c55e",display:"inline-block"}}/>
+              <span>{syncing?"שומר...":"מסונכרן ☁️"}</span>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+            <button onClick={()=>setTab("main")}     style={tabS("main")}>🏠 ראשי</button>
+            <button onClick={()=>setTab("avrechim")} style={tabS("avrechim")}>👨‍🎓 אברכים</button>
+            <button onClick={()=>setTab("summary")}  style={tabS("summary")}>📂 סיכומים</button>
+          </div>
+        </div>
+      </header>
+
+      {/* Month Selector */}
+      <div style={{maxWidth:720,margin:"0 auto",padding:"10px 14px 0"}}>
+        <div style={{background:"#fff",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",gap:10,boxShadow:"0 1px 4px rgba(0,0,0,0.07)",flexWrap:"wrap"}}>
+          <span style={{fontWeight:700,fontSize:13,color:"#1e3a5f"}}>📅 חודש:</span>
+          <button onClick={()=>{ let m=selMonth-1,y=selYear; if(m<0){m=11;y--;} setSelMonth(m);setSelYear(y); }}
+            style={{...smallBtn,fontSize:16,padding:"2px 10px"}}>‹</button>
+          <span style={{fontWeight:700,fontSize:15,color:"#1e293b",minWidth:110,textAlign:"center"}}>{mkMonthLabel(selYear,selMonth)}</span>
+          <button onClick={()=>{ let m=selMonth+1,y=selYear; if(m>11){m=0;y++;} setSelMonth(m);setSelYear(y); }}
+            style={{...smallBtn,fontSize:16,padding:"2px 10px"}}>›</button>
+          <div style={{marginRight:"auto",display:"flex",gap:8,alignItems:"center"}}>
+            <span style={{fontSize:12,color:"#64748b"}}>יתרה חיה:</span>
+            <span style={{fontWeight:800,fontSize:15,color:"#2563eb"}}>{fmt(liveBalance)} ₪</span>
+          </div>
+        </div>
+      </div>
+
+      <main style={{maxWidth:720,margin:"0 auto",padding:"12px 14px"}}>
+        {tab==="main"     && <MainTab selKey={selKey} selYear={selYear} selMonth={selMonth} baseBalance={baseBalance} setBaseBalance={setBaseBalance} liveBalance={liveBalance} curTotals={curTotals} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} syncing={syncing} allDonorNames={allDonorNames} />}
+        {tab==="avrechim" && <AvrechimTab avrechim={avrechim} setAvrechim={setAvrechim} selKey={selKey} prevKey={prevKey} getAV={getAV} setAvMonthField={setAvMonthField} calcAvrechMonth={calcAvrechMonth} totalOwed={totalOwed} />}
+        {tab==="summary"  && <SummaryTab avrechim={avrechim} allMonthKeys={allMonthKeys()} calcMonthTotals={calcMonthTotals} calcAvrechMonth={calcAvrechMonth} getPrevMonthKey={getPrevMonthKey} baseBalance={baseBalance} liveBalance={liveBalance} selKey={selKey} />}
+      </main>
+    </div>
+  );
+}
+
+// ── MAIN TAB ────────────────────────────────────────────────
+function MainTab({ selKey, selYear, selMonth, baseBalance, setBaseBalance, liveBalance, curTotals, allMonths, getMD, setMonthField, allDonorNames }){
+  const [editBase,setEditBase]=useState(false);
+  const [tempBase,setTempBase]=useState(baseBalance.amount);
+  const [showDonor,setShowDonor]=useState(false);
+  const [newDonor,setNewDonor]=useState({name:"",amount:""});
+  const donors=(allMonths[selKey]?.donors)||[];
+
+  return (
+    <div style={col}>
+      {/* BALANCE */}
+      <div style={{background:"linear-gradient(135deg,#0f2044,#1d4ed8)",borderRadius:12,padding:"14px 16px",color:"#fff",boxShadow:"0 2px 8px rgba(0,0,0,0.15)"}}>
+        <div style={{fontSize:13,opacity:.75,marginBottom:4}}>יתרה חיה מצטברת</div>
+        <div style={{fontSize:36,fontWeight:800}}>{fmt(liveBalance)} ₪</div>
+        <div style={{display:"flex",gap:7,marginTop:10,flexWrap:"wrap"}}>
+          <Chip label="בסיס"          val={fmt(baseBalance.amount)+" ₪"} />
+          <Chip label="הכנסות חודש"   val={"+"+fmt(curTotals.income)+" ₪"} pos />
+          <Chip label="קיזוז עיגול"   val={"−"+fmt(curTotals.totalRounding)+" ₪"} neg />
+          <Chip label="נשלח לאברכים"  val={"−"+fmt(curTotals.sent)+" ₪"} neg />
+        </div>
+        <div style={{marginTop:8,fontSize:12,opacity:.7}}>
+          בסיס נכון לתאריך: {baseBalance.date}
+          <button style={{background:"none",border:"none",color:"rgba(255,255,255,.7)",cursor:"pointer",fontSize:12,marginRight:10,textDecoration:"underline"}}
+            onClick={()=>{setTempBase(baseBalance.amount);setEditBase(true);}}>✏️ עדכן בסיס</button>
+        </div>
+      </div>
+
+      {editBase && (
+        <div style={card}>
+          <div style={{fontWeight:700,fontSize:14,marginBottom:8}}>עדכון יתרת בסיס</div>
+          <div style={{display:"flex",gap:8}}>
+            <input style={{...inp,flex:1}} type="number" value={tempBase} onChange={e=>setTempBase(e.target.value)} autoFocus/>
+            <button style={greenBtn} onClick={()=>{setBaseBalance({amount:Number(tempBase)||0,date:new Date().toLocaleDateString("he-IL")});setEditBase(false);}}>שמור</button>
+            <button style={grayBtn}  onClick={()=>setEditBase(false)}>ביטול</button>
+          </div>
+        </div>
+      )}
+
+      {/* DONORS */}
+      <datalist id="donor-names-list">
+        {allDonorNames.map((n,i)=><option key={i} value={n}/>)}
+      </datalist>
+      <div style={card}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+          <span style={{fontWeight:700,fontSize:14}}>💝 תורמים — {mkMonthLabel(selYear,selMonth)}</span>
+          <button style={addBtn} onClick={()=>setShowDonor(true)}>+ הוסף</button>
+        </div>
+        {donors.length===0
+          ? <div style={empty}>לחץ ״+ הוסף״ להוסיף תורם</div>
+          : <table style={tbl}>
+              <thead><tr><th style={th}>שם</th><th style={th}>סכום (₪)</th><th style={th}></th></tr></thead>
+              <tbody>
+                {donors.map((d,i)=>(
+                  <tr key={i} style={{borderBottom:"1px solid #f1f5f9"}}>
+                    <td style={td}><input style={iinp} list="donor-names-list" value={d.name} onChange={e=>setMonthField(selKey,"donors",donors.map((x,j)=>j===i?{...x,name:e.target.value}:x))}/></td>
+                    <td style={td}><input style={{...iinp,textAlign:"left"}} type="number" value={d.amount} onChange={e=>setMonthField(selKey,"donors",donors.map((x,j)=>j===i?{...x,amount:e.target.value}:x))}/></td>
+                    <td style={td}><button style={delBtn} onClick={()=>setMonthField(selKey,"donors",donors.filter((_,j)=>j!==i))}>✕</button></td>
+                  </tr>
+                ))}
+                <tr style={{background:"#f0f9ff"}}><td style={{...td,fontWeight:700}}>סה״כ</td><td style={{...td,fontWeight:700}}>{fmt(curTotals.donors)} ₪</td><td></td></tr>
+              </tbody>
+            </table>
+        }
+      </div>
+
+      {/* INCOME */}
+      <div style={card}>
+        <div style={{fontWeight:700,fontSize:14,marginBottom:10}}>📥 הכנסות נוספות (מתווספות לקופה)</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <IField label="🏛️ הכנסת דתות (₪)" value={getMD(selKey,"datot")}  onChange={v=>setMonthField(selKey,"datot",Number(v)||0)} />
+          <IField label="📚 קרן התורה (₪)"   value={getMD(selKey,"keren")}  onChange={v=>setMonthField(selKey,"keren",Number(v)||0)} />
+        </div>
+      </div>
+
+      {/* SENT */}
+      <div style={card}>
+        <div style={{fontWeight:700,fontSize:14,marginBottom:10}}>📤 נשלח לאברכים (מתקזז מהקופה)</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+          <IField label="👨‍🎓 מספר × 2,000" value={getMD(selKey,"sent2000")}  onChange={v=>setMonthField(selKey,"sent2000",Number(v)||0)} />
+          <IField label="👨‍🎓 מספר × 1,000" value={getMD(selKey,"sent1000")}  onChange={v=>setMonthField(selKey,"sent1000",Number(v)||0)} />
+          <IField label="📚 מספר × 1,000"      value={getMD(selKey,"sentKeren")} onChange={v=>setMonthField(selKey,"sentKeren",Number(v)||0)} />
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginTop:8}}>
+          <CBox label="שולם ×2000" val={fmt(getMD(selKey,"sent2000")*2000)+" ₪"} />
+          <CBox label="שולם ×1000" val={fmt(getMD(selKey,"sent1000")*1000)+" ₪"} />
+          <CBox label="שולם קרן"   val={fmt(getMD(selKey,"sentKeren")*1000)+" ₪"} />
+        </div>
+      </div>
+
+      {/* MINI SUMMARY */}
+      <div style={{...card,background:"#f0fdf4",border:"1.5px solid #22c55e"}}>
+        <div style={{fontWeight:700,fontSize:14,marginBottom:8}}>📊 סיכום {mkMonthLabel(selYear,selMonth)}</div>
+        <MR l="סה״כ הכנסות"        v={curTotals.income} />
+        <MR l="קיזוז עיגול"         v={-curTotals.totalRounding} neg />
+        <MR l="נשלח לאברכים"       v={-curTotals.sent} neg />
+        <div style={divider}/>
+        <MR l="נטו חודש זה" v={curTotals.net} bold color={curTotals.net>=0?"#16a34a":"#dc2626"} />
+      </div>
+
+      {showDonor && (
+        <Modal title="הוספת תורם" onClose={()=>setShowDonor(false)}>
+          <FG label="שם התורם"><input style={inp} list="donor-names-list" value={newDonor.name} onChange={e=>setNewDonor(p=>({...p,name:e.target.value}))} placeholder="שם..."/></FG>
+          <FG label="סכום (₪)"><input style={inp} type="number" value={newDonor.amount} onChange={e=>setNewDonor(p=>({...p,amount:e.target.value}))} placeholder="0"/></FG>
+          <button style={primaryBtn} onClick={()=>{
+            if(!newDonor.name||!newDonor.amount) return;
+            setMonthField(selKey,"donors",[...donors,{name:newDonor.name,amount:Number(newDonor.amount)}]);
+            setNewDonor({name:"",amount:""});
+            setShowDonor(false);
+          }}>הוסף</button>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ── AVRECHIM TAB ─────────────────────────────────────────────
+function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, getAV, setAvMonthField, calcAvrechMonth, totalOwed }){
+  const [editId,setEditId]=useState(null);
+  const [showAdd,setShowAdd]=useState(false);
+  const [newAv,setNewAv]=useState({name:"",track:"1000",maxStipend:1600,incomeGroup:"datot"});
+  const updAv=(id,k,v)=>setAvrechim(p=>p.map(a=>a.id===id?{...a,[k]:v}:a));
+  const avNames = avrechim.map(a=>a.name).filter(Boolean);
+
+  return (
+    <div style={col}>
+      <div style={{background:"linear-gradient(135deg,#3b0764,#7c3aed)",borderRadius:12,padding:"14px 16px",color:"#fff",boxShadow:"0 2px 8px rgba(0,0,0,0.15)"}}>
+        <div style={{fontSize:13,opacity:.8}}>סה״כ חוב לאברכים החודש</div>
+        <div style={{fontSize:34,fontWeight:800}}>{fmt(totalOwed)} ₪</div>
+        <div style={{fontSize:11,opacity:.7,marginTop:3}}>כולל פערים מחודש קודם</div>
+      </div>
+
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div style={{fontWeight:700,fontSize:14,color:"#475569"}}>רשימת אברכים</div>
+        <button style={addBtn} onClick={()=>setShowAdd(true)}>+ הוסף אברך</button>
+      </div>
+
+      <datalist id="avrech-names-list">
+        {avNames.map((n,i)=><option key={i} value={n}/>)}
+      </datalist>
+
+      {avrechim.filter(a=>a.active).map(av=>{
+        const c=calcAvrechMonth(av,selKey,prevKey);
+        const isEdit=editId===av.id;
+        const maxS=Number(av.maxStipend||1600);
+        return (
+          <div key={av.id} style={{...card,borderRight:`4px solid ${trackColor[av.track]}`}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
+                {isEdit
+                  ? <input style={iinp} list="avrech-names-list" value={av.name} onChange={e=>updAv(av.id,"name",e.target.value)}/>
+                  : <span style={{fontWeight:700,fontSize:15}}>{av.name}</span>}
+                <span style={{fontSize:11,color:"#fff",borderRadius:20,padding:"2px 8px",fontWeight:600,background:trackColor[av.track]||"#64748b"}}>{trackLabel[av.track]}</span>
+                <span style={{fontSize:11,color:"#fff",borderRadius:20,padding:"2px 8px",fontWeight:600,background:groupColor[c.incomeGroup]||"#64748b"}}>{groupLabel[c.incomeGroup]||"—"}</span>
+                <span style={{fontSize:11,color:"#94a3b8"}}>מקס׳ {fmt(maxS)} ₪</span>
+              </div>
+              <div style={{display:"flex",gap:5}}>
+                <button style={smallBtn} onClick={()=>setEditId(isEdit?null:av.id)}>{isEdit?"✓":"✏️"}</button>
+                <button style={{...smallBtn,background:"#fee2e2",color:"#dc2626"}} onClick={()=>updAv(av.id,"active",false)}>✕</button>
+              </div>
+            </div>
+
+            {isEdit && (
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginTop:8}}>
+                <FG label="מסלול">
+                  <select style={inp} value={av.track} onChange={e=>updAv(av.id,"track",e.target.value)}>
+                    <option value="2000">2,000 ₪</option>
+                    <option value="1000">1,000 ₪</option>
+                  </select>
+                </FG>
+                <FG label="קבוצת הכנסה">
+                  <select style={inp} value={av.incomeGroup||(av.track==="keren"?"keren":"datot")} onChange={e=>updAv(av.id,"incomeGroup",e.target.value)}>
+                    <option value="datot">זכאי דתות</option>
+                    <option value="keren">מושהה קרן</option>
+                  </select>
+                </FG>
+                <FG label="מלגה מקסימום (₪)">
+                  <input style={inp} type="number" value={maxS} onChange={e=>updAv(av.id,"maxStipend",e.target.value)}/>
+                </FG>
+              </div>
+            )}
+
+            {/* שדות חודשיים */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:5,marginTop:10}}>
+              <AvF label="💰 מגיע לו" val={getAV(selKey,av.id,"monthlyStipend")} onChange={v=>setAvMonthField(selKey,av.id,"monthlyStipend",v)} placeholder={`עד ${fmt(maxS)}`} hi />
+              <AvF label="🎓 בחינות"  val={getAV(selKey,av.id,"exams")}           onChange={v=>setAvMonthField(selKey,av.id,"exams",v)} />
+            </div>
+
+            {/* הכנסה + עיגול — תיבה משולבת */}
+            <div style={{background:c.incomeGroup==="datot"?"#fffbeb":"#f0fdf4",borderRadius:8,padding:"8px 10px",marginTop:6,fontSize:12}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:6}}>
+                {/* שורת הכנסה */}
+                <span style={{color:groupColor[c.incomeGroup]||"#64748b",fontWeight:700}}>
+                  {c.incomeGroup==="datot"
+                    ? `🏛️ דתות: ${fmt(c.datot)} ₪ (${fmt(c.totalDatot)} ÷ ${c.datotCount})`
+                    : `📚 קרן: ${fmt(c.keren)} ₪ (${fmt(c.totalKeren)} ÷ ${c.kerenCount})`}
+                </span>
+                <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                  {(c.datotRaw!==""||c.kerenRaw!=="")
+                    ? <span style={{color:"#dc2626",fontSize:10}}>⚠️ עקיפה</span>
+                    : <span style={{color:"#94a3b8",fontSize:10}}>אוטו׳</span>}
+                  <button style={{...smallBtn,fontSize:10,padding:"2px 6px"}}
+                    onClick={()=>{setAvMonthField(selKey,av.id,"datot","");setAvMonthField(selKey,av.id,"keren","");}}>↺ אפס</button>
+                  <button style={{...smallBtn,fontSize:10,padding:"2px 6px",background:"#fef3c7"}}
+                    onClick={()=>{
+                      if(c.incomeGroup==="datot") setAvMonthField(selKey,av.id,"datot",c.autoDatot);
+                      else setAvMonthField(selKey,av.id,"keren",c.autoKeren);
+                    }}>✏️ עקוף</button>
+                </div>
+              </div>
+
+              {/* שדה עקיפה ידנית */}
+              {(c.datotRaw!==""||c.kerenRaw!=="") && (
+                <div style={{marginTop:6}}>
+                  {c.incomeGroup==="datot"
+                    ? <AvF label="🏛️ דתות ידני (₪)" val={getAV(selKey,av.id,"datot")} onChange={v=>setAvMonthField(selKey,av.id,"datot",v)} />
+                    : <AvF label="📚 קרן ידני (₪)"   val={getAV(selKey,av.id,"keren")} onChange={v=>setAvMonthField(selKey,av.id,"keren",v)} />}
+                </div>
+              )}
+
+              {/* עיגול סריקוב */}
+              <div style={{marginTop:6,paddingTop:6,borderTop:"1px solid rgba(0,0,0,0.06)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{color:"#1d4ed8",fontWeight:600}}>⚖️ עיגול סריקוב מהקופה:</span>
+                <span style={{color:"#1e293b",fontWeight:700,fontSize:13}}>
+                  {c.incomeGroup==="datot"
+                    ? `${fmt(c.trackNum)} − ${fmt(c.datot)} = `
+                    : `${fmt(c.trackNum)} − ${fmt(c.keren)} = `}
+                  <span style={{color:"#2563eb",fontSize:14}}>{fmt(c.rounding)} ₪</span>
+                </span>
+              </div>
+            </div>
+
+            {/* נוסחת בנק — מוצגת רק כשיש ערך */}
+            {c.monthly>0 && (
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-around",background:"#f8fafc",borderRadius:8,padding:"8px 4px",marginTop:8,gap:4,flexWrap:"wrap"}}>
+                <CI l="מגיע לו"  v={c.monthly} />
+                <span style={{color:"#94a3b8"}}>−</span>
+                <CI l="עיגול"    v={c.rounding} />
+                {c.exams>0&&<><span style={{color:"#94a3b8"}}>+</span><CI l="בחינות" v={c.exams}/></>}
+                {c.prevBankGap!==0&&<><span style={{color:"#94a3b8"}}>{c.prevBankGap>0?"+":"−"}</span><CI l="פער קודם" v={Math.abs(c.prevBankGap)}/></>}
+                <span style={{color:"#94a3b8"}}>=</span>
+                <CI l="🏦 לבנק" v={c.effectiveBank} bold color={c.effectiveBank>=0?"#16a34a":"#dc2626"} />
+              </div>
+            )}
+
+            {/* הכנסתי בפועל + פער — תמיד מוצג */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:8}}>
+              <div style={{display:"flex",flexDirection:"column",gap:3}}>
+                <label style={{fontSize:10,color:"#059669",fontWeight:700}}>🏦 הכנסתי לבנק (₪)</label>
+                <input
+                  style={{border:"2px solid #34d399",borderRadius:6,padding:"5px 6px",fontSize:12,width:"100%",boxSizing:"border-box"}}
+                  type="number" value={getAV(selKey,av.id,"actualBank")} placeholder="0"
+                  onChange={e=>{
+                    const v=e.target.value;
+                    setAvMonthField(selKey,av.id,"actualBank",v);
+                    const actual=v!==""?Number(v):null;
+                    if(actual!==null){
+                      setAvMonthField(selKey,av.id,"bankGap",c.effectiveBank-actual);
+                    }
+                  }}
+                />
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:3}}>
+                <label style={{fontSize:10,color:c.bankGap>0?"#dc2626":c.bankGap<0?"#2563eb":"#64748b",fontWeight:700}}>
+                  {c.bankGap>0?"⬆️ חייב לו (לחודש הבא)":c.bankGap<0?"⬇️ שילמתי יותר (לנכות)":"↔️ פער לחודש הבא"}
+                </label>
+                <input
+                  style={{border:`2px solid ${c.bankGap>0?"#fca5a5":c.bankGap<0?"#93c5fd":"#e2e8f0"}`,borderRadius:6,padding:"5px 6px",fontSize:12,width:"100%",boxSizing:"border-box"}}
+                  type="number" value={getAV(selKey,av.id,"bankGap")} placeholder="0"
+                  onChange={e=>setAvMonthField(selKey,av.id,"bankGap",e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* הודעת פער */}
+            {getAV(selKey,av.id,"actualBank")!==""&&c.bankGap!==0&&(
+              <div style={{background:c.bankGap>0?"#fef2f2":"#eff6ff",borderRadius:8,padding:"5px 10px",marginTop:4,fontSize:12}}>
+                <span style={{color:c.bankGap>0?"#dc2626":"#2563eb",fontWeight:600}}>
+                  {c.bankGap>0
+                    ? `⬆️ חסר ${fmt(c.bankGap)} ₪ — יתווסף לחישוב בנק חודש הבא`
+                    : `⬇️ שולם ${fmt(Math.abs(c.bankGap))} ₪ יותר — יקוזז מבנק חודש הבא`}
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {avrechim.some(a=>!a.active)&&(
+        <div style={card}>
+          <div style={{fontWeight:700,color:"#94a3b8",marginBottom:6}}>לא פעילים</div>
+          {avrechim.filter(a=>!a.active).map(av=>(
+            <div key={av.id} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",color:"#94a3b8"}}>
+              <span>{av.name}</span>
+              <button style={smallBtn} onClick={()=>updAv(av.id,"active",true)}>שחזר</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showAdd&&(
+        <Modal title="הוספת אברך חדש" onClose={()=>setShowAdd(false)}>
+          <FG label="שם"><input style={inp} list="avrech-names-list" value={newAv.name} onChange={e=>setNewAv(p=>({...p,name:e.target.value}))} placeholder="שם האברך"/></FG>
+          <FG label="מסלול">
+            <select style={inp} value={newAv.track} onChange={e=>setNewAv(p=>({...p,track:e.target.value}))}>
+              <option value="2000">2,000 ₪</option>
+              <option value="1000">1,000 ₪</option>
+            </select>
+          </FG>
+          <FG label="קבוצת הכנסה">
+            <select style={inp} value={newAv.incomeGroup||"datot"} onChange={e=>setNewAv(p=>({...p,incomeGroup:e.target.value}))}>
+              <option value="datot">זכאי דתות</option>
+              <option value="keren">מושהה קרן</option>
+            </select>
+          </FG>
+          <FG label="מלגה מקסימום (₪)">
+            <input style={inp} type="number" value={newAv.maxStipend} onChange={e=>setNewAv(p=>({...p,maxStipend:e.target.value}))} placeholder="1600"/>
+          </FG>
+          <button style={primaryBtn} onClick={()=>{
+            if(!newAv.name) return;
+            setAvrechim(p=>[...p,{...newAv,id:Date.now(),active:true,incomeGroup:newAv.incomeGroup||"datot"}]);
+            setNewAv({name:"",track:"1000",maxStipend:1600,incomeGroup:"datot"});
+            setShowAdd(false);
+          }}>הוסף אברך</button>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ── SUMMARY TAB ──────────────────────────────────────────────
+function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, getPrevMonthKey, baseBalance, liveBalance, selKey }){
+  const [openMonth,setOpenMonth]=useState(selKey);
+
+  return (
+    <div style={col}>
+      <div style={{background:"linear-gradient(135deg,#0f2044,#1d4ed8)",borderRadius:12,padding:"14px 16px",color:"#fff"}}>
+        <div style={{fontSize:13,opacity:.75}}>יתרה חיה מצטברת</div>
+        <div style={{fontSize:32,fontWeight:800}}>{fmt(liveBalance)} ₪</div>
+        <div style={{fontSize:12,opacity:.7,marginTop:4}}>בסיס {fmt(baseBalance.amount)} ₪ (נכון ל-{baseBalance.date}) + סיכום כל החודשים</div>
+      </div>
+
+      {allMonthKeys.length===0 && <div style={{...card,...{color:"#94a3b8",textAlign:"center"}}}>אין נתונים עדיין</div>}
+
+      {[...allMonthKeys].reverse().map(key=>{
+        const t=calcMonthTotals(key);
+        const prevK=getPrevMonthKey(key);
+        const isOpen=openMonth===key;
+        const [y,m]=key.split("-");
+        const label=mkMonthLabel(Number(y),Number(m)-1);
+        return (
+          <div key={key} style={card}>
+            <button onClick={()=>setOpenMonth(isOpen?null:key)} style={{background:"none",border:"none",cursor:"pointer",width:"100%",textAlign:"right",display:"flex",justifyContent:"space-between",alignItems:"center",padding:0}}>
+              <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                <span style={{fontWeight:700,fontSize:14}}>{label}</span>
+                <span style={{fontSize:12,color:t.net>=0?"#16a34a":"#dc2626",fontWeight:600}}>{fmtSigned(t.net)} ₪ נטו</span>
+              </div>
+              <span style={{color:"#94a3b8"}}>{isOpen?"▲":"▼"}</span>
+            </button>
+
+            {isOpen && (
+              <div style={{marginTop:12}}>
+                <MR l="תורמים"       v={t.donors} />
+                <MR l="דתות"         v={t.datot} />
+                <MR l="קרן התורה"    v={t.keren} />
+                <MR l="סה״כ הכנסות" v={t.income} bold />
+                <div style={divider}/>
+                <MR l="קיזוז עיגול"  v={-t.totalRounding} neg />
+                <MR l="נשלח"         v={-t.sent} neg />
+                <div style={divider}/>
+                <MR l="נטו חודש" v={t.net} bold color={t.net>=0?"#16a34a":"#dc2626"} />
+
+                {/* Per-avrech table */}
+                <div style={{marginTop:12,fontSize:13,fontWeight:700,color:"#475569",marginBottom:6}}>פירוט אברכים:</div>
+                <table style={tbl}>
+                  <thead>
+                    <tr>
+                      <th style={th}>שם</th>
+                      <th style={th}>מגיע</th>
+                      <th style={th}>עיגול</th>
+                      <th style={th}>בחינות</th>
+                      <th style={th}>פער קודם</th>
+                      <th style={th}>🏦 לבנק</th>
+                      <th style={th}>הוכנס</th>
+                      <th style={th}>פער</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {avrechim.filter(a=>a.active).map(av=>{
+                      const c=calcAvrechMonth(av,key,prevK);
+                      if(c.monthly===0) return null;
+                      return (
+                        <tr key={av.id} style={{borderBottom:"1px solid #f1f5f9",borderRight:`3px solid ${trackColor[av.track]}`}}>
+                          <td style={td}>{av.name}</td>
+                          <td style={td}>{fmt(c.monthly)}</td>
+                          <td style={td}>{c.rounding>0?fmt(c.rounding):"—"}</td>
+                          <td style={td}>{c.exams>0?fmt(c.exams):"—"}</td>
+                          <td style={{...td,color:c.prevBankGap>0?"#dc2626":c.prevBankGap<0?"#2563eb":"#94a3b8"}}>{c.prevBankGap!==0?fmtSigned(c.prevBankGap):"—"}</td>
+                          <td style={{...td,fontWeight:700,color:c.effectiveBank>=0?"#16a34a":"#dc2626"}}>{fmt(c.effectiveBank)}</td>
+                          <td style={td}>{c.actualBank!==null?fmt(c.actualBank):"—"}</td>
+                          <td style={{...td,color:c.bankGap>0?"#dc2626":c.bankGap<0?"#2563eb":"#94a3b8"}}>{c.actualBank!==null?(c.bankGap!==0?fmtSigned(c.bankGap):"✓"):"—"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── SMALL COMPONENTS ─────────────────────────────────────────
+function Chip({label,val,pos,neg}){
+  const bg=pos?"rgba(34,197,94,0.22)":neg?"rgba(239,68,68,0.22)":"rgba(255,255,255,0.14)";
+  return <div style={{background:bg,borderRadius:8,padding:"4px 10px",fontSize:12,display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
+    <span style={{opacity:.7,fontSize:10}}>{label}</span><span style={{fontWeight:700}}>{val}</span>
+  </div>;
+}
+function IField({label,value,onChange}){
+  return <div style={{display:"flex",flexDirection:"column",gap:4}}>
+    <label style={{fontSize:12,color:"#64748b",fontWeight:600}}>{label}</label>
+    <input style={inp} type="number" value={value||""} onChange={e=>onChange(e.target.value)} placeholder="0"/>
+  </div>;
+}
+function AvF({label,val,onChange,placeholder,hi}){
+  return <div style={{display:"flex",flexDirection:"column",gap:3}}>
+    <label style={{fontSize:10,color:hi?"#4f46e5":"#64748b",fontWeight:hi?700:400}}>{label}</label>
+    <input style={{border:hi?"2px solid #6366f1":"1px solid #e2e8f0",borderRadius:6,padding:"5px 6px",fontSize:12,width:"100%",boxSizing:"border-box"}}
+      type="number" value={val} onChange={e=>onChange(e.target.value)} placeholder={placeholder||"0"}/>
+  </div>;
+}
+function CI({l,v,bold,color}){
+  return <div style={{textAlign:"center"}}>
+    <div style={{fontSize:10,color:"#94a3b8"}}>{l}</div>
+    <div style={{fontWeight:bold?700:600,color:color||"#1e293b",fontSize:bold?15:13}}>{fmt(v)} ₪</div>
+  </div>;
+}
+function CBox({label,val}){
+  return <div style={{background:"#f0f9ff",borderRadius:8,padding:"7px 8px",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+    <span style={{fontSize:11,color:"#64748b"}}>{label}</span>
+    <span style={{fontWeight:700,color:"#0369a1"}}>{val}</span>
+  </div>;
+}
+function MR({l,v,bold,neg,color}){
+  return <div style={{display:"flex",justifyContent:"space-between",padding:"3px 0",fontWeight:bold?700:400}}>
+    <span style={{color:"#475569"}}>{l}</span>
+    <span style={{color:color||(neg?"#dc2626":"#1e293b")}}>{fmt(v)} ₪</span>
+  </div>;
+}
+function FG({label,children}){
+  return <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:10}}>
+    <label style={{fontSize:13,color:"#475569",fontWeight:600}}>{label}</label>{children}
+  </div>;
+}
+function Modal({title,onClose,children}){
+  return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:16}} onClick={onClose}>
+    <div style={{background:"#fff",borderRadius:14,padding:18,width:"100%",maxWidth:360,maxHeight:"85vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+        <span style={{fontWeight:700,fontSize:16}}>{title}</span>
+        <button style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:"#64748b"}} onClick={onClose}>✕</button>
+      </div>
+      {children}
+    </div>
+  </div>;
+}
+
+// ── STYLES ───────────────────────────────────────────────────
+const col       = {display:"flex",flexDirection:"column",gap:12};
+const card      = {background:"#fff",borderRadius:12,padding:"13px 15px",boxShadow:"0 1px 4px rgba(0,0,0,0.07)"};
+const inp       = {border:"1px solid #e2e8f0",borderRadius:8,padding:"8px 10px",fontSize:13,width:"100%",boxSizing:"border-box"};
+const iinp      = {border:"1px solid #e2e8f0",borderRadius:6,padding:"4px 7px",width:"100%",fontSize:13};
+const tbl       = {width:"100%",borderCollapse:"collapse"};
+const th        = {padding:"5px 6px",background:"#f8fafc",textAlign:"right",fontSize:11,color:"#64748b",borderBottom:"1px solid #e2e8f0"};
+const td        = {padding:"5px 6px",fontSize:12};
+const empty     = {color:"#94a3b8",textAlign:"center",padding:10,fontSize:13};
+const divider   = {height:1,background:"#e2e8f0",margin:"5px 0"};
+const addBtn    = {padding:"5px 11px",borderRadius:8,background:"#eff6ff",color:"#2563eb",border:"1px solid #bfdbfe",cursor:"pointer",fontWeight:600,fontSize:12};
+const primaryBtn= {width:"100%",padding:"11px",background:"#2563eb",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:700,cursor:"pointer"};
+const greenBtn  = {padding:"8px 14px",background:"#22c55e",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontWeight:600};
+const grayBtn   = {padding:"8px 12px",background:"#f1f5f9",color:"#475569",border:"1px solid #e2e8f0",borderRadius:8,cursor:"pointer"};
+const smallBtn  = {padding:"4px 9px",borderRadius:6,background:"#f1f5f9",border:"1px solid #e2e8f0",cursor:"pointer",fontSize:12};
+const delBtn    = {background:"#fee2e2",color:"#dc2626",border:"none",borderRadius:6,padding:"3px 8px",cursor:"pointer"};
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
