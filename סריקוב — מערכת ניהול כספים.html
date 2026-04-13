@@ -390,8 +390,10 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, getAV, setAvMonth
   const [editId,setEditId]=useState(null);
   const [showAdd,setShowAdd]=useState(false);
   const [newAv,setNewAv]=useState({name:"",track:"1000",maxStipend:1600,incomeGroup:"datot"});
+  const [search,setSearch]=useState("");
   const updAv=(id,k,v)=>setAvrechim(p=>p.map(a=>a.id===id?{...a,[k]:v}:a));
   const avNames = avrechim.map(a=>a.name).filter(Boolean);
+  const filteredAvrechim = avrechim.filter(a=>a.active && a.name.includes(search));
 
   return (
     <div style={col}>
@@ -406,11 +408,21 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, getAV, setAvMonth
         <button style={addBtn} onClick={()=>setShowAdd(true)}>+ הוסף אברך</button>
       </div>
 
+      <div style={{position:"relative"}}>
+        <input
+          style={{...inp,paddingRight:34,width:"100%"}}
+          placeholder="🔍 חיפוש אברך..."
+          value={search}
+          onChange={e=>setSearch(e.target.value)}
+        />
+        {search && <button onClick={()=>setSearch("")} style={{position:"absolute",left:8,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"#94a3b8",fontSize:16}}>✕</button>}
+      </div>
+
       <datalist id="avrech-names-list">
         {avNames.map((n,i)=><option key={i} value={n}/>)}
       </datalist>
 
-      {avrechim.filter(a=>a.active).map(av=>{
+      {filteredAvrechim.map(av=>{
         const c=calcAvrechMonth(av,selKey,prevKey);
         const isEdit=editId===av.id;
         const maxS=Number(av.maxStipend||1600);
