@@ -199,17 +199,7 @@ function App(){
     return { donors, datot, keren, income, totalRounding, sent, adjustment, net };
   };
 
-  // Parse base balance date "D.M.YY" → "YYYY-MM"
-  const parseBaseMonthKey = (dateStr) => {
-    try {
-      const parts = (dateStr||"").split(".");
-      if(parts.length < 2) return "0000-00";
-      const m = parts[1].padStart(2,"0");
-      const y = parts[2] ? (parts[2].length===2 ? "20"+parts[2] : parts[2]) : String(now.getFullYear());
-      return `${y}-${m}`;
-    } catch(e){ return "0000-00"; }
-  };
-  const baseMonthKey = parseBaseMonthKey(baseBalance.date);
+  const baseMonthKey = baseBalance.monthKey || "0000-00";
 
   // Cumulative live balance = base + sum of months >= base month with activity
   const monthHasActivity = k => {
@@ -328,7 +318,7 @@ function MainTab({ selKey, selYear, selMonth, baseBalance, setBaseBalance, liveB
           <div style={{fontWeight:700,fontSize:14,marginBottom:8}}>עדכון יתרת בסיס</div>
           <div style={{display:"flex",gap:8}}>
             <input style={{...inp,flex:1}} type="number" value={tempBase} onChange={e=>setTempBase(e.target.value)} autoFocus/>
-            <button style={greenBtn} onClick={()=>{setBaseBalance({amount:Number(tempBase)||0,date:new Date().toLocaleDateString("he-IL")});setEditBase(false);}}>שמור</button>
+            <button style={greenBtn} onClick={()=>{setBaseBalance({amount:Number(tempBase)||0,date:new Date().toLocaleDateString("he-IL"),monthKey:mkMonthKey(now.getFullYear(),now.getMonth())});setEditBase(false);}}>שמור</button>
             <button style={grayBtn}  onClick={()=>setEditBase(false)}>ביטול</button>
           </div>
         </div>
