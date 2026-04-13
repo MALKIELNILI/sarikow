@@ -195,7 +195,7 @@ function App(){
     },0);
     const sent = Number(getMD(monthKey,"sent2000"))*2000+Number(getMD(monthKey,"sent1000"))*1000+Number(getMD(monthKey,"sentKeren"))*1000;
     const adjustment = Number(getMD(monthKey,"adjustment"))||0;
-    const net = income - sent + adjustment;
+    const net = donors - totalRounding + adjustment;
     return { donors, datot, keren, income, totalRounding, sent, adjustment, net };
   };
 
