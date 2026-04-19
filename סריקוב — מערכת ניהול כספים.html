@@ -170,12 +170,24 @@ function App(){
     // מה הוכנס בפועל לבנק
     const actualBankRaw = getAV(monthKey,av.id,"actualBank");
     const actualBank = actualBankRaw!==""?Number(actualBankRaw):null;
-    // פער לחודש הבא
+    // בונוסים שאינם מצטברים לחודש הבא
+    const holiday = Number(getAV(monthKey,av.id,"holiday"))||0;
+    const depositRounding = Number(getAV(monthKey,av.id,"depositRounding"))||0;
+    const totalToBank = effectiveBank + holiday + depositRounding;
+    // פיצול בנק/מזומן — ברירת מחדל: כל הסכום לבנק
+    const bankDepositRaw = getAV(monthKey,av.id,"bankDeposit");
+    const bankDeposit = bankDepositRaw!==""?Number(bankDepositRaw):totalToBank;
+    const cashAmount = Math.max(0, totalToBank - bankDeposit);
+    // פער לחודש הבא — ברירת מחדל: מניחים שהופקד bankDeposit + מזומן = totalToBank
+    const actualBankForGap = actualBank!==null ? actualBank : (totalToBank>0 ? bankDeposit : null);
     const bankGapRaw = getAV(monthKey,av.id,"bankGap");
-    const bankGapAuto = actualBank!==null ? effectiveBank - actualBank : 0;
+    const bankGapAuto = actualBankForGap!==null ? effectiveBank - (actualBankForGap + cashAmount - holiday - depositRounding) : 0;
     const bankGap = bankGapRaw!==""?Number(bankGapRaw):bankGapAuto;
+    // תענית דיבור — מזומן נפרד, 15 ₪ ליום
+    const taanitDays   = Number(getAV(monthKey,av.id,"taanitDays"))||0;
+    const taanitAmount = taanitDays * 15;
 
-    return { monthly, datot, keren, autoDatot, autoKeren, datotRaw, kerenRaw, rounding, exams, bank, prevBankGap, effectiveBank, actualBank, bankGapAuto, bankGap, trackNum, datotCount, kerenCount, incomeGroup, totalDatot, totalKeren };
+    return { monthly, datot, keren, autoDatot, autoKeren, datotRaw, kerenRaw, rounding, exams, bank, prevBankGap, effectiveBank, actualBank, holiday, depositRounding, totalToBank, bankDeposit, cashAmount, bankGapAuto, bankGap, trackNum, datotCount, kerenCount, incomeGroup, totalDatot, totalKeren, taanitDays, taanitAmount };
   };
 
   // Get sorted month keys
@@ -256,18 +268,22 @@ function App(){
     <div style={{minHeight:"100vh",background:"#f1f5f9"}}>
       <header style={{background:"#fff",boxShadow:"0 2px 8px rgba(0,0,0,0.08)",position:"sticky",top:0,zIndex:100}}>
         <div style={{maxWidth:720,margin:"0 auto",padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
-          <div>
-            <div style={{fontSize:20,fontWeight:800,color:"#1e3a5f"}}>סריקוב</div>
-            <div style={{fontSize:10,color:"#94a3b8",display:"flex",alignItems:"center",gap:4}}>
-              מערכת ניהול כספים
-              <span style={{width:6,height:6,borderRadius:"50%",background:syncing?"#f59e0b":"#22c55e",display:"inline-block"}}/>
-              <span>{syncing?"שומר...":"מסונכרן ☁️"}</span>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <img src="./logo.jpg" alt="לוגו" style={{height:52,width:"auto",objectFit:"contain"}}/>
+            <div>
+              <div style={{fontSize:20,fontWeight:800,color:"#1e3a5f"}}>סריקוב</div>
+              <div style={{fontSize:10,color:"#94a3b8",display:"flex",alignItems:"center",gap:4}}>
+                מערכת ניהול כספים
+                <span style={{width:6,height:6,borderRadius:"50%",background:syncing?"#f59e0b":"#22c55e",display:"inline-block"}}/>
+                <span>{syncing?"שומר...":"מסונכרן ☁️"}</span>
+              </div>
             </div>
           </div>
           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
             <button onClick={()=>setTab("main")}     style={tabS("main")}>🏠 ראשי</button>
             <button onClick={()=>setTab("avrechim")} style={tabS("avrechim")}>👨‍🎓 אברכים</button>
             <button onClick={()=>setTab("summary")}  style={tabS("summary")}>📂 סיכומים</button>
+            <button onClick={()=>setTab("bank")}     style={tabS("bank")}>🏦 בנק</button>
           </div>
         </div>
       </header>
@@ -292,6 +308,7 @@ function App(){
         {tab==="main"     && <MainTab selKey={selKey} selYear={selYear} selMonth={selMonth} baseBalance={baseBalance} setBaseBalance={setBaseBalance} liveBalance={liveBalance} curTotals={curTotals} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} syncing={syncing} allDonorNames={allDonorNames} />}
         {tab==="avrechim" && <AvrechimTab avrechim={avrechim} setAvrechim={setAvrechim} selKey={selKey} prevKey={prevKey} getAV={getAV} setAvMonthField={setAvMonthField} calcAvrechMonth={calcAvrechMonth} totalOwed={totalOwed} />}
         {tab==="summary"  && <SummaryTab avrechim={avrechim} allMonthKeys={allMonthKeys()} calcMonthTotals={calcMonthTotals} calcAvrechMonth={calcAvrechMonth} getPrevMonthKey={getPrevMonthKey} baseBalance={baseBalance} liveBalance={liveBalance} selKey={selKey} />}
+        {tab==="bank"     && <BankTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} />}
       </main>
     </div>
   );
@@ -453,10 +470,175 @@ function MainTab({ selKey, selYear, selMonth, baseBalance, setBaseBalance, liveB
   );
 }
 
+// ── IMPORT MODAL (JB) ────────────────────────────────────────
+function ImportModal({ avrechim, selKey, setAvMonthField, onClose }){
+  const [jbData,setJbData]=useState(null);
+  const [rows,setRows]=useState([]);
+  const [importing,setImporting]=useState(false);
+
+  const loadFile = e => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try{
+        const data = JSON.parse(ev.target.result);
+        if(!data.workers) throw new Error('Invalid');
+        // Auto-match by name
+        const matched = data.workers.map(w=>{
+          let av = avrechim.find(a=>a.active && a.name===w.name);
+          if(!av){
+            const parts = w.name.trim().split(/\s+/);
+            // Try matching last name (first word in Hebrew is first name, last word is last name)
+            av = avrechim.find(a=>a.active && parts.some(p=>p.length>2 && a.name.includes(p)));
+          }
+          // אם יש סכום מדויק מ-JB (מקובץ XLS) — להשתמש בו ישירות
+          // אחרת — לחשב לפי ימים × מקסימום מלגה
+          const jbSalary = w.salary ? Math.round(w.salary) : null;
+          const maxS = av?Number(av.maxStipend||1600):0;
+          const calc = jbSalary !== null ? jbSalary
+                     : av ? Math.round(w.days/data.total_days*maxS) : 0;
+          return { jbName:w.name, jbId:w.jb_id, days:w.days, pct:w.pct,
+                   jbSalary, avId:av?av.id:null, stipend:calc, skip:false };
+        });
+        setJbData(data);
+        setRows(matched);
+      }catch(e){ alert('שגיאה בקריאת הקובץ — ודא שהרצת jb_export.py'); }
+    };
+    reader.readAsText(file,'utf-8');
+  };
+
+  const updRow=(i,patch)=>setRows(r=>r.map((x,j)=>j===i?{...x,...patch}:x));
+  const recalc=(i,avId)=>{
+    const av=avrechim.find(a=>a.id===avId);
+    const maxS=av?Number(av.maxStipend||1600):0;
+    const calc=jbData?Math.round(rows[i].days/jbData.total_days*maxS):0;
+    updRow(i,{avId,stipend:calc});
+  };
+
+  const doImport=()=>{
+    setImporting(true);
+    rows.filter(r=>!r.skip&&r.avId&&r.stipend>0).forEach(r=>{
+      setAvMonthField(selKey,r.avId,'monthlyStipend',r.stipend);
+    });
+    setTimeout(()=>{ setImporting(false); onClose(); },800);
+  };
+
+  const matched   = rows.filter(r=>!r.skip&&r.avId).length;
+  const unmatched = rows.filter(r=>!r.avId).length;
+  const fromXLS   = jbData&&rows.length>0&&rows[0].jbSalary!==null;
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:12}} onClick={onClose}>
+      <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:680,maxHeight:"90vh",display:"flex",flexDirection:"column",overflow:"hidden"}} onClick={e=>e.stopPropagation()}>
+        {/* Header */}
+        <div style={{padding:"14px 18px",borderBottom:"1px solid #e2e8f0",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
+          <div>
+            <div style={{fontWeight:700,fontSize:16}}>📥 ייבוא נוכחות מ-JB</div>
+            {jbData&&<div style={{fontSize:12,color:"#64748b",marginTop:2}}>
+              תקופה: {jbData.period} | {jbData.total_days} ימי עבודה
+              {fromXLS
+                ? <span style={{marginRight:8,background:"#dcfce7",color:"#16a34a",borderRadius:6,padding:"1px 6px",fontWeight:600}}>✓ סכומים מדויקים מ-JB</span>
+                : <span style={{marginRight:8,background:"#fef9c3",color:"#92400e",borderRadius:6,padding:"1px 6px"}}>חישוב לפי ימים</span>}
+            </div>}
+          </div>
+          <button style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:"#64748b"}} onClick={onClose}>✕</button>
+        </div>
+
+        {!jbData?(
+          /* Step 1: Load file */
+          <div style={{padding:24,display:"flex",flexDirection:"column",gap:16}}>
+            <div style={{background:"#f0f9ff",borderRadius:10,padding:14,fontSize:13,lineHeight:1.7}}>
+              <div style={{fontWeight:700,marginBottom:6}}>הוראות:</div>
+              <div>1️⃣ פתח שורת פקודה (cmd) והרץ:</div>
+              <div style={{fontFamily:"monospace",background:"#1e293b",color:"#7dd3fc",padding:"6px 10px",borderRadius:6,margin:"4px 0",fontSize:12}}>
+                python C:\JBCLOCK\jb_export.py 26 3
+              </div>
+              <div style={{fontSize:11,color:"#64748b"}}>(שנה את 26 3 לשנה ולחודש הרצויים)</div>
+              <div style={{marginTop:6}}>2️⃣ לאחר הרצה — לחץ "טען קובץ" ובחר <strong>C:\JBCLOCK\jb_data.json</strong></div>
+            </div>
+            <label style={{...primaryBtn,textAlign:"center",cursor:"pointer",display:"block"}}>
+              📂 טען קובץ jb_data.json
+              <input type="file" accept=".json" style={{display:"none"}} onChange={loadFile}/>
+            </label>
+          </div>
+        ):(
+          <>
+            {/* Step 2: Preview & edit */}
+            <div style={{overflowY:"auto",flex:1}}>
+              {unmatched>0&&(
+                <div style={{margin:"8px 12px",background:"#fef2f2",borderRadius:8,padding:"7px 12px",fontSize:12,color:"#dc2626"}}>
+                  ⚠️ {unmatched} עובדים לא זוהו — בחר אברך ידנית בשורות המסומנות
+                </div>
+              )}
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                <thead style={{position:"sticky",top:0,background:"#f8fafc"}}>
+                  <tr>
+                    <th style={{...th,padding:"7px 8px"}}>שם JB</th>
+                    <th style={{...th,padding:"7px 8px"}}>ימים</th>
+                    <th style={{...th,padding:"7px 8px"}}>%</th>
+                    <th style={{...th,padding:"7px 8px",minWidth:120}}>אברך במערכת</th>
+                    <th style={{...th,padding:"7px 8px"}}>מגיע לו (₪)</th>
+                    <th style={{...th,padding:"7px 8px"}}>דלג</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r,i)=>(
+                    <tr key={i} style={{borderBottom:"1px solid #f1f5f9",background:r.skip?"#f8fafc":r.avId?"#fff":"#fef2f2",opacity:r.skip?0.45:1}}>
+                      <td style={{...td,padding:"5px 8px",fontWeight:600}}>{r.jbName}</td>
+                      <td style={{...td,padding:"5px 8px",textAlign:"center",color:"#475569"}}>{r.days}/{jbData.total_days}</td>
+                      <td style={{...td,padding:"5px 8px",textAlign:"center",fontWeight:r.pct>=80?"700":"400",color:r.pct>=80?"#16a34a":r.pct>=50?"#d97706":"#dc2626"}}>{r.pct}%</td>
+                      <td style={{...td,padding:"4px 6px"}}>
+                        <select style={{...iinp,fontSize:11,color:r.avId?"#1e293b":"#dc2626"}}
+                          value={r.avId||""}
+                          onChange={e=>recalc(i,e.target.value?Number(e.target.value):null)}>
+                          <option value="">-- לא מותאם --</option>
+                          {avrechim.filter(a=>a.active).map(a=>(
+                            <option key={a.id} value={a.id}>{a.name}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td style={{...td,padding:"4px 6px"}}>
+                        <input style={{...iinp,textAlign:"left",width:70,color:r.avId?"#1e293b":"#94a3b8"}}
+                          type="number" value={r.stipend}
+                          onChange={e=>updRow(i,{stipend:Number(e.target.value)})}
+                          disabled={!r.avId||r.skip}/>
+                      </td>
+                      <td style={{...td,padding:"4px 8px",textAlign:"center"}}>
+                        <input type="checkbox" checked={r.skip} onChange={e=>updRow(i,{skip:e.target.checked})}/>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {/* Footer */}
+            <div style={{padding:"12px 16px",borderTop:"1px solid #e2e8f0",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0,gap:10}}>
+              <div style={{fontSize:13,color:"#475569"}}>
+                <span style={{color:"#16a34a",fontWeight:700}}>{matched}</span> אברכים יוזנו
+                {unmatched>0&&<span style={{color:"#dc2626",marginRight:8}}> | {unmatched} לא מותאמים</span>}
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button style={grayBtn} onClick={onClose}>ביטול</button>
+                <button style={{...primaryBtn,width:"auto",padding:"9px 20px",opacity:matched===0||importing?0.6:1}}
+                  disabled={matched===0||importing}
+                  onClick={doImport}>
+                  {importing?"מייבא...":"✅ ייבא "+matched+" אברכים"}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── AVRECHIM TAB ─────────────────────────────────────────────
 function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, getAV, setAvMonthField, calcAvrechMonth, totalOwed }){
   const [editId,setEditId]=useState(null);
   const [showAdd,setShowAdd]=useState(false);
+  const [showImport,setShowImport]=useState(false);
   const [newAv,setNewAv]=useState({name:"",track:"1000",maxStipend:1600,incomeGroup:"datot"});
   const [search,setSearch]=useState("");
   const updAv=(id,k,v)=>setAvrechim(p=>p.map(a=>a.id===id?{...a,[k]:v}:a));
@@ -471,10 +653,15 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, getAV, setAvMonth
         <div style={{fontSize:11,opacity:.7,marginTop:3}}>כולל פערים מחודש קודם</div>
       </div>
 
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:6}}>
         <div style={{fontWeight:700,fontSize:14,color:"#475569"}}>רשימת אברכים</div>
-        <button style={addBtn} onClick={()=>setShowAdd(true)}>+ הוסף אברך</button>
+        <div style={{display:"flex",gap:6}}>
+          <button style={{...addBtn,background:"#f0fdf4",color:"#16a34a",border:"1px solid #86efac"}}
+            onClick={()=>setShowImport(true)}>📥 ייבוא JB</button>
+          <button style={addBtn} onClick={()=>setShowAdd(true)}>+ הוסף אברך</button>
+        </div>
       </div>
+      {showImport&&<ImportModal avrechim={avrechim} selKey={selKey} setAvMonthField={setAvMonthField} onClose={()=>setShowImport(false)}/>}
 
       <div style={{position:"relative"}}>
         <input
@@ -536,6 +723,49 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, getAV, setAvMonth
               <AvF label="💰 מגיע לו" val={getAV(selKey,av.id,"monthlyStipend")} onChange={v=>setAvMonthField(selKey,av.id,"monthlyStipend",v)} placeholder={`עד ${fmt(maxS)}`} hi />
               <AvF label="🎓 בחינות"  val={getAV(selKey,av.id,"exams")}           onChange={v=>setAvMonthField(selKey,av.id,"exams",v)} />
             </div>
+            {/* תענית דיבור */}
+            <div style={{background:"#f0f9ff",border:"1.5px solid #bae6fd",borderRadius:8,padding:"8px 10px",marginTop:6}}>
+              <div style={{fontWeight:700,fontSize:12,color:"#0369a1",marginBottom:6}}>🤫 תענית דיבור — 15 ₪ ליום</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,alignItems:"center"}}>
+                <div>
+                  <label style={{fontSize:11,color:"#0369a1",display:"block",marginBottom:3}}>מספר ימים</label>
+                  <input
+                    type="number" min="0"
+                    value={getAV(selKey,av.id,"taanitDays")}
+                    placeholder="0"
+                    onChange={e=>setAvMonthField(selKey,av.id,"taanitDays",e.target.value)}
+                    style={{border:"1.5px solid #7dd3fc",borderRadius:6,padding:"6px 8px",fontSize:13,width:"100%",boxSizing:"border-box",background:"#fff"}}
+                  />
+                </div>
+                <div style={{textAlign:"center"}}>
+                  {c.taanitDays>0 ? (
+                    <>
+                      <div style={{fontSize:11,color:"#0369a1"}}>סה״כ מזומן</div>
+                      <div style={{fontSize:18,fontWeight:800,color:"#0369a1"}}>{fmt(c.taanitAmount)} ₪</div>
+                      <div style={{fontSize:10,color:"#64748b"}}>{c.taanitDays} ימים × 15 ₪</div>
+                    </>
+                  ) : (
+                    <div style={{fontSize:11,color:"#94a3b8"}}>הזן ימים לחישוב</div>
+                  )}
+                </div>
+              </div>
+              {c.taanitDays>0&&(
+                <div style={{marginTop:8,paddingTop:6,borderTop:"1px solid #bae6fd",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span style={{fontSize:12,color:"#0369a1",fontWeight:600}}>💵 קיבל במזומן?</span>
+                  <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",
+                    background:getAV(selKey,av.id,"taanitPaid")==="1"?"#0369a1":"#f1f5f9",
+                    border:`2px solid ${getAV(selKey,av.id,"taanitPaid")==="1"?"#0369a1":"#cbd5e1"}`,
+                    borderRadius:7,padding:"4px 12px",fontSize:12,fontWeight:600,
+                    color:getAV(selKey,av.id,"taanitPaid")==="1"?"#fff":"#64748b",transition:"all .2s",userSelect:"none"}}>
+                    <input type="checkbox"
+                      checked={getAV(selKey,av.id,"taanitPaid")==="1"}
+                      onChange={e=>setAvMonthField(selKey,av.id,"taanitPaid",e.target.checked?"1":"")}
+                      style={{width:14,height:14,cursor:"pointer",accentColor:"#0369a1"}}/>
+                    {getAV(selKey,av.id,"taanitPaid")==="1"?"✓ קיבל":"סמן קיבל"}
+                  </label>
+                </div>
+              )}
+            </div>
 
             {/* הכנסה + עיגול — תיבה משולבת */}
             <div style={{background:c.incomeGroup==="datot"?"#fffbeb":"#f0fdf4",borderRadius:8,padding:"8px 10px",marginTop:6,fontSize:12}}>
@@ -589,24 +819,74 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, getAV, setAvMonth
                 <CI l="עיגול"    v={c.rounding} />
                 {c.exams>0&&<><span style={{color:"#94a3b8"}}>+</span><CI l="בחינות" v={c.exams}/></>}
                 {c.prevBankGap!==0&&<><span style={{color:"#94a3b8"}}>{c.prevBankGap>0?"+":"−"}</span><CI l="פער קודם" v={Math.abs(c.prevBankGap)}/></>}
+                {c.holiday>0&&<><span style={{color:"#94a3b8"}}>+</span><CI l="🎉 חג" v={c.holiday} color="#b45309"/></>}
+                {c.depositRounding>0&&<><span style={{color:"#94a3b8"}}>+</span><CI l="⭕ עיגול" v={c.depositRounding} color="#7c3aed"/></>}
                 <span style={{color:"#94a3b8"}}>=</span>
-                <CI l="🏦 לבנק" v={c.effectiveBank} bold color={c.effectiveBank>=0?"#16a34a":"#dc2626"} />
+                <CI l="🏦 לבנק" v={c.totalToBank} bold color={c.totalToBank>=0?"#16a34a":"#dc2626"} />
+              </div>
+            )}
+
+            {/* חג ועיגול הפקדה */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:8}}>
+              <AvF label="🎉 חג (₪)" val={getAV(selKey,av.id,"holiday")} onChange={v=>setAvMonthField(selKey,av.id,"holiday",v)} />
+              <div style={{display:"flex",flexDirection:"column",gap:3}}>
+                <label style={{fontSize:10,color:"#7c3aed",fontWeight:700}}>⭕ עיגול הפקדה (₪)</label>
+                <div style={{display:"flex",gap:4}}>
+                  <input style={{border:"1px solid #c4b5fd",borderRadius:6,padding:"5px 6px",fontSize:12,flex:1,minWidth:0,boxSizing:"border-box"}}
+                    type="number" value={getAV(selKey,av.id,"depositRounding")} placeholder="0"
+                    onChange={e=>setAvMonthField(selKey,av.id,"depositRounding",e.target.value)}/>
+                  <button style={{...smallBtn,background:"#ede9fe",color:"#7c3aed",border:"1px solid #c4b5fd",whiteSpace:"nowrap",padding:"3px 7px",fontSize:11}}
+                    onClick={()=>{
+                      const base=c.effectiveBank+(Number(getAV(selKey,av.id,"holiday"))||0);
+                      const rounded=Math.ceil(base/10)*10;
+                      setAvMonthField(selKey,av.id,"depositRounding",rounded-base>0?rounded-base:0);
+                    }}>עגל↑10</button>
+                </div>
+              </div>
+            </div>
+            {c.totalToBank>0&&(
+              <div style={{background:"#ecfdf5",border:"1.5px solid #34d399",borderRadius:8,padding:"7px 12px",marginTop:6,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{fontSize:12,color:"#059669",fontWeight:700}}>💰 סה״כ להפקדה:</span>
+                <span style={{fontSize:16,fontWeight:800,color:"#059669"}}>{fmt(c.totalToBank)} ₪</span>
+              </div>
+            )}
+
+            {/* פיצול בנק / מזומן */}
+            {c.totalToBank>0&&(
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:6}}>
+                <div style={{display:"flex",flexDirection:"column",gap:3}}>
+                  <label style={{fontSize:10,color:"#0369a1",fontWeight:700}}>🏦 הפקדה לבנק (₪)</label>
+                  <input style={{border:`2px solid ${getAV(selKey,av.id,"bankDeposit")!==""?"#f59e0b":"#7dd3fc"}`,borderRadius:6,padding:"5px 6px",fontSize:12,width:"100%",boxSizing:"border-box"}}
+                    type="number"
+                    value={getAV(selKey,av.id,"bankDeposit")!==""?getAV(selKey,av.id,"bankDeposit"):(c.totalToBank||"")}
+                    onChange={e=>setAvMonthField(selKey,av.id,"bankDeposit",e.target.value)}/>
+                </div>
+                <div style={{background:c.cashAmount>0?"#fefce8":"#f8fafc",border:`1.5px solid ${c.cashAmount>0?"#fde047":"#e2e8f0"}`,borderRadius:8,padding:"6px 10px",display:"flex",flexDirection:"column",justifyContent:"center"}}>
+                  <span style={{fontSize:10,color:"#92400e",fontWeight:700}}>💵 מזומן</span>
+                  <span style={{fontSize:16,fontWeight:800,color:c.cashAmount>0?"#b45309":"#94a3b8"}}>
+                    {c.cashAmount>0?fmt(c.cashAmount)+" ₪":"—"}
+                  </span>
+                </div>
               </div>
             )}
 
             {/* הכנסתי בפועל + פער — תמיד מוצג */}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:8}}>
               <div style={{display:"flex",flexDirection:"column",gap:3}}>
-                <label style={{fontSize:10,color:"#059669",fontWeight:700}}>🏦 הכנסתי לבנק (₪)</label>
+                <label style={{fontSize:10,color:"#059669",fontWeight:700}}>
+                  🏦 הכנסתי לבנק (₪)
+                  {getAV(selKey,av.id,"actualBank")===""&&c.totalToBank>0&&<span style={{color:"#94a3b8",fontWeight:400}}> — אוטו׳</span>}
+                </label>
                 <input
-                  style={{border:"2px solid #34d399",borderRadius:6,padding:"5px 6px",fontSize:12,width:"100%",boxSizing:"border-box"}}
-                  type="number" value={getAV(selKey,av.id,"actualBank")} placeholder="0"
+                  style={{border:`2px solid ${getAV(selKey,av.id,"actualBank")!==""?"#f59e0b":"#34d399"}`,borderRadius:6,padding:"5px 6px",fontSize:12,width:"100%",boxSizing:"border-box"}}
+                  type="number"
+                  value={getAV(selKey,av.id,"actualBank")!==""?getAV(selKey,av.id,"actualBank"):(c.bankDeposit||"")}
                   onChange={e=>{
                     const v=e.target.value;
                     setAvMonthField(selKey,av.id,"actualBank",v);
                     const actual=v!==""?Number(v):null;
                     if(actual!==null){
-                      setAvMonthField(selKey,av.id,"bankGap",c.effectiveBank-actual);
+                      setAvMonthField(selKey,av.id,"bankGap",c.effectiveBank-(actual+c.cashAmount-c.holiday-c.depositRounding));
                     }
                   }}
                 />
@@ -760,6 +1040,251 @@ function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, 
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// ── BANK TAB ─────────────────────────────────────────────────
+function BankTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, selMonth, getAV, setAvMonthField }){
+  const [expanded, setExpanded] = React.useState(false);
+
+  const deposits = avrechim
+    .filter(a=>a.active)
+    .map(av=>({ av, c:calcAvrechMonth(av,selKey,prevKey) }))
+    .filter(({c})=>c.monthly>0||c.holiday>0||c.totalToBank>0);
+
+  const cashList = deposits.filter(({c})=>c.cashAmount>0);
+
+  // תענית דיבור
+  const taanitList       = avrechim.filter(a=>a.active).map(av=>({ av, c:calcAvrechMonth(av,selKey,prevKey) })).filter(({c})=>c.taanitAmount>0);
+  const totalTaanit      = taanitList.reduce((s,{c})=>s+c.taanitAmount,0);
+  const taanitPaidCount  = taanitList.filter(({av})=>getAV(selKey,av.id,"taanitPaid")==="1").length;
+  const taanitPaidTotal  = taanitList.filter(({av})=>getAV(selKey,av.id,"taanitPaid")==="1").reduce((s,{c})=>s+c.taanitAmount,0);
+  const allTaanitPaid    = taanitPaidCount===taanitList.length && taanitList.length>0;
+
+  // סיכומי בנק
+  const totalDeposit   = deposits.reduce((s,{c})=>s+c.totalToBank,0);
+  const totalBankXfer  = deposits.reduce((s,{c})=>s+c.bankDeposit,0);  // בנק בלבד
+  const totalCash      = cashList.reduce((s,{c})=>s+c.cashAmount,0);   // מזומן בלבד
+  const totalRounding  = deposits.reduce((s,{c})=>s+c.depositRounding,0); // עיגול סריקוב
+  const grandTotal     = totalBankXfer + totalCash;
+
+  // העברות בנק
+  const totalCount     = deposits.length;
+  const sentCount      = deposits.filter(({av})=>getAV(selKey,av.id,"bankRequested")==="1").length;
+  const sentTotal      = deposits.filter(({av})=>getAV(selKey,av.id,"bankRequested")==="1")
+                                 .reduce((s,{c})=>s+c.bankDeposit,0);
+  const pendingBank    = totalBankXfer - sentTotal;
+  const allSent        = sentCount===totalCount && totalCount>0;
+
+  // מזומן
+  const cashPaidCount  = cashList.filter(({av})=>getAV(selKey,av.id,"cashPaid")==="1").length;
+  const cashPaidTotal  = cashList.filter(({av})=>getAV(selKey,av.id,"cashPaid")==="1")
+                                 .reduce((s,{c})=>s+c.cashAmount,0);
+  const allCashPaid    = cashPaidCount===cashList.length && cashList.length>0;
+
+  const rowS = {display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",
+                borderBottom:"1px solid #f1f5f9",fontSize:13};
+
+  return (
+    <div style={col}>
+
+      {/* ── כרטיס סיכום כולל ── */}
+      <div style={{background:"linear-gradient(135deg,#1e3a5f,#2563eb)",borderRadius:12,padding:"16px",color:"#fff",boxShadow:"0 2px 8px rgba(0,0,0,0.18)"}}>
+        <div style={{fontSize:12,opacity:.75,marginBottom:4}}>סה״כ תשלומים — {mkMonthLabel(selYear,selMonth)}</div>
+        <div style={{fontSize:36,fontWeight:800,marginBottom:8}}>{fmt(grandTotal)} ₪</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+          <div style={{background:"rgba(255,255,255,.13)",borderRadius:8,padding:"6px 10px"}}>
+            <div style={{fontSize:10,opacity:.75}}>🏦 העברות לבנק</div>
+            <div style={{fontWeight:700,fontSize:15}}>{fmt(totalBankXfer)} ₪</div>
+          </div>
+          <div style={{background:"rgba(255,255,255,.13)",borderRadius:8,padding:"6px 10px"}}>
+            <div style={{fontSize:10,opacity:.75}}>💵 מזומן</div>
+            <div style={{fontWeight:700,fontSize:15}}>{fmt(totalCash)} ₪</div>
+          </div>
+          {totalTaanit>0&&(
+            <div style={{background:"rgba(255,255,255,.13)",borderRadius:8,padding:"6px 10px",gridColumn:"1/-1"}}>
+              <div style={{fontSize:10,opacity:.75}}>🤫 תענית דיבור (מזומן)</div>
+              <div style={{fontWeight:700,fontSize:15}}>{fmt(totalTaanit)} ₪</div>
+            </div>
+          )}
+          {totalRounding>0&&(
+            <div style={{background:"rgba(255,255,255,.13)",borderRadius:8,padding:"6px 10px",gridColumn:"1/-1"}}>
+              <div style={{fontSize:10,opacity:.75}}>⭕ עיגול סריקוב החודש</div>
+              <div style={{fontWeight:700,fontSize:15}}>{fmt(totalRounding)} ₪</div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── כרטיס מזומן ── */}
+      {cashList.length>0&&(
+        <div style={{...card,background:allCashPaid?"#f0fdf4":"#fefce8",border:`2px solid ${allCashPaid?"#16a34a":"#fbbf24"}`}}>
+          <div style={{fontWeight:700,fontSize:14,color:allCashPaid?"#166534":"#92400e",marginBottom:8}}>
+            {allCashPaid?"✅ כל המזומן שולם":"💵 תשלומי מזומן"}
+            <span style={{fontSize:11,fontWeight:400,marginRight:6,color:"#64748b"}}>
+              ({cashPaidCount}/{cashList.length} שולמו — {fmt(cashPaidTotal)} ₪)
+            </span>
+          </div>
+          {cashList.map(({av,c})=>{
+            const paid = getAV(selKey,av.id,"cashPaid")==="1";
+            return (
+              <div key={av.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                padding:"7px 8px",borderRadius:8,marginBottom:4,
+                background:paid?"#dcfce7":"#fff",border:`1px solid ${paid?"#86efac":"#e2e8f0"}`,
+                opacity:paid?.65:1,transition:"all .2s"}}>
+                <div>
+                  <span style={{fontWeight:700,fontSize:14}}>{av.name}</span>
+                  {paid&&<span style={{fontSize:11,color:"#16a34a",marginRight:6,fontWeight:600}}> ✓ שולם</span>}
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontWeight:800,fontSize:16,color:"#b45309"}}>{fmt(c.cashAmount)} ₪</span>
+                  <label style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer",
+                    background:paid?"#16a34a":"#f1f5f9",border:`2px solid ${paid?"#16a34a":"#cbd5e1"}`,
+                    borderRadius:7,padding:"4px 10px",fontSize:12,fontWeight:600,
+                    color:paid?"#fff":"#64748b",transition:"all .2s",userSelect:"none"}}>
+                    <input type="checkbox"
+                      checked={paid}
+                      onChange={e=>setAvMonthField(selKey,av.id,"cashPaid",e.target.checked?"1":"")}
+                      style={{width:15,height:15,cursor:"pointer",accentColor:"#16a34a"}}/>
+                    שולם
+                  </label>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── כרטיס תענית דיבור ── */}
+      {taanitList.length>0&&(
+        <div style={{...card,background:allTaanitPaid?"#f0f9ff":"#e0f2fe",border:`2px solid ${allTaanitPaid?"#0369a1":"#7dd3fc"}`}}>
+          <div style={{fontWeight:700,fontSize:14,color:allTaanitPaid?"#075985":"#0369a1",marginBottom:8}}>
+            {allTaanitPaid?"✅ כל תענית דיבור שולמה":"🤫 תענית דיבור — מזומן"}
+            <span style={{fontSize:11,fontWeight:400,marginRight:6,color:"#64748b"}}>
+              ({taanitPaidCount}/{taanitList.length} שולמו — {fmt(taanitPaidTotal)} ₪)
+            </span>
+          </div>
+          {taanitList.map(({av,c})=>{
+            const paid = getAV(selKey,av.id,"taanitPaid")==="1";
+            return (
+              <div key={av.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                padding:"7px 8px",borderRadius:8,marginBottom:4,
+                background:paid?"#dbeafe":"#fff",border:`1px solid ${paid?"#93c5fd":"#e2e8f0"}`,
+                opacity:paid?.65:1,transition:"all .2s"}}>
+                <div>
+                  <span style={{fontWeight:700,fontSize:14}}>{av.name}</span>
+                  {paid&&<span style={{fontSize:11,color:"#0369a1",marginRight:6,fontWeight:600}}> ✓ קיבל</span>}
+                  <div style={{fontSize:11,color:"#64748b"}}>{c.taanitDays} ימים × 15 ₪</div>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontWeight:800,fontSize:16,color:"#0369a1"}}>{fmt(c.taanitAmount)} ₪</span>
+                  <label style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer",
+                    background:paid?"#0369a1":"#f1f5f9",border:`2px solid ${paid?"#0369a1":"#cbd5e1"}`,
+                    borderRadius:7,padding:"4px 10px",fontSize:12,fontWeight:600,
+                    color:paid?"#fff":"#64748b",transition:"all .2s",userSelect:"none"}}>
+                    <input type="checkbox"
+                      checked={paid}
+                      onChange={e=>setAvMonthField(selKey,av.id,"taanitPaid",e.target.checked?"1":"")}
+                      style={{width:15,height:15,cursor:"pointer",accentColor:"#0369a1"}}/>
+                    {paid?"שולם":"סמן"}
+                  </label>
+                </div>
+              </div>
+            );
+          })}
+          <div style={{marginTop:8,paddingTop:6,borderTop:"1px solid #bae6fd",display:"flex",justifyContent:"space-between"}}>
+            <span style={{fontSize:13,fontWeight:700,color:"#0369a1"}}>סה״כ תענית דיבור</span>
+            <span style={{fontSize:15,fontWeight:800,color:"#0369a1"}}>{fmt(totalTaanit)} ₪</span>
+          </div>
+        </div>
+      )}
+
+      {/* ── כרטיס העברות בנק ── */}
+      {totalCount>0&&(
+        <div style={{...card,background:allSent?"#f0fdf4":"#fffbeb",border:`2px solid ${allSent?"#16a34a":"#f59e0b"}`}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:700,fontSize:14,color:allSent?"#166534":"#92400e",marginBottom:6}}>
+                {allSent?"✅ כל הדרישות נשלחו":"🏦 העברות לבנק"}
+              </div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",fontSize:12}}>
+                <div style={{background:allSent?"#dcfce7":"#fef9c3",borderRadius:7,padding:"3px 10px"}}>
+                  <span style={{color:"#64748b"}}>נשלחו </span>
+                  <span style={{fontWeight:700,color:allSent?"#166534":"#92400e"}}>{sentCount}/{totalCount}</span>
+                </div>
+                {sentTotal>0&&<div style={{background:"#dcfce7",borderRadius:7,padding:"3px 10px"}}>
+                  <span style={{color:"#64748b"}}>הועבר </span>
+                  <span style={{fontWeight:700,color:"#166534"}}>{fmt(sentTotal)} ₪</span>
+                </div>}
+                {pendingBank>0&&<div style={{background:"#fef9c3",borderRadius:7,padding:"3px 10px"}}>
+                  <span style={{color:"#64748b"}}>ממתין </span>
+                  <span style={{fontWeight:700,color:"#b45309"}}>{fmt(pendingBank)} ₪</span>
+                </div>}
+              </div>
+            </div>
+            <button onClick={()=>setExpanded(v=>!v)}
+              style={{background:"#fff",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"6px 14px",
+                fontSize:12,fontWeight:600,cursor:"pointer",color:"#374151",whiteSpace:"nowrap"}}>
+              {expanded?"▲ כווץ":"▼ הרחב"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── רשימת אברכים (מוצגת רק כשמורחב) ── */}
+      {expanded && deposits.length===0 &&
+        <div style={{...card,color:"#94a3b8",textAlign:"center"}}>אין נתוני הפקדה לחודש זה</div>}
+      {expanded && deposits.map(({av,c})=>(
+        <div key={av.id} style={{...card,borderRight:`4px solid ${trackColor[av.track]||"#64748b"}`,opacity:getAV(selKey,av.id,"bankRequested")==="1"?0.6:1}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:6}}>
+            <div style={{flex:1}}>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontWeight:700,fontSize:15}}>{av.name}</span>
+                {getAV(selKey,av.id,"bankRequested")==="1"&&
+                  <span style={{fontSize:11,background:"#dcfce7",color:"#166534",borderRadius:10,padding:"2px 8px",fontWeight:600}}>✓ נשלחה דרישה</span>}
+              </div>
+              <div style={{display:"flex",gap:6,marginTop:4,flexWrap:"wrap",fontSize:12,color:"#64748b"}}>
+                <span>בסיס: {fmt(c.effectiveBank)} ₪</span>
+                {c.holiday>0&&<span style={{color:"#b45309",fontWeight:600}}>+ חג: {fmt(c.holiday)} ₪</span>}
+                {c.depositRounding>0&&<span style={{color:"#7c3aed",fontWeight:600}}>+ עיגול: {fmt(c.depositRounding)} ₪</span>}
+              </div>
+              {c.cashAmount>0&&(
+                <div style={{display:"flex",gap:8,marginTop:6,flexWrap:"wrap"}}>
+                  <div style={{background:"#eff6ff",borderRadius:8,padding:"4px 10px",fontSize:12}}>
+                    <span style={{color:"#64748b"}}>🏦 בנק: </span>
+                    <span style={{fontWeight:700,color:"#0369a1"}}>{fmt(c.bankDeposit)} ₪</span>
+                  </div>
+                  <div style={{background:"#fefce8",borderRadius:8,padding:"4px 10px",fontSize:12}}>
+                    <span style={{color:"#64748b"}}>💵 מזומן: </span>
+                    <span style={{fontWeight:700,color:"#b45309"}}>{fmt(c.cashAmount)} ₪</span>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
+              <div style={{fontWeight:800,fontSize:20,color:"#059669"}}>{fmt(c.totalToBank)} ₪</div>
+              {c.actualBank!=null&&(
+                <div style={{fontSize:11,color:c.bankGap===0?"#16a34a":c.bankGap>0?"#dc2626":"#2563eb",fontWeight:600}}>
+                  {c.bankGap===0?"✓ שולם":c.bankGap>0?`חסר ${fmt(c.bankGap)} ₪`:`עודף ${fmt(Math.abs(c.bankGap))} ₪`}
+                </div>
+              )}
+              <label style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer",userSelect:"none",
+                background:getAV(selKey,av.id,"bankRequested")==="1"?"#dcfce7":"#f1f5f9",
+                border:`2px solid ${getAV(selKey,av.id,"bankRequested")==="1"?"#16a34a":"#cbd5e1"}`,
+                borderRadius:8,padding:"4px 10px",fontSize:12,fontWeight:600,
+                color:getAV(selKey,av.id,"bankRequested")==="1"?"#166534":"#64748b",
+                transition:"all .2s"}}>
+                <input type="checkbox"
+                  checked={getAV(selKey,av.id,"bankRequested")==="1"}
+                  onChange={e=>setAvMonthField(selKey,av.id,"bankRequested",e.target.checked?"1":"")}
+                  style={{width:16,height:16,cursor:"pointer",accentColor:"#16a34a"}}/>
+                נשלחה דרישה
+              </label>
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
