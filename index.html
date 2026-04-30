@@ -527,8 +527,24 @@ function MainTab({ selKey, selYear, selMonth, baseBalance, setBaseBalance, liveB
         {allDonorNames.map((n,i)=><option key={i} value={n}/>)}
       </datalist>
       <div style={card}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-          <span style={{fontWeight:700,fontSize:14}}>💝 תורמים — {mkMonthLabel(selYear,selMonth)}</span>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:6}}>
+          <div>
+            <div style={{fontWeight:700,fontSize:14}}>💝 תורמים — {mkMonthLabel(selYear,selMonth)}</div>
+            <div style={{marginTop:5,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+              <span style={{fontSize:11,color:"#64748b"}}>📅 תאריך סיכום:</span>
+              <input type="date"
+                value={getMD(selKey,"summaryDate","")}
+                onChange={e=>setMonthField(selKey,"summaryDate",e.target.value)}
+                style={{fontSize:11,border:"1.5px solid #cbd5e1",borderRadius:6,padding:"3px 7px",color:"#1e293b",background:"#f8fafc",direction:"ltr"}}
+              />
+              {!getMD(selKey,"summaryDate") && (
+                <button style={{...smallBtn,fontSize:10,background:"#f0f9ff",color:"#0369a1",border:"1px solid #bae6fd"}}
+                  onClick={()=>setMonthField(selKey,"summaryDate",new Date().toISOString().split("T")[0])}>
+                  היום
+                </button>
+              )}
+            </div>
+          </div>
           <button style={addBtn} onClick={()=>setShowDonor(true)}>+ הוסף</button>
         </div>
         {donors.length===0
@@ -613,7 +629,14 @@ function MainTab({ selKey, selYear, selMonth, baseBalance, setBaseBalance, liveB
 
       {/* MINI SUMMARY */}
       <div style={{...card,background:"#f0fdf4",border:"1.5px solid #22c55e"}}>
-        <div style={{fontWeight:700,fontSize:14,marginBottom:8}}>📊 סיכום {mkMonthLabel(selYear,selMonth)}</div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,flexWrap:"wrap",gap:6}}>
+          <span style={{fontWeight:700,fontSize:14}}>📊 סיכום {mkMonthLabel(selYear,selMonth)}</span>
+          {getMD(selKey,"summaryDate") && (
+            <span style={{fontSize:12,fontWeight:700,color:"#166534",background:"#bbf7d0",borderRadius:20,padding:"3px 10px"}}>
+              📅 {getMD(selKey,"summaryDate").split("-").reverse().join("/")}
+            </span>
+          )}
+        </div>
         <MR l="תורמים"         v={curTotals.donors} />
         <MR l="דתות"           v={curTotals.datot} />
         <MR l="קרן"            v={curTotals.keren} />
