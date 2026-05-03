@@ -414,10 +414,19 @@ function App(){
   const curTotals = calcMonthTotals(selKey);
   const prevKey   = getPrevMonthKey(selKey);
 
-  // שמות תורמים ידועים לצורך מילוי אוטומטי
-  const allDonorNames = [...new Set(
-    Object.values(allMonths).flatMap(m=>(m.donors||[]).map(d=>d.name).filter(Boolean))
-  )];
+  // היסטוריית תורמים: שם → סכום אחרון (ממוין לפי מפתח חודש)
+  const donorHistory = (() => {
+    const map = {};
+    Object.entries(allMonths)
+      .sort(([a],[b])=>a.localeCompare(b))
+      .forEach(([,m])=>{
+        (m.donors||[]).forEach(d=>{
+          if(d.name && Number(d.amount)>0) map[d.name]=Number(d.amount);
+        });
+      });
+    return map;
+  })();
+  const allDonorNames = Object.keys(donorHistory);
 
   const totalOwed = avrechim.filter(a=>a.active).reduce((s,av)=>s+calcAvrechMonth(av,selKey,prevKey).effectiveBank,0);
 
@@ -473,7 +482,7 @@ function App(){
       </div>
 
       <main style={{maxWidth:720,margin:"0 auto",padding:"12px 14px"}}>
-        {tab==="main"       && <MainTab selKey={selKey} selYear={selYear} selMonth={selMonth} baseBalance={baseBalance} setBaseBalance={setBaseBalance} liveBalance={liveBalance} curTotals={curTotals} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} syncing={syncing} allDonorNames={allDonorNames} />}
+        {tab==="main"       && <MainTab selKey={selKey} selYear={selYear} selMonth={selMonth} baseBalance={baseBalance} setBaseBalance={setBaseBalance} liveBalance={liveBalance} curTotals={curTotals} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} syncing={syncing} allDonorNames={allDonorNames} donorHistory={donorHistory} />}
         {tab==="avrechim"   && <AvrechimTab avrechim={avrechim} setAvrechim={setAvrechim} selKey={selKey} prevKey={prevKey} getAV={getAV} setAvMonthField={setAvMonthField} calcAvrechMonth={calcAvrechMonth} totalOwed={totalOwed} />}
         {tab==="attendance" && <AttendanceTab avrechim={avrechim} selKey={selKey} selYear={selYear} selMonth={selMonth} attendance={attendance} setAttendanceDay={setAttendanceDay} fillMonthBatch={fillMonthBatch} customVacations={customVacations} setCustomVacation={setCustomVacation} removeCustomVacation={removeCustomVacation} beinHazmanims={beinHazmanims} addBeinHazmanim={addBeinHazmanim} removeBeinHazmanim={removeBeinHazmanim} updateBeinHazmanim={updateBeinHazmanim} hiddenHols={hiddenHols} toggleHolidayHidden={toggleHolidayHidden} />}
         {tab==="summary"    && <SummaryTab avrechim={avrechim} allMonthKeys={allMonthKeys()} calcMonthTotals={calcMonthTotals} calcAvrechMonth={calcAvrechMonth} getPrevMonthKey={getPrevMonthKey} baseBalance={baseBalance} liveBalance={liveBalance} selKey={selKey} />}
@@ -484,7 +493,7 @@ function App(){
 }
 
 // ── MAIN TAB ────────────────────────────────────────────────
-function MainTab({ selKey, selYear, selMonth, baseBalance, setBaseBalance, liveBalance, curTotals, allMonths, getMD, setMonthField, allDonorNames }){
+function MainTab({ selKey, selYear, selMonth, baseBalance, setBaseBalance, liveBalance, curTotals, allMonths, getMD, setMonthField, allDonorNames, donorHistory }){
   const [editBase,setEditBase]=useState(false);
   const [tempBase,setTempBase]=useState(baseBalance.amount);
   const [showDonor,setShowDonor]=useState(false);
@@ -554,7 +563,15 @@ function MainTab({ selKey, selYear, selMonth, baseBalance, setBaseBalance, liveB
               <tbody>
                 {donors.map((d,i)=>(
                   <tr key={i} style={{borderBottom:"1px solid #f1f5f9"}}>
-                    <td style={td}><input style={iinp} list="donor-names-list" value={d.name} onChange={e=>setMonthField(selKey,"donors",donors.map((x,j)=>j===i?{...x,name:e.target.value}:x))}/></td>
+                    <td style={td}><input style={iinp} list="donor-names-list" value={d.name} onChange={e=>{
+                      const name=e.target.value;
+                      setMonthField(selKey,"donors",donors.map((x,j)=>{
+                        if(j!==i) return x;
+                        const upd={...x,name};
+                        if(donorHistory[name]!==undefined) upd.amount=donorHistory[name];
+                        return upd;
+                      }));
+                    }}/></td>
                     <td style={td}><input style={{...iinp,textAlign:"left"}} type="number" value={d.amount} onChange={e=>setMonthField(selKey,"donors",donors.map((x,j)=>j===i?{...x,amount:e.target.value}:x))}/></td>
                     <td style={td}><button style={delBtn} onClick={()=>setMonthField(selKey,"donors",donors.filter((_,j)=>j!==i))}>✕</button></td>
                   </tr>
@@ -648,7 +665,10 @@ function MainTab({ selKey, selYear, selMonth, baseBalance, setBaseBalance, liveB
 
       {showDonor && (
         <Modal title="הוספת תורם" onClose={()=>setShowDonor(false)}>
-          <FG label="שם התורם"><input style={inp} list="donor-names-list" value={newDonor.name} onChange={e=>setNewDonor(p=>({...p,name:e.target.value}))} placeholder="שם..."/></FG>
+          <FG label="שם התורם"><input style={inp} list="donor-names-list" value={newDonor.name} onChange={e=>{
+            const name=e.target.value;
+            setNewDonor(p=>({...p, name, amount: donorHistory[name]!==undefined ? donorHistory[name] : p.amount}));
+          }} placeholder="שם..."/></FG>
           <FG label="סכום (₪)"><input style={inp} type="number" value={newDonor.amount} onChange={e=>setNewDonor(p=>({...p,amount:e.target.value}))} placeholder="0"/></FG>
           <button style={primaryBtn} onClick={()=>{
             if(!newDonor.name||!newDonor.amount) return;
