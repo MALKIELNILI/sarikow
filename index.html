@@ -485,7 +485,7 @@ function App(){
         {tab==="main"       && <MainTab selKey={selKey} selYear={selYear} selMonth={selMonth} baseBalance={baseBalance} setBaseBalance={setBaseBalance} liveBalance={liveBalance} curTotals={curTotals} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} syncing={syncing} allDonorNames={allDonorNames} donorHistory={donorHistory} />}
         {tab==="avrechim"   && <AvrechimTab avrechim={avrechim} setAvrechim={setAvrechim} selKey={selKey} prevKey={prevKey} getAV={getAV} setAvMonthField={setAvMonthField} calcAvrechMonth={calcAvrechMonth} totalOwed={totalOwed} />}
         {tab==="attendance" && <AttendanceTab avrechim={avrechim} selKey={selKey} selYear={selYear} selMonth={selMonth} attendance={attendance} setAttendanceDay={setAttendanceDay} fillMonthBatch={fillMonthBatch} customVacations={customVacations} setCustomVacation={setCustomVacation} removeCustomVacation={removeCustomVacation} beinHazmanims={beinHazmanims} addBeinHazmanim={addBeinHazmanim} removeBeinHazmanim={removeBeinHazmanim} updateBeinHazmanim={updateBeinHazmanim} hiddenHols={hiddenHols} toggleHolidayHidden={toggleHolidayHidden} />}
-        {tab==="summary"    && <SummaryTab avrechim={avrechim} allMonthKeys={allMonthKeys()} calcMonthTotals={calcMonthTotals} calcAvrechMonth={calcAvrechMonth} getPrevMonthKey={getPrevMonthKey} baseBalance={baseBalance} liveBalance={liveBalance} selKey={selKey} />}
+        {tab==="summary"    && <SummaryTab avrechim={avrechim} allMonthKeys={allMonthKeys()} calcMonthTotals={calcMonthTotals} calcAvrechMonth={calcAvrechMonth} getPrevMonthKey={getPrevMonthKey} baseBalance={baseBalance} liveBalance={liveBalance} selKey={selKey} allMonths={allMonths} />}
         {tab==="bank"       && <BankTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} />}
       </main>
     </div>
@@ -661,6 +661,16 @@ function MainTab({ selKey, selYear, selMonth, baseBalance, setBaseBalance, liveB
         {curTotals.adjustment!==0 && <MR l={curTotals.adjustment>0?"התאמה ➕":"התאמה ➖"} v={curTotals.adjustment} color={curTotals.adjustment>0?"#16a34a":"#dc2626"} />}
         <div style={divider}/>
         <MR l="נטו חודש זה" v={curTotals.net} bold color={curTotals.net>=0?"#16a34a":"#dc2626"} />
+        <div style={{height:1,background:"rgba(34,197,94,0.4)",margin:"8px 0"}}/>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 0"}}>
+          <span style={{fontWeight:800,fontSize:15,color:"#14532d"}}>💰 יתרה כוללת בקופה</span>
+          <span style={{fontWeight:800,fontSize:22,color:"#15803d"}}>{fmt(liveBalance)} ₪</span>
+        </div>
+        {getMD(selKey,"summaryDate") && (
+          <div style={{fontSize:11,color:"#166534",textAlign:"center",marginTop:3,background:"#bbf7d0",borderRadius:8,padding:"3px 8px"}}>
+            📅 תאריך פגישה עם סריקוב: {getMD(selKey,"summaryDate").split("-").reverse().join("/")}
+          </div>
+        )}
       </div>
 
       {showDonor && (
@@ -1176,8 +1186,14 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, getAV, setAvMonth
 }
 
 // ── SUMMARY TAB ──────────────────────────────────────────────
-function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, getPrevMonthKey, baseBalance, liveBalance, selKey }){
+function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, getPrevMonthKey, baseBalance, liveBalance, selKey, allMonths }){
   const [openMonth,setOpenMonth]=useState(selKey);
+  const baseMonthKey = baseBalance.monthKey || "0000-00";
+  const calcCumBalance = (upToKey) => {
+    let sum = Number(baseBalance.amount||0);
+    allMonthKeys.filter(k=>k>=baseMonthKey&&k<=upToKey).forEach(k=>{ sum+=calcMonthTotals(k).net; });
+    return sum;
+  };
 
   return (
     <div style={col}>
@@ -1216,6 +1232,15 @@ function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, 
                 <MR l="נשלח"         v={-t.sent} neg />
                 <div style={divider}/>
                 <MR l="נטו חודש" v={t.net} bold color={t.net>=0?"#16a34a":"#dc2626"} />
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#eff6ff",borderRadius:8,padding:"8px 12px",marginTop:8,border:"1.5px solid #bfdbfe"}}>
+                  <span style={{fontWeight:700,fontSize:13,color:"#1d4ed8"}}>💰 יתרה כוללת עד חודש זה</span>
+                  <span style={{fontWeight:800,fontSize:18,color:"#1d4ed8"}}>{fmt(calcCumBalance(key))} ₪</span>
+                </div>
+                {allMonths[key]?.summaryDate && (
+                  <div style={{fontSize:11,color:"#166534",textAlign:"center",marginTop:4,background:"#bbf7d0",borderRadius:8,padding:"3px 8px"}}>
+                    📅 תאריך פגישה: {allMonths[key].summaryDate.split("-").reverse().join("/")}
+                  </div>
+                )}
 
                 {/* Per-avrech table */}
                 <div style={{marginTop:12,fontSize:13,fontWeight:700,color:"#475569",marginBottom:6}}>פירוט אברכים:</div>
