@@ -60,20 +60,20 @@ const fmtSigned = n => (n>0?"+":"")+fmt(n);
 const now = new Date();
 
 const defaultAvrechim = [
-  {id:6,  name:"יונתן עובדיה",  track:"1000", maxStipend:1000, active:true, incomeGroup:"datot"},
-  {id:9,  name:"חזקיה כהן",     track:"2000", maxStipend:1600, active:true, incomeGroup:"datot"},
+  {id:6,  name:"יונתן עובדיה",  track:"1000", maxStipend:2000, active:true, incomeGroup:"datot"},
+  {id:9,  name:"חזקיה כהן",     track:"2000", maxStipend:2000, active:true, incomeGroup:"datot"},
   {id:8,  name:"מאיר חאלו",     track:"2000", maxStipend:4300, active:true, incomeGroup:"datot"},
-  {id:1,  name:"עמנואל חיימוב", track:"1000", maxStipend:1600, active:true, incomeGroup:"datot"},
-  {id:2,  name:"משה קוסיוב",    track:"1000", maxStipend:1600, active:true, incomeGroup:"datot"},
-  {id:3,  name:"יהודה יגודיוב", track:"1000", maxStipend:1600, active:true, incomeGroup:"datot"},
-  {id:4,  name:"אליהו רדעאי",   track:"1000", maxStipend:1600, active:true, incomeGroup:"datot"},
-  {id:15, name:"אברהם אליאב",   track:"1000", maxStipend:1600, active:true, incomeGroup:"keren"},
-  {id:14, name:"אוראל",         track:"1000", maxStipend:1600, active:true, incomeGroup:"keren"},
-  {id:10, name:"אביתר אבייב",   track:"1000", maxStipend:1600, active:true, incomeGroup:"keren"},
-  {id:11, name:"אלחנן יצחקוב",  track:"1000", maxStipend:1600, active:true, incomeGroup:"keren"},
-  {id:12, name:"דניאל יוסופוב", track:"1000", maxStipend:1600, active:true, incomeGroup:"keren"},
-  {id:13, name:"רפאל חיימוב",   track:"1000", maxStipend:1600, active:true, incomeGroup:"keren"},
-  {id:5,  name:"אוריאל",        track:"1000", maxStipend:1000, active:true, incomeGroup:"datot"},
+  {id:1,  name:"עמנואל חיימוב", track:"1000", maxStipend:2000, active:true, incomeGroup:"datot"},
+  {id:2,  name:"משה קוסיוב",    track:"1000", maxStipend:2000, active:true, incomeGroup:"datot"},
+  {id:3,  name:"יהודה יגודיוב", track:"1000", maxStipend:2000, active:true, incomeGroup:"datot"},
+  {id:4,  name:"אליהו רדעאי",   track:"1000", maxStipend:2000, active:true, incomeGroup:"datot"},
+  {id:15, name:"אברהם אליאב",   track:"1000", maxStipend:2000, active:true, incomeGroup:"keren"},
+  {id:14, name:"אוראל",         track:"1000", maxStipend:2000, active:true, incomeGroup:"keren"},
+  {id:10, name:"אביתר אבייב",   track:"1000", maxStipend:2000, active:true, incomeGroup:"keren"},
+  {id:11, name:"אלחנן יצחקוב",  track:"1000", maxStipend:2000, active:true, incomeGroup:"keren"},
+  {id:12, name:"דניאל יוסופוב", track:"1000", maxStipend:2000, active:true, incomeGroup:"keren"},
+  {id:13, name:"רפאל חיימוב",   track:"1000", maxStipend:2000, active:true, incomeGroup:"keren"},
+  {id:5,  name:"אוריאל",        track:"1000", maxStipend:2000, active:true, incomeGroup:"datot"},
   {id:7,  name:"מאור עובדיה",   track:"2000", maxStipend:2600, active:true, incomeGroup:"datot"},
 ];
 
@@ -186,6 +186,7 @@ function App(){
   const [syncing,setSyncing]     = useState(false);
   const [baseBalance,setBaseBS]  = useState({amount:191321,date:"29.1.26"});
   const [avrechim,setAvrechimS]  = useState(defaultAvrechim);
+  const [supplementSettings,setSupplementS] = useState({datot:1000,keren:1000});
   // allMonths: { "2026-01": { donors, datot, keren, sent2000, sent1000, sentKeren }, ... }
   const [allMonths,setAllMonthsS]= useState({});
   // avAllMonths: { "2026-01": { avId: { monthlyStipend, datot, keren, roundingByFriend, exams } } }
@@ -203,8 +204,8 @@ function App(){
   const local = useRef({baseBalance,avrechim,allMonths,avAllMonths,attendance:{},customVacations:{},beinHazmanims:BEIN_HAZMANIM,hiddenHols:[]});
 
   useEffect(()=>{
-    let loaded={base:false,av:false,months:false,avmonths:false,att:false,cv:false,bh:false,hh:false};
-    const check=()=>{ if(loaded.base&&loaded.av&&loaded.months&&loaded.avmonths&&loaded.att&&loaded.cv&&loaded.bh&&loaded.hh) setReady(true); };
+    let loaded={base:false,av:false,months:false,avmonths:false,att:false,cv:false,bh:false,hh:false,supp:false};
+    const check=()=>{ if(loaded.base&&loaded.av&&loaded.months&&loaded.avmonths&&loaded.att&&loaded.cv&&loaded.bh&&loaded.hh&&loaded.supp) setReady(true); };
     const u1=fbListen("baseBalance",v=>{ if(v){setBaseBS(v);local.current.baseBalance=v;} loaded.base=true;check(); });
     const u2=fbListen("avrechim",v=>{
       if(v&&Array.isArray(v)){
@@ -230,12 +231,15 @@ function App(){
       loaded.bh=true;check();
     });
     const u8=fbListen("hiddenHols",v=>{ const d=v||[]; setHiddenHols(d);local.current.hiddenHols=d; loaded.hh=true;check(); });
-    return()=>{ u1();u2();u3();u4();u5();u6();u7();u8(); };
+    const u9=fbListen("supplementSettings",v=>{ if(v&&typeof v==="object"){setSupplementS(v);local.current.supplementSettings=v;} loaded.supp=true;check(); });
+    return()=>{ u1();u2();u3();u4();u5();u6();u7();u8();u9(); };
   },[]);
 
   const sync = fn => { setSyncing(true); fn(); setTimeout(()=>setSyncing(false),1200); };
   const setBaseBalance = v => { setBaseBS(v); sync(()=>fbSet("baseBalance",v)); };
   const setAvrechim    = fn => { const n=typeof fn==="function"?fn(local.current.avrechim):fn; local.current.avrechim=n; setAvrechimS(n); sync(()=>fbSet("avrechim",n)); };
+
+  const setSupplementSettings = v => { setSupplementS(v); local.current.supplementSettings=v; sync(()=>fbSet("supplementSettings",v)); };
 
   const setMonthField = (key,field,val) => {
     const cur = local.current.allMonths;
@@ -330,10 +334,19 @@ function App(){
     const rounding = Math.max(0, trackNum - datot - keren);
     // בנק בסיסי: מגיע לו − עיגול + בחינות
     const bank = monthly - rounding + exams;
-    // פער מחודש קודם
-    const prevBankGap = prevMonthKey ? (Number(getAV(prevMonthKey,av.id,"bankGap"))||0) : 0;
-    // לבנק החודש = בנק + פער מחודש קודם
-    const effectiveBank = bank + prevBankGap;
+    // אין העברת פערים לחודש הבא — כל חודש עומד בפני עצמו
+    const prevBankGap = 0;
+    const effectiveBank = bank;
+
+    // ── חישוב יתרה לחשבון ──
+    const suppAmt = incomeGroup==="keren"
+      ? Number((local.current.supplementSettings||supplementSettings)?.keren||0)
+      : Number((local.current.supplementSettings||supplementSettings)?.datot||0);
+    // מה האברך מקבל בפועל: חיצוני (דתות/קרן) + השלמת סריקוב
+    const externalPerAvrech = autoDatot + autoKeren;
+    const totalReceived = externalPerAvrech + suppAmt;
+    // יתרה: חיובי = סריקוב חייב לאברך | שלילי = אברך חייב לסריקוב
+    const settlementBalance = monthly > 0 ? monthly - totalReceived : 0;
     // מה הוכנס בפועל לבנק
     const actualBankRaw = getAV(monthKey,av.id,"actualBank");
     const actualBank = actualBankRaw!==""?Number(actualBankRaw):null;
@@ -354,7 +367,7 @@ function App(){
     const taanitDays   = Number(getAV(monthKey,av.id,"taanitDays"))||0;
     const taanitAmount = taanitDays * 15;
 
-    return { monthly, datot, keren, autoDatot, autoKeren, datotRaw, kerenRaw, rounding, exams, bank, prevBankGap, effectiveBank, actualBank, holiday, depositRounding, totalToBank, bankDeposit, cashAmount, bankGapAuto, bankGap, trackNum, datotCount, kerenCount, incomeGroup, totalDatot, totalKeren, taanitDays, taanitAmount };
+    return { monthly, datot, keren, autoDatot, autoKeren, datotRaw, kerenRaw, rounding, exams, bank, prevBankGap, effectiveBank, actualBank, holiday, depositRounding, totalToBank, bankDeposit, cashAmount, bankGapAuto, bankGap, trackNum, datotCount, kerenCount, incomeGroup, totalDatot, totalKeren, taanitDays, taanitAmount, suppAmt, externalPerAvrech, totalReceived, settlementBalance };
   };
 
   // Get sorted month keys
@@ -461,6 +474,7 @@ function App(){
             <button onClick={()=>setTab("attendance")} style={tabS("attendance")}>📋 נוכחות</button>
             <button onClick={()=>setTab("summary")}    style={tabS("summary")}>📂 סיכומים</button>
             <button onClick={()=>setTab("bank")}       style={tabS("bank")}>🏦 בנק</button>
+            <button onClick={()=>setTab("settlement")} style={tabS("settlement")}>💰 חשבון</button>
           </div>
         </div>
       </header>
@@ -487,6 +501,7 @@ function App(){
         {tab==="attendance" && <AttendanceTab avrechim={avrechim} selKey={selKey} selYear={selYear} selMonth={selMonth} attendance={attendance} setAttendanceDay={setAttendanceDay} fillMonthBatch={fillMonthBatch} customVacations={customVacations} setCustomVacation={setCustomVacation} removeCustomVacation={removeCustomVacation} beinHazmanims={beinHazmanims} addBeinHazmanim={addBeinHazmanim} removeBeinHazmanim={removeBeinHazmanim} updateBeinHazmanim={updateBeinHazmanim} hiddenHols={hiddenHols} toggleHolidayHidden={toggleHolidayHidden} />}
         {tab==="summary"    && <SummaryTab avrechim={avrechim} allMonthKeys={allMonthKeys()} calcMonthTotals={calcMonthTotals} calcAvrechMonth={calcAvrechMonth} getPrevMonthKey={getPrevMonthKey} baseBalance={baseBalance} liveBalance={liveBalance} selKey={selKey} allMonths={allMonths} />}
         {tab==="bank"       && <BankTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} />}
+        {tab==="settlement" && <SettlementTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} supplementSettings={supplementSettings} setSupplementSettings={setSupplementSettings} />}
       </main>
     </div>
   );
@@ -2093,6 +2108,165 @@ const greenBtn  = {padding:"8px 14px",background:"#22c55e",color:"#fff",border:"
 const grayBtn   = {padding:"8px 12px",background:"#f1f5f9",color:"#475569",border:"1px solid #e2e8f0",borderRadius:8,cursor:"pointer"};
 const smallBtn  = {padding:"4px 9px",borderRadius:6,background:"#f1f5f9",border:"1px solid #e2e8f0",cursor:"pointer",fontSize:12};
 const delBtn    = {background:"#fee2e2",color:"#dc2626",border:"none",borderRadius:6,padding:"3px 8px",cursor:"pointer"};
+
+// ── SETTLEMENT TAB ───────────────────────────────────────────
+function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, selMonth, getAV, setAvMonthField, supplementSettings, setSupplementSettings }){
+  const [editSupp,setEditSupp] = useState(false);
+  const [tempDatot,setTempDatot] = useState(String(supplementSettings.datot||1000));
+  const [tempKeren,setTempKeren] = useState(String(supplementSettings.keren||1000));
+
+  const rows = avrechim.filter(a=>a.active).map(av=>({
+    av,
+    c: calcAvrechMonth(av,selKey,prevKey),
+    paid: getAV(selKey,av.id,"settlementPaid")==="1"
+  }));
+
+  // חיובי = סריקוב חייב לאברך | שלילי = אברך חייב לסריקוב
+  const iOweRows    = rows.filter(({c})=>c.settlementBalance>0 && c.monthly>0);
+  const theyOweRows = rows.filter(({c})=>c.settlementBalance<0 && c.monthly>0);
+  const evenRows    = rows.filter(({c})=>c.settlementBalance===0 && c.monthly>0);
+  const noDataRows  = rows.filter(({c})=>c.monthly===0);
+
+  const totalIOwe   = iOweRows.reduce((s,{c})=>s+c.settlementBalance,0);
+  const totalOwedMe = theyOweRows.reduce((s,{c})=>s+Math.abs(c.settlementBalance),0);
+
+  const paidIOwe    = iOweRows.filter(({paid})=>paid).reduce((s,{c})=>s+c.settlementBalance,0);
+  const paidOwedMe  = theyOweRows.filter(({paid})=>paid).reduce((s,{c})=>s+Math.abs(c.settlementBalance),0);
+
+  const ARow = ({av,c,paid})=>{
+    const bal = c.settlementBalance;
+    const absBal = Math.abs(bal);
+    const iOwe = bal>0;
+    return (
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+        padding:"9px 10px",borderRadius:9,marginBottom:5,
+        background: paid?"#f0fdf4":iOwe?"#fffbeb":"#fef2f2",
+        border:`1.5px solid ${paid?"#86efac":iOwe?"#fde68a":"#fecaca"}`,
+        opacity:paid?0.7:1,transition:"all .2s"}}>
+        <div>
+          <div style={{fontWeight:700,fontSize:14}}>{av.name}</div>
+          <div style={{fontSize:11,color:"#64748b",marginTop:2}}>
+            מגיע לו: <b>{fmt(c.monthly)} ₪</b> &nbsp;|&nbsp;
+            חיצוני: {fmt(c.externalPerAvrech)} ₪ &nbsp;|&nbsp;
+            השלמה: {fmt(c.suppAmt)} ₪
+          </div>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <div style={{textAlign:"center"}}>
+            <div style={{fontSize:16,fontWeight:800,color:iOwe?"#d97706":"#dc2626"}}>
+              {iOwe?"▲":"▼"} {fmt(absBal)} ₪
+            </div>
+            <div style={{fontSize:10,color:"#94a3b8"}}>{iOwe?"סריקוב חייב":"אברך חייב"}</div>
+          </div>
+          <label style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer",
+            background:paid?"#16a34a":"#f1f5f9",border:`2px solid ${paid?"#16a34a":"#cbd5e1"}`,
+            borderRadius:7,padding:"4px 10px",fontSize:12,fontWeight:600,
+            color:paid?"#fff":"#64748b",transition:"all .2s",userSelect:"none"}}>
+            <input type="checkbox"
+              checked={paid}
+              onChange={e=>setAvMonthField(selKey,av.id,"settlementPaid",e.target.checked?"1":"")}
+              style={{width:15,height:15,cursor:"pointer",accentColor:"#16a34a"}}/>
+            {paid?"✓ בוצע":"סמן"}
+          </label>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div style={col}>
+      {/* כרטיס הגדרות השלמה */}
+      <div style={{...card,borderRight:"4px solid #7c3aed"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:editSupp?10:0}}>
+          <div style={{fontWeight:700,fontSize:14,color:"#7c3aed"}}>⚙️ הגדרות השלמה חודשית (₪ לאברך)</div>
+          <button style={{...smallBtn,color:"#7c3aed",borderColor:"#c4b5fd"}}
+            onClick={()=>{ setTempDatot(String(supplementSettings.datot||1000)); setTempKeren(String(supplementSettings.keren||1000)); setEditSupp(!editSupp); }}>
+            {editSupp?"סגור":"✏️ ערוך"}
+          </button>
+        </div>
+        {!editSupp && (
+          <div style={{display:"flex",gap:16,marginTop:6}}>
+            <div style={{fontSize:13}}><span style={{color:"#b45309",fontWeight:700}}>דתות:</span> <b>{fmt(supplementSettings.datot||0)} ₪</b> לאברך</div>
+            <div style={{fontSize:13}}><span style={{color:"#059669",fontWeight:700}}>קרן:</span> <b>{fmt(supplementSettings.keren||0)} ₪</b> לאברך</div>
+          </div>
+        )}
+        {editSupp && (
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <div>
+              <label style={{fontSize:12,color:"#b45309",fontWeight:700,display:"block",marginBottom:4}}>השלמה — דתות (₪ לאברך)</label>
+              <input type="number" style={inp} value={tempDatot} onChange={e=>setTempDatot(e.target.value)}/>
+            </div>
+            <div>
+              <label style={{fontSize:12,color:"#059669",fontWeight:700,display:"block",marginBottom:4}}>השלמה — קרן (₪ לאברך)</label>
+              <input type="number" style={inp} value={tempKeren} onChange={e=>setTempKeren(e.target.value)}/>
+            </div>
+            <div style={{gridColumn:"1/-1"}}>
+              <button style={{...primaryBtn,background:"#7c3aed"}} onClick={()=>{
+                setSupplementSettings({datot:Number(tempDatot)||0,keren:Number(tempKeren)||0});
+                setEditSupp(false);
+              }}>💾 שמור הגדרות</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* סיכום כולל */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+        <div style={{background:"linear-gradient(135deg,#92400e,#d97706)",borderRadius:12,padding:"14px",color:"#fff"}}>
+          <div style={{fontSize:11,opacity:.8}}>אני חייב לאברכים</div>
+          <div style={{fontSize:28,fontWeight:800}}>{fmt(totalIOwe)} ₪</div>
+          <div style={{fontSize:11,opacity:.7,marginTop:2}}>שולם: {fmt(paidIOwe)} ₪</div>
+        </div>
+        <div style={{background:"linear-gradient(135deg,#991b1b,#dc2626)",borderRadius:12,padding:"14px",color:"#fff"}}>
+          <div style={{fontSize:11,opacity:.8}}>אברכים חייבים לי</div>
+          <div style={{fontSize:28,fontWeight:800}}>{fmt(totalOwedMe)} ₪</div>
+          <div style={{fontSize:11,opacity:.7,marginTop:2}}>הוחזר: {fmt(paidOwedMe)} ₪</div>
+        </div>
+      </div>
+
+      {/* רשימה: אני חייב */}
+      {iOweRows.length>0&&(
+        <div style={card}>
+          <div style={{fontWeight:700,fontSize:14,color:"#d97706",marginBottom:8}}>
+            🟡 אני חייב לאברך ({iOweRows.length})
+          </div>
+          {iOweRows.map(({av,c,paid})=><ARow key={av.id} av={av} c={c} paid={paid}/>)}
+        </div>
+      )}
+
+      {/* רשימה: אברך חייב לי */}
+      {theyOweRows.length>0&&(
+        <div style={card}>
+          <div style={{fontWeight:700,fontSize:14,color:"#dc2626",marginBottom:8}}>
+            🔴 אברך חייב לי ({theyOweRows.length})
+          </div>
+          {theyOweRows.map(({av,c,paid})=><ARow key={av.id} av={av} c={c} paid={paid}/>)}
+        </div>
+      )}
+
+      {/* מאוזנים */}
+      {evenRows.length>0&&(
+        <div style={card}>
+          <div style={{fontWeight:700,fontSize:13,color:"#16a34a",marginBottom:6}}>✅ מאוזן ({evenRows.length})</div>
+          {evenRows.map(({av,c})=>(
+            <div key={av.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 8px",borderRadius:7,background:"#f0fdf4",marginBottom:4}}>
+              <span style={{fontWeight:600,fontSize:13}}>{av.name}</span>
+              <span style={{fontSize:12,color:"#16a34a",fontWeight:700}}>✓ מאוזן — {fmt(c.monthly)} ₪</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ללא נתונים */}
+      {noDataRows.length>0&&(
+        <div style={{...card,opacity:0.6}}>
+          <div style={{fontWeight:600,fontSize:12,color:"#94a3b8",marginBottom:5}}>⬜ ללא נתוני מגיע ({noDataRows.length})</div>
+          <div style={{fontSize:12,color:"#94a3b8"}}>{noDataRows.map(({av})=>av.name).join(" | ")}</div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
 </script>
