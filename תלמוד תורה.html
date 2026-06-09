@@ -1359,7 +1359,8 @@ function renderDashboard(){
   const n1=D.settings.name1||'מלכיאל',n2=D.settings.name2||'השותף';
   const inc=D.incomes.filter(i=>i.month===m&&i.year===y);
   const exp=D.expenses.filter(e=>e.month===m&&e.year===y);
-  const totalInc=inc.reduce((s,i)=>s+i.amount,0);
+  const nistanimInc=inc.filter(i=>i.type==='nistanim').reduce((s,i)=>s+i.amount,0);
+  const totalInc=inc.filter(i=>i.type!=='nistanim').reduce((s,i)=>s+i.amount,0);
   const totalExp=exp.reduce((s,e)=>s+e.amount,0);
   const profit=totalInc-totalExp;
   const half=profit/2;
@@ -1380,10 +1381,11 @@ function renderDashboard(){
   const effectiveHalf=effectiveProfit/2;
 
   $('dash-cards').innerHTML=`
-    <div class="card green"><div class="label">הכנסות בפועל</div><div class="val">₪${fmt(totalInc)}</div><div class="sub-val">${inc.length} רשומות</div></div>
+    <div class="card green"><div class="label">הכנסות בפועל</div><div class="val">₪${fmt(totalInc)}</div><div class="sub-val">${inc.filter(i=>i.type!=='nistanim').length} רשומות</div></div>
     <div class="card red"><div class="label">הוצאות</div><div class="val">₪${fmt(totalExp)}</div><div class="sub-val">שכ"ל: ₪${fmt(tuitionExp)}</div></div>
     <div class="card ${effectiveProfit>=0?'blue':'red'}"><div class="label">רווח (כולל יעד)</div><div class="val">₪${fmt(effectiveProfit)}</div><div class="sub-val">לפני חלוקה</div></div>
-    <div class="card yellow"><div class="label">חלק לכל שותף</div><div class="val">₪${fmt(effectiveHalf)}</div><div class="sub-val">50% / 50%</div></div>`;
+    <div class="card yellow"><div class="label">חלק לכל שותף</div><div class="val">₪${fmt(effectiveHalf)}</div><div class="sub-val">50% / 50%</div></div>
+    ${nistanimInc>0?`<div class="card" style="background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.3);"><div class="label" style="color:#7c3aed;">ניצנים ← גוטליב</div><div class="val" style="color:#7c3aed;">₪${fmt(nistanimInc)}</div><div class="sub-val">לא נכלל ברווח</div></div>`:''}`;
 
   // קטע יעד + כפתור השלמה
   const hasAutoComplete=(D.completions||[]).some(c=>c.month===m&&c.year===y);
@@ -1467,10 +1469,10 @@ function renderDashboard(){
       <div class="section-header"><h2>📊 פירוט הכנסות</h2></div>
       <div style="padding:0;">
         ${inc.length?`<table><thead><tr><th>סוג</th><th>פירוט</th><th>סכום</th></tr></thead><tbody>
-        ${inc.map(i=>`<tr>
-          <td><span class="badge ${tb[i.type]}">${tl[i.type]}</span></td>
+        ${inc.map(i=>`<tr${i.type==='nistanim'?' style="opacity:0.65;"':''}>
+          <td><span class="badge ${tb[i.type]}">${tl[i.type]}${i.type==='nistanim'?' → גוטליב':''}</span></td>
           <td class="text-muted">${i.type==='tuition'&&i.students?`${i.students}×₪${i.rate}`:(i.note||'-')}</td>
-          <td class="text-green" style="font-weight:700">₪${fmt(i.amount)}</td>
+          <td class="${i.type==='nistanim'?'text-muted':'text-green'}" style="font-weight:700">₪${fmt(i.amount)}</td>
         </tr>`).join('')}
         </tbody></table>`:'<div class="empty-state">אין הכנסות לחודש זה</div>'}
       </div>
@@ -1497,7 +1499,7 @@ function renderYearly(){
   let totalInc=0,totalExp=0,totalProfit=0,totalTuitionInc=0;
   const rows=HEB.map((mName,idx)=>{
     const m=idx+1;
-    const inc=D.incomes.filter(i=>i.month===m&&i.year===y).reduce((s,i)=>s+i.amount,0);
+    const inc=D.incomes.filter(i=>i.month===m&&i.year===y&&i.type!=='nistanim').reduce((s,i)=>s+i.amount,0);
     const tuitionInc=D.incomes.filter(i=>i.month===m&&i.year===y&&i.type==='tuition').reduce((s,i)=>s+i.amount,0);
     const exp=D.expenses.filter(e=>e.month===m&&e.year===y).reduce((s,e)=>s+e.amount,0);
     const profit=inc-exp;
@@ -1633,10 +1635,11 @@ window.exportMonthPDF=function(){
   const n1=D.settings.name1||'מלכיאל',n2=D.settings.name2||'השותף';
   const inc=D.incomes.filter(i=>i.month===m&&i.year===y);
   const exp=D.expenses.filter(e=>e.month===m&&e.year===y);
-  const totalInc=inc.reduce((s,i)=>s+i.amount,0);
+  const nistanimInc=inc.filter(i=>i.type==='nistanim').reduce((s,i)=>s+i.amount,0);
+  const totalInc=inc.filter(i=>i.type!=='nistanim').reduce((s,i)=>s+i.amount,0);
   const totalExp=exp.reduce((s,e)=>s+e.amount,0);
   const profit=totalInc-totalExp;
-  const tl={tuition:'שכ"ל תלמידים',municipality:'עירייה',other:'אחר'};
+  const tl={tuition:'שכ"ל תלמידים',nistanim:'ניצנים (גוטליב)',municipality:'עירייה',other:'אחר'};
   const html=`<html dir="rtl"><head><meta charset="UTF-8">
   <style>body{font-family:Arial,sans-serif;padding:30px;direction:rtl;}
   h1{font-size:20px;margin-bottom:6px;}h2{font-size:15px;margin:20px 0 8px;border-bottom:1px solid #ccc;padding-bottom:4px;}
@@ -1648,7 +1651,8 @@ window.exportMonthPDF=function(){
   <h1>📚 דוח חודשי — ${HEB[m-1]} ${y}</h1>
   <p style="color:#888;font-size:12px;">הופק: ${new Date().toLocaleDateString('he-IL')}</p>
   <div class="summary">
-    <div class="box"><div class="lbl">הכנסות</div><div class="vl">₪${fmt(totalInc)}</div></div>
+    <div class="box"><div class="lbl">הכנסות (ללא ניצנים)</div><div class="vl">₪${fmt(totalInc)}</div></div>
+    ${nistanimInc>0?`<div class="box" style="border-color:#7c3aed;"><div class="lbl" style="color:#7c3aed;">ניצנים → גוטליב</div><div class="vl" style="color:#7c3aed;">₪${fmt(nistanimInc)}</div></div>`:''}
     <div class="box"><div class="lbl">הוצאות</div><div class="vl">₪${fmt(totalExp)}</div></div>
     <div class="box"><div class="lbl">רווח</div><div class="vl">₪${fmt(profit)}</div></div>
     <div class="box"><div class="lbl">חלק ${n1}</div><div class="vl">₪${fmt(profit/2)}</div></div>
@@ -1671,7 +1675,7 @@ window.exportYearlyPDF=function(){
   let totalInc=0,totalExp=0;
   const rows=HEB.map((mName,idx)=>{
     const m=idx+1;
-    const inc=D.incomes.filter(i=>i.month===m&&i.year===y).reduce((s,i)=>s+i.amount,0);
+    const inc=D.incomes.filter(i=>i.month===m&&i.year===y&&i.type!=='nistanim').reduce((s,i)=>s+i.amount,0);
     const exp=D.expenses.filter(e=>e.month===m&&e.year===y).reduce((s,e)=>s+e.amount,0);
     totalInc+=inc;totalExp+=exp;
     return{mName,inc,exp,profit:inc-exp};
