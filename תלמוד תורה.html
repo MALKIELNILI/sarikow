@@ -1146,13 +1146,6 @@ function renderExpenses(){
 
 // מחשב את כל המאזן מכל הנתונים
 function calcDebtSummary(){
-  const n2=D.settings.name2||'השותף';
-
-  // 1. חובות מהוצאות: כל הוצאה על שם השותף = חוב שלי של 50%
-  let partnerExpDebt=0;
-  const monthlyData={};
-
-  // איסוף נתונים לפי חודש
   const allMonths=new Set();
   D.incomes.forEach(i=>allMonths.add(`${i.year}-${String(i.month).padStart(2,'0')}`));
   D.expenses.forEach(e=>allMonths.add(`${e.year}-${String(e.month).padStart(2,'0')}`));
@@ -1160,68 +1153,55 @@ function calcDebtSummary(){
   const monthRows=[];
   [...allMonths].sort().forEach(key=>{
     const [y,m]=[parseInt(key.split('-')[0]),parseInt(key.split('-')[1])];
-    const inc=D.incomes.filter(i=>i.month===m&&i.year===y).reduce((s,i)=>s+i.amount,0);
-    const expTotal=D.expenses.filter(e=>e.month===m&&e.year===y).reduce((s,e)=>s+e.amount,0);
-    const expByPartner=D.expenses.filter(e=>e.month===m&&e.year===y&&e.payer==='partner').reduce((s,e)=>s+e.amount,0);
-    const expByMeBoth=D.expenses.filter(e=>e.month===m&&e.year===y&&(e.payer==='me'||e.payer==='me-both')).reduce((s,e)=>s+e.amount,0);
-    const profit=inc-expTotal;
-    const myProfit=profit/2;
-    const myDebtFromPartnerExp=expByPartner;
+    const inc=D.incomes.filter(i=>i.month===m&&i.year===y&&i.type!=='nistanim').reduce((s,i)=>s+i.amount,0);
+    const kupaExp=D.expenses.filter(e=>e.month===m&&e.year===y&&(e.payer==='partner'||e.payer==='tuition')).reduce((s,e)=>s+e.amount,0);
+    const myExp=D.expenses.filter(e=>e.month===m&&e.year===y&&(e.payer==='me'||e.payer==='me-both')).reduce((s,e)=>s+e.amount,0);
+    // רווח קופה = אפס כשיש גירעון (אין רווח שלילי לחלק)
+    const kupaProfit=Math.max(0,inc-kupaExp);
+    const myProfitShare=kupaProfit/2;
+    // מה שמגיע לי = חלק ברווח + מה ששילמתי מכיסי
+    const owedToMe=myProfitShare+myExp;
 
-    monthRows.push({key,y,m,inc,expTotal,expByPartner,expByMeBoth,profit,myProfit,myDebtFromPartnerExp,
+    monthRows.push({key,y,m,inc,kupaExp,myExp,kupaProfit,myProfitShare,owedToMe,
       label:`${HEB[m-1]} ${y}`});
   });
 
-  // סה"כ חוב שנצבר מהוצאות השותף
-  const totalDebtFromExp=monthRows.reduce((s,r)=>s+r.myDebtFromPartnerExp,0);
-
-  // סה"כ זכות מרווחים
-  const totalMyProfit=monthRows.reduce((s,r)=>s+r.myProfit,0);
-
-  // סה"כ חלק שותף שכיסיתי עבורו (מקזז מהחוב שלי)
-  const totalPartnerShareCovered=monthRows.reduce((s,r)=>s+r.expByMeBoth,0);
-
-  // תשלומים ששילמתי לשותף
+  const totalMyProfit=monthRows.reduce((s,r)=>s+r.myProfitShare,0);
+  const totalMyExp=monthRows.reduce((s,r)=>s+r.myExp,0);
+  const totalOwedToMe=monthRows.reduce((s,r)=>s+r.owedToMe,0);
+  // תשלומים שקיבלתי מהשותף
   const totalPaid=(D.payments||[]).reduce((s,p)=>s+p.amount,0);
+  // יתרה: חיובי = השותף חייב לי, שלילי = אני חייב לשותף
+  const finalBalance=totalOwedToMe-totalPaid;
 
-  // חוב גולמי = חוב מהוצאות - זכות מרווחים - מה שכיסיתי עבורו
-  const grossDebt=totalDebtFromExp - totalMyProfit - totalPartnerShareCovered;
-  // יתרה סופית אחרי תשלומים
-  const finalBalance=grossDebt - totalPaid;
-
-  return{totalDebtFromExp,totalMyProfit,totalPaid,totalPartnerShareCovered,grossDebt,finalBalance,monthRows};
+  return{totalMyProfit,totalMyExp,totalOwedToMe,totalPaid,finalBalance,monthRows};
 }
 
 function renderDebts(){
   const n1=D.settings.name1||'מלכיאל',n2=D.settings.name2||'השותף';
-  const {totalDebtFromExp,totalMyProfit,totalPaid,totalPartnerShareCovered,grossDebt,finalBalance,monthRows}=calcDebtSummary();
+  const {totalMyProfit,totalMyExp,totalOwedToMe,totalPaid,finalBalance,monthRows}=calcDebtSummary();
 
-  // כרטיסי סיכום
-  const balColor=finalBalance>0?'red':finalBalance<0?'green':'blue';
-  const balMsg=finalBalance>0?`אתה חייב ל${n2}`:finalBalance<0?`${n2} חייב לך`:'מאוזן';
+  // כרטיסי סיכום — חיובי = השותף חייב לי
+  const balColor=finalBalance>0?'green':finalBalance<0?'red':'blue';
+  const balMsg=finalBalance>0?`${n2} חייב לך`:finalBalance<0?`אתה חייב ל${n2}`:'מאוזן';
 
   $('debt-summary').innerHTML=`
     <div class="cards" style="margin-bottom:14px;">
-      <div class="card red">
-        <div class="label">חוב מהוצאות השותף</div>
-        <div class="val">₪${fmt(totalDebtFromExp)}</div>
-        <div class="sub-val">50% ממה ששילם ${n2} (הסכום כבר מחולק)</div>
-      </div>
-      <div class="card ${totalMyProfit>=0?'green':'red'}">
-        <div class="label">${totalMyProfit>=0?'זכות מרווחים':'חוב מהפסדים'}</div>
-        <div class="val">₪${fmt(Math.abs(totalMyProfit))}</div>
-        <div class="sub-val">${totalMyProfit>=0?'מקזז את החוב':'מוסיף לחוב'}</div>
-      </div>
-      ${totalPartnerShareCovered>0?`
       <div class="card green">
-        <div class="label">כיסיתי חלק השותף</div>
-        <div class="val">₪${fmt(totalPartnerShareCovered)}</div>
-        <div class="sub-val">מכל הוצאה ששילמתי — מקוזז אוטומטית</div>
+        <div class="label">חלקי ברווח הקופה</div>
+        <div class="val">₪${fmt(totalMyProfit)}</div>
+        <div class="sub-val">50% מרווח הקופה כל החודשים</div>
+      </div>
+      ${totalMyExp>0?`
+      <div class="card green">
+        <div class="label">שילמתי מכיסי</div>
+        <div class="val">₪${fmt(totalMyExp)}</div>
+        <div class="sub-val">${n2} חייב להחזיר לי</div>
       </div>`:''}
       <div class="card blue">
-        <div class="label">שילמתי לשותף</div>
+        <div class="label">קיבלתי מ${n2}</div>
         <div class="val">₪${fmt(totalPaid)}</div>
-        <div class="sub-val">סה"כ תשלומים</div>
+        <div class="sub-val">סה"כ שולם לי</div>
       </div>
       <div class="card ${balColor}">
         <div class="label">יתרה סופית</div>
@@ -1229,11 +1209,11 @@ function renderDebts(){
         <div class="sub-val">${balMsg}</div>
       </div>
     </div>
-    <div class="alert ${finalBalance>0?'alert-warning':finalBalance<0?'alert-success':'alert-info'}" style="margin-bottom:14px;font-size:14px;">
+    <div class="alert ${finalBalance>0?'alert-success':finalBalance<0?'alert-warning':'alert-info'}" style="margin-bottom:14px;font-size:14px;">
       ${finalBalance>0
-        ?`⚠️ <strong>אתה חייב ל${n2}: ₪${fmt(finalBalance)}</strong>`
+        ?`✅ <strong>${n2} חייב לך: ₪${fmt(finalBalance)}</strong>`
         :finalBalance<0
-        ?`✅ <strong>${n2} חייב לך: ₪${fmt(Math.abs(finalBalance))}</strong>`
+        ?`⚠️ <strong>אתה חייב ל${n2}: ₪${fmt(Math.abs(finalBalance))}</strong>`
         :`✅ <strong>החשבון מאוזן לגמרי</strong>`}
     </div>`;
 
@@ -1259,39 +1239,32 @@ function renderDebts(){
 
   // פירוט לפי חודשים
   const mEl=$('debt-months-table');
-  const activeMonths=monthRows.filter(r=>r.inc>0||r.expTotal>0);
+  const activeMonths=monthRows.filter(r=>r.inc>0||r.kupaExp>0||r.myExp>0);
   if(!activeMonths.length){
     mEl.innerHTML='<div class="empty-state">אין נתונים עדיין</div>';
   } else {
     mEl.innerHTML=`<table><thead><tr>
-      <th>חודש</th><th>הכנסות</th><th>הוצאות</th>
-      <th>שילם ${n2}</th><th>חוב מהוצאות</th>
-      <th>חלקי ברווח</th><th>מאזן חודש</th>
+      <th>חודש</th><th>הכנסות</th><th>הוצ' קופה</th>
+      <th>רווח קופה</th><th>חלקי</th>
+      <th>שילמתי</th><th>מגיע לי</th>
     </tr></thead><tbody>
-    ${activeMonths.map(r=>{
-      const monthBalance=r.myProfit - r.myDebtFromPartnerExp;
-      return `<tr>
-        <td style="font-weight:600">${r.label}</td>
-        <td class="text-green">₪${fmt(r.inc)}</td>
-        <td class="text-red">₪${fmt(r.expTotal)}</td>
-        <td style="color:var(--accent2)">₪${fmt(r.expByPartner*2)}</td>
-        <td class="text-red">−₪${fmt(r.myDebtFromPartnerExp)}</td>
-        <td class="${r.myProfit>=0?'text-green':'text-red'}">${r.myProfit>=0?'+':''} ₪${fmt(r.myProfit)}</td>
-        <td style="font-weight:700;color:${monthBalance>=0?'var(--green)':'var(--red)'}">
-          ${monthBalance>=0?'+':''}₪${fmt(monthBalance)}
-        </td>
-      </tr>`;
-    }).join('')}
+    ${activeMonths.map(r=>`<tr>
+      <td style="font-weight:600">${r.label}</td>
+      <td class="text-green">₪${fmt(r.inc)}</td>
+      <td class="text-red">₪${fmt(r.kupaExp)}</td>
+      <td class="${r.kupaProfit>0?'text-green':'text-muted'}">₪${fmt(r.kupaProfit)}</td>
+      <td class="text-green">₪${fmt(r.myProfitShare)}</td>
+      <td class="${r.myExp>0?'text-green':'text-muted'}">₪${fmt(r.myExp)}</td>
+      <td style="font-weight:700;color:var(--green)">₪${fmt(r.owedToMe)}</td>
+    </tr>`).join('')}
     </tbody><tfoot><tr>
       <td style="font-weight:700;padding:10px 11px;">סה"כ</td>
       <td style="color:var(--green);font-weight:700;padding:10px 11px;">₪${fmt(activeMonths.reduce((s,r)=>s+r.inc,0))}</td>
-      <td style="color:var(--red);font-weight:700;padding:10px 11px;">₪${fmt(activeMonths.reduce((s,r)=>s+r.expTotal,0))}</td>
-      <td style="color:var(--accent2);font-weight:700;padding:10px 11px;">₪${fmt(activeMonths.reduce((s,r)=>s+r.expByPartner*2,0))}</td>
-      <td style="color:var(--red);font-weight:700;padding:10px 11px;">−₪${fmt(totalDebtFromExp)}</td>
-      <td style="font-weight:700;padding:10px 11px;" class="${totalMyProfit>=0?'text-green':'text-red'}">${totalMyProfit>=0?'+':''}₪${fmt(totalMyProfit)}</td>
-      <td style="font-weight:800;padding:10px 11px;color:${(totalMyProfit-totalDebtFromExp)>=0?'var(--green)':'var(--red)'}">
-        ${(totalMyProfit-totalDebtFromExp)>=0?'+':''}₪${fmt(totalMyProfit-totalDebtFromExp)}
-      </td>
+      <td style="color:var(--red);font-weight:700;padding:10px 11px;">₪${fmt(activeMonths.reduce((s,r)=>s+r.kupaExp,0))}</td>
+      <td style="font-weight:700;padding:10px 11px;">₪${fmt(activeMonths.reduce((s,r)=>s+r.kupaProfit,0))}</td>
+      <td style="color:var(--green);font-weight:700;padding:10px 11px;">₪${fmt(totalMyProfit)}</td>
+      <td style="color:var(--green);font-weight:700;padding:10px 11px;">₪${fmt(totalMyExp)}</td>
+      <td style="color:var(--green);font-weight:800;padding:10px 11px;">₪${fmt(totalOwedToMe)}</td>
     </tr></tfoot></table>`;
   }
 }
@@ -1361,8 +1334,10 @@ function renderDashboard(){
   const exp=D.expenses.filter(e=>e.month===m&&e.year===y);
   const nistanimInc=inc.filter(i=>i.type==='nistanim').reduce((s,i)=>s+i.amount,0);
   const totalInc=inc.filter(i=>i.type!=='nistanim').reduce((s,i)=>s+i.amount,0);
-  const totalExp=exp.reduce((s,e)=>s+e.amount,0);
-  const profit=totalInc-totalExp;
+  const kupaExp=exp.filter(e=>e.payer==='partner'||e.payer==='tuition').reduce((s,e)=>s+e.amount,0);
+  const myExp=exp.filter(e=>e.payer==='me'||e.payer==='me-both').reduce((s,e)=>s+e.amount,0);
+  const totalExp=kupaExp+myExp;
+  const profit=Math.max(0,totalInc-kupaExp);
   const half=profit/2;
   const active=D.debts.filter(x=>!x.settled);
   const pPaid=active.filter(x=>x.type==='partner_paid_for_me').reduce((s,x)=>s+x.amount,0);
@@ -1373,17 +1348,17 @@ function renderDashboard(){
   const tuitionInc=inc.filter(i=>i.type==='tuition').reduce((s,i)=>s+i.amount,0);
   const autoCompleteInc=inc.filter(i=>i.autoComplete).reduce((s,i)=>s+i.amount,0);
   const targetDiff=tuitionInc-target;
-  const tuitionExp=exp.filter(e=>e.payer==='tuition').reduce((s,e)=>s+e.amount,0);
 
-  // חישוב רווח כולל ההשלמה
+  // חישוב רווח קופה כולל השלמה (הוצאות שלי לא משפיעות על רווח)
   const effectiveInc=totalInc+(target>0&&targetDiff<0?-targetDiff:0);
-  const effectiveProfit=effectiveInc-totalExp;
+  const effectiveProfit=Math.max(0,effectiveInc-kupaExp);
   const effectiveHalf=effectiveProfit/2;
 
   $('dash-cards').innerHTML=`
     <div class="card green"><div class="label">הכנסות בפועל</div><div class="val">₪${fmt(totalInc)}</div><div class="sub-val">${inc.filter(i=>i.type!=='nistanim').length} רשומות</div></div>
-    <div class="card red"><div class="label">הוצאות</div><div class="val">₪${fmt(totalExp)}</div><div class="sub-val">שכ"ל: ₪${fmt(tuitionExp)}</div></div>
-    <div class="card ${effectiveProfit>=0?'blue':'red'}"><div class="label">רווח (כולל יעד)</div><div class="val">₪${fmt(effectiveProfit)}</div><div class="sub-val">לפני חלוקה</div></div>
+    <div class="card red"><div class="label">הוצאות קופה</div><div class="val">₪${fmt(kupaExp)}</div><div class="sub-val">שולם ע"י יוסף חיים</div></div>
+    ${myExp>0?`<div class="card" style="background:rgba(234,179,8,0.12);border:1px solid rgba(234,179,8,0.4);"><div class="label" style="color:#b45309;">שילמתי מכיסי</div><div class="val" style="color:#b45309;">₪${fmt(myExp)}</div><div class="sub-val">לא גורע מרווח הקופה</div></div>`:''}
+    <div class="card ${effectiveProfit>0?'blue':'red'}"><div class="label">רווח קופה (כולל יעד)</div><div class="val">₪${fmt(effectiveProfit)}</div><div class="sub-val">לפני חלוקה</div></div>
     <div class="card yellow"><div class="label">חלק לכל שותף</div><div class="val">₪${fmt(effectiveHalf)}</div><div class="sub-val">50% / 50%</div></div>
     ${nistanimInc>0?`<div class="card" style="background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.3);"><div class="label" style="color:#7c3aed;">ניצנים ← גוטליב</div><div class="val" style="color:#7c3aed;">₪${fmt(nistanimInc)}</div><div class="sub-val">לא נכלל ברווח</div></div>`:''}`;
 
@@ -1501,10 +1476,10 @@ function renderYearly(){
     const m=idx+1;
     const inc=D.incomes.filter(i=>i.month===m&&i.year===y&&i.type!=='nistanim').reduce((s,i)=>s+i.amount,0);
     const tuitionInc=D.incomes.filter(i=>i.month===m&&i.year===y&&i.type==='tuition').reduce((s,i)=>s+i.amount,0);
-    const exp=D.expenses.filter(e=>e.month===m&&e.year===y).reduce((s,e)=>s+e.amount,0);
-    const profit=inc-exp;
-    totalInc+=inc;totalExp+=exp;totalProfit+=profit;totalTuitionInc+=tuitionInc;
-    return{mName,inc,tuitionInc,exp,profit};
+    const kupaExp=D.expenses.filter(e=>e.month===m&&e.year===y&&(e.payer==='partner'||e.payer==='tuition')).reduce((s,e)=>s+e.amount,0);
+    const profit=Math.max(0,inc-kupaExp);
+    totalInc+=inc;totalExp+=kupaExp;totalProfit+=profit;totalTuitionInc+=tuitionInc;
+    return{mName,inc,tuitionInc,exp:kupaExp,profit};
   });
 
   const totalTargetDiff=totalTuitionInc-(target*12);
@@ -1637,8 +1612,9 @@ window.exportMonthPDF=function(){
   const exp=D.expenses.filter(e=>e.month===m&&e.year===y);
   const nistanimInc=inc.filter(i=>i.type==='nistanim').reduce((s,i)=>s+i.amount,0);
   const totalInc=inc.filter(i=>i.type!=='nistanim').reduce((s,i)=>s+i.amount,0);
-  const totalExp=exp.reduce((s,e)=>s+e.amount,0);
-  const profit=totalInc-totalExp;
+  const kupaExp=exp.filter(e=>e.payer==='partner'||e.payer==='tuition').reduce((s,e)=>s+e.amount,0);
+  const myExp=exp.filter(e=>e.payer==='me'||e.payer==='me-both').reduce((s,e)=>s+e.amount,0);
+  const profit=Math.max(0,totalInc-kupaExp);
   const tl={tuition:'שכ"ל תלמידים',nistanim:'ניצנים (גוטליב)',municipality:'עירייה',other:'אחר'};
   const html=`<html dir="rtl"><head><meta charset="UTF-8">
   <style>body{font-family:Arial,sans-serif;padding:30px;direction:rtl;}
@@ -1653,8 +1629,9 @@ window.exportMonthPDF=function(){
   <div class="summary">
     <div class="box"><div class="lbl">הכנסות (ללא ניצנים)</div><div class="vl">₪${fmt(totalInc)}</div></div>
     ${nistanimInc>0?`<div class="box" style="border-color:#7c3aed;"><div class="lbl" style="color:#7c3aed;">ניצנים → גוטליב</div><div class="vl" style="color:#7c3aed;">₪${fmt(nistanimInc)}</div></div>`:''}
-    <div class="box"><div class="lbl">הוצאות</div><div class="vl">₪${fmt(totalExp)}</div></div>
-    <div class="box"><div class="lbl">רווח</div><div class="vl">₪${fmt(profit)}</div></div>
+    <div class="box"><div class="lbl">הוצאות קופה</div><div class="vl">₪${fmt(kupaExp)}</div></div>
+    ${myExp>0?`<div class="box" style="border-color:#b45309;"><div class="lbl" style="color:#b45309;">שילמתי מכיסי</div><div class="vl" style="color:#b45309;">₪${fmt(myExp)}</div></div>`:''}
+    <div class="box"><div class="lbl">רווח קופה</div><div class="vl">₪${fmt(profit)}</div></div>
     <div class="box"><div class="lbl">חלק ${n1}</div><div class="vl">₪${fmt(profit/2)}</div></div>
   </div>
   <h2>הכנסות</h2>
@@ -1664,7 +1641,9 @@ window.exportMonthPDF=function(){
   <h2>הוצאות</h2>
   <table><tr><th>תיאור</th><th>שילם</th><th>סכום</th></tr>
   ${exp.map(e=>`<tr><td>${e.desc}</td><td>${e.payer==='me'?n1:e.payer==='partner'?n2:'קופת שכ"ל'}</td><td>₪${fmt(e.amount)}</td></tr>`).join('')}
-  <tr><td><b>סה"כ</b></td><td></td><td><b>₪${fmt(totalExp)}</b></td></tr></table>
+  <tr><td><b>סה"כ קופה</b></td><td></td><td><b>₪${fmt(kupaExp)}</b></td></tr>
+  ${myExp>0?`<tr><td><b>שילם ${n1} מכיסו</b></td><td></td><td><b>₪${fmt(myExp)}</b></td></tr>`:''}
+  </table>
   </body></html>`;
   const w=window.open('','_blank');w.document.write(html);w.document.close();setTimeout(()=>w.print(),400);
 };
@@ -1676,9 +1655,10 @@ window.exportYearlyPDF=function(){
   const rows=HEB.map((mName,idx)=>{
     const m=idx+1;
     const inc=D.incomes.filter(i=>i.month===m&&i.year===y&&i.type!=='nistanim').reduce((s,i)=>s+i.amount,0);
-    const exp=D.expenses.filter(e=>e.month===m&&e.year===y).reduce((s,e)=>s+e.amount,0);
-    totalInc+=inc;totalExp+=exp;
-    return{mName,inc,exp,profit:inc-exp};
+    const kupaExp=D.expenses.filter(e=>e.month===m&&e.year===y&&(e.payer==='partner'||e.payer==='tuition')).reduce((s,e)=>s+e.amount,0);
+    const profit=Math.max(0,inc-kupaExp);
+    totalInc+=inc;totalExp+=kupaExp;
+    return{mName,inc,exp:kupaExp,profit};
   });
   const html=`<html dir="rtl"><head><meta charset="UTF-8">
   <style>body{font-family:Arial,sans-serif;padding:30px;direction:rtl;}
