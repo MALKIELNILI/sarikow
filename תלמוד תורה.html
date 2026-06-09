@@ -1400,7 +1400,8 @@ function renderDashboard(){
   // קטע יעד + כפתור השלמה
   const hasAutoComplete=(D.completions||[]).some(c=>c.month===m&&c.year===y);
   const completion=(D.completions||[]).find(c=>c.month===m&&c.year===y);
-  const rawExcess=tuitionInc-target;
+  // עודף לצורך הקדמה = effectiveTuitionInc (כולל מה שהועבר אליי) פחות היעד
+  const rawExcess=Math.max(0,effectiveTuitionInc-target);
   const targetSection=target>0?`<div class="section" style="margin-bottom:14px;">
     <div class="section-header"><h2>🎯 יעד שכר לימוד — ${HEB[m-1]} ${y}</h2></div>
     <div class="section-body">
