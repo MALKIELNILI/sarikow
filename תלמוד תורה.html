@@ -1,0 +1,1925 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>תלמוד תורה</title>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="icon.png"/>
+<meta name="theme-color" content="#0f1117"/>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap');
+:root{
+  --bg:#0f1117;--surface:#1a1d27;--surface2:#22263a;--border:#2e3350;
+  --accent:#4f8ef7;--accent2:#7c5ef7;--green:#34c77b;--red:#f75e5e;
+  --yellow:#f7c948;--text:#e8eaf6;--muted:#7b82a3;--radius:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;direction:rtl;}
+
+/* LOGIN */
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}
+.login-box{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:40px;width:100%;max-width:360px;text-align:center;}
+.login-box .logo{font-size:48px;margin-bottom:16px;}
+.login-box h1{font-size:22px;font-weight:700;margin-bottom:6px;}
+.login-box p{color:var(--muted);font-size:14px;margin-bottom:28px;}
+.login-box input{margin-bottom:12px;text-align:center;font-size:16px;padding:12px;}
+.login-box .btn-login{width:100%;padding:12px;font-size:16px;}
+.login-err{color:var(--red);font-size:13px;margin-top:8px;min-height:20px;}
+
+/* APP */
+#main-app{display:none;}
+header{background:linear-gradient(135deg,#1a1d27,#22263a);border-bottom:1px solid var(--border);padding:12px 18px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100;}
+header .logo{width:38px;height:38px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+header h1{font-size:17px;font-weight:700;flex:1;}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;flex-shrink:0;}
+.sync-dot.syncing{background:var(--yellow);animation:pulse 1s infinite;}
+.sync-dot.error{background:var(--red);}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
+.sync-label{font-size:11px;color:var(--muted);}
+
+.tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--border);padding:0 12px;overflow-x:auto;}
+.tab{padding:12px 13px;font-size:12px;font-weight:500;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all 0.2s;font-family:'Heebo',sans-serif;background:none;border-top:none;border-left:none;border-right:none;}
+.tab:hover{color:var(--text);}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+
+.content{padding:16px;max-width:900px;margin:0 auto;}
+.page{display:none;}
+.page.active{display:block;}
+
+/* CARDS */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px;margin-bottom:18px;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;}
+.card .label{font-size:11px;color:var(--muted);margin-bottom:5px;}
+.card .val{font-size:20px;font-weight:700;}
+.card .sub-val{font-size:10px;color:var(--muted);margin-top:3px;}
+.card.green .val{color:var(--green);}
+.card.red .val{color:var(--red);}
+.card.blue .val{color:var(--accent);}
+.card.yellow .val{color:var(--yellow);}
+.card.purple .val{color:var(--accent2);}
+
+/* SECTION */
+.section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:14px;overflow:hidden;}
+.section-header{padding:12px 15px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:var(--surface2);}
+.section-header h2{font-size:13px;font-weight:600;}
+.section-body{padding:14px;}
+
+/* FORM */
+.form-row{display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;}
+.form-group{display:flex;flex-direction:column;gap:4px;flex:1;min-width:105px;}
+.form-group label{font-size:11px;color:var(--muted);}
+input,select{background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 10px;font-size:14px;font-family:'Heebo',sans-serif;direction:rtl;width:100%;transition:border-color 0.2s;}
+input:focus,select:focus{outline:none;border-color:var(--accent);}
+select option{background:var(--surface);}
+
+/* BUTTONS */
+.btn{padding:8px 15px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;font-family:'Heebo',sans-serif;transition:all 0.15s;white-space:nowrap;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-success{background:var(--green);color:#fff;}
+.btn-danger{background:var(--red);color:#fff;}
+.btn-warning{background:var(--yellow);color:#111;}
+.btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+.btn-ghost:hover{border-color:var(--accent);}
+.btn-sm{padding:4px 9px;font-size:11px;}
+
+/* TABLE */
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{text-align:right;padding:8px 11px;font-size:11px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);}
+td{padding:9px 11px;border-bottom:1px solid rgba(46,51,80,0.5);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(255,255,255,0.02);}
+
+/* BADGE */
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;}
+.badge-green{background:rgba(52,199,123,0.15);color:var(--green);}
+.badge-red{background:rgba(247,94,94,0.15);color:var(--red);}
+.badge-blue{background:rgba(79,142,247,0.15);color:var(--accent);}
+.badge-yellow{background:rgba(247,201,72,0.15);color:var(--yellow);}
+.badge-purple{background:rgba(124,94,247,0.15);color:var(--accent2);}
+
+/* SETTINGS */
+.settings-row{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--border);}
+.settings-row:last-child{border-bottom:none;}
+.settings-row .slabel{flex:1;font-size:14px;}
+.settings-row .sdesc{font-size:11px;color:var(--muted);}
+.inline-edit{display:flex;align-items:center;gap:7px;}
+.inline-edit input{width:120px;}
+
+/* MISC */
+.month-bar{display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap;}
+.month-bar select{width:auto;}
+.month-label{font-size:16px;font-weight:700;}
+.alert{padding:10px 13px;border-radius:10px;font-size:13px;margin-bottom:11px;}
+.alert-info{background:rgba(79,142,247,0.1);border:1px solid rgba(79,142,247,0.3);color:var(--accent);}
+.alert-success{background:rgba(52,199,123,0.1);border:1px solid rgba(52,199,123,0.3);color:var(--green);}
+.alert-warning{background:rgba(247,201,72,0.1);border:1px solid rgba(247,201,72,0.3);color:var(--yellow);}
+.big-split{display:flex;gap:12px;margin-top:10px;}
+.split-box{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center;}
+.split-box .sname{font-size:11px;color:var(--muted);margin-bottom:5px;}
+.split-box .sval{font-size:24px;font-weight:800;}
+.split-box .sadj{font-size:10px;color:var(--muted);margin-top:4px;}
+.split-box.mine{border-color:rgba(79,142,247,0.4);}
+.split-box.mine .sval{color:var(--accent);}
+.split-box.partner .sval{color:var(--accent2);}
+.empty-state{text-align:center;padding:30px 20px;color:var(--muted);font-size:13px;}
+.text-green{color:var(--green);}
+.text-red{color:var(--red);}
+.text-muted{color:var(--muted);}
+
+/* HALF/FULL */
+.half-full{display:flex;gap:5px;}
+.half-full button{flex:1;padding:7px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-family:'Heebo',sans-serif;transition:all 0.15s;}
+.half-full button.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+
+/* SEARCH */
+.search-bar{position:relative;margin-bottom:12px;}
+.search-bar input{padding-right:36px;}
+.search-bar .search-icon{position:absolute;right:11px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;pointer-events:none;}
+
+/* QUICK ADD FAB */
+.fab{position:fixed;bottom:24px;left:24px;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-size:24px;border:none;cursor:pointer;box-shadow:0 4px 20px rgba(79,142,247,0.4);z-index:200;display:flex;align-items:center;justify-content:center;transition:transform 0.2s;}
+.fab:hover{transform:scale(1.1);}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:500;align-items:center;justify-content:center;padding:16px;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:22px;width:100%;max-width:520px;max-height:92vh;overflow-y:auto;}
+.modal h3{font-size:15px;font-weight:700;margin-bottom:16px;}
+.modal-btns{display:flex;gap:9px;margin-top:16px;justify-content:flex-end;}
+
+/* YEARLY TABLE */
+.yearly-table td:first-child{font-weight:600;}
+.yearly-row-total td{border-top:2px solid var(--border);font-weight:800;background:var(--surface2);}
+
+/* CONFIRM MODAL */
+#confirm-modal .modal{max-width:340px;text-align:center;}
+#confirm-modal .modal p{color:var(--muted);font-size:14px;margin-bottom:20px;}
+#confirm-modal .modal-btns{justify-content:center;}
+
+/* TOAST */
+#toast{position:fixed;bottom:20px;right:20px;background:#22263a;border:1px solid #34c77b;color:#e8eaf6;padding:10px 15px;border-radius:10px;font-size:13px;z-index:9999;font-family:Heebo,sans-serif;box-shadow:0 4px 20px rgba(0,0,0,0.4);transition:opacity 0.3s;opacity:0;pointer-events:none;}
+
+@media(max-width:600px){
+  .content{padding:10px;}
+  .cards{grid-template-columns:repeat(2,1fr);}
+  .form-row{flex-direction:column;}
+  .big-split{flex-direction:column;}
+  .tab{padding:10px 9px;font-size:11px;}
+  .fab{bottom:16px;left:16px;width:46px;height:46px;font-size:20px;}
+
+  /* טבלאות במובייל */
+  table{font-size:12px;}
+  th,td{padding:6px 5px;}
+  .col-hide-mobile{display:none;}
+  .col-show-mobile{display:block !important;}
+
+  /* גלילה אופקית לטבלאות */
+  #income-table, #expense-table, #payments-table, #debt-months-table{
+    overflow-x:auto;display:block;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="logo">📚</div>
+    <h1>תלמוד תורה</h1>
+    <p>מערכת ניהול הכנסות והוצאות</p>
+    <input type="password" id="pwd-input" placeholder="סיסמה" onkeydown="if(event.key==='Enter')tryLogin()">
+    <button class="btn btn-primary btn-login" onclick="tryLogin()">כניסה</button>
+    <button class="btn btn-ghost btn-login" style="margin-top:8px;font-size:13px;" onclick="resetPassword()">שכחתי סיסמה / כניסה ללא סיסמה</button>
+    <div class="login-err" id="login-err"></div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="main-app">
+  <header>
+    <div class="logo">📚</div>
+    <h1>תלמוד תורה</h1>
+    <span class="sync-dot" id="sync-dot"></span>
+    <span class="sync-label" id="sync-label">מסונכרן</span>
+    <button class="btn btn-ghost btn-sm" onclick="doLogout()" style="margin-right:auto;">יציאה</button>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" data-page="dashboard" onclick="showPage('dashboard',this)">📊 סיכום</button>
+    <button class="tab" data-page="income" onclick="showPage('income',this)">💰 הכנסות</button>
+    <button class="tab" data-page="expenses" onclick="showPage('expenses',this)">📋 הוצאות</button>
+    <button class="tab" data-page="debts" onclick="showPage('debts',this)">🔄 חובות</button>
+    <button class="tab" data-page="yearly" onclick="showPage('yearly',this)">📆 שנתי</button>
+    <button class="tab" data-page="search" onclick="showPage('search',this);renderGlobalSearch()">🔍 חיפוש</button>
+    <button class="tab" data-page="settings" onclick="showPage('settings',this)">⚙️ הגדרות</button>
+  </div>
+
+  <div class="content">
+
+    <!-- DASHBOARD -->
+    <div id="page-dashboard" class="page active">
+      <div class="month-bar">
+        <span class="month-label">📅</span>
+        <button class="btn btn-ghost btn-sm" onclick="navMonth('dash-month','dash-year',-1,renderDashboard)" style="padding:6px 10px">◀</button>
+        <select id="dash-month" onchange="renderDashboard()"></select>
+        <select id="dash-year" onchange="renderDashboard()"></select>
+        <button class="btn btn-ghost btn-sm" onclick="navMonth('dash-month','dash-year',1,renderDashboard)" style="padding:6px 10px">▶</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportMonthPDF()">📄 PDF</button>
+      </div>
+      <div id="dash-cards" class="cards"></div>
+      <div id="dash-split"></div>
+      <div id="dash-quick-add"></div>
+      <div id="dash-detail"></div>
+    </div>
+
+    <!-- INCOME -->
+    <div id="page-income" class="page">
+      <div class="section">
+        <div class="section-header"><h2>💰 הוספת הכנסה</h2></div>
+        <div class="section-body">
+          <div class="form-row">
+            <div class="form-group"><label>חודש</label><select id="inc-month"></select></div>
+            <div class="form-group"><label>שנה</label><select id="inc-year"></select></div>
+            <div class="form-group">
+              <label>סוג</label>
+              <select id="inc-type" onchange="incTypeChange()">
+                <option value="tuition">שכר לימוד תלמידים</option>
+                <option value="nistanim">ניצנים</option>
+                <option value="municipality">תשלום עירייה</option>
+                <option value="other">אחר</option>
+              </select>
+            </div>
+            <div class="form-group" id="inc-students-wrap"><label>מס' תלמידים</label><input type="number" id="inc-students" min="0" oninput="calcTuition()"></div>
+            <div class="form-group" id="inc-rate-wrap"><label>תשלום לתלמיד (₪)</label><input type="number" id="inc-rate" min="0" oninput="calcTuition()"></div>
+            <div class="form-group"><label>סכום (₪)</label><input type="number" id="inc-amount" min="0" placeholder="0"></div>
+            <div class="form-group">
+              <label>סכום שהוזן הוא</label>
+              <div class="half-full">
+                <button id="inc-full-btn" class="active" onclick="setIncHalf('full')">מלא ÷2</button>
+                <button id="inc-half-btn" onclick="setIncHalf('half')">כבר חצי</button>
+              </div>
+            </div>
+            <div class="form-group"><label>הערה</label><input type="text" id="inc-note" placeholder="הערה"></div>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-success" onclick="addIncome()">➕ הוסף הכנסה</button>
+            <button class="btn btn-ghost" onclick="openExcelPaste('income')">📋 הדבק מאקסל</button>
+          </div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-header">
+          <h2>📋 רשימת הכנסות</h2>
+          <div style="display:flex;gap:5px;align-items:center;">
+            <button class="btn btn-ghost btn-sm" onclick="navMonth('inc-filter-month','inc-filter-year',-1,renderIncomes)" style="padding:5px 9px">◀</button>
+            <select id="inc-filter-month" onchange="renderIncomes()"></select>
+            <select id="inc-filter-year" onchange="renderIncomes()"></select>
+            <button class="btn btn-ghost btn-sm" onclick="navMonth('inc-filter-month','inc-filter-year',1,renderIncomes)" style="padding:5px 9px">▶</button>
+          </div>
+        </div>
+        <div class="section-body" style="padding:12px;">
+          <div class="search-bar">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="inc-search" placeholder="חיפוש..." oninput="renderIncomes()">
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+            <button class="btn btn-danger btn-sm" onclick="bulkDeleteMonth('income')">🗑️ מחק כל החודש</button>
+          </div>
+        </div>
+        <div style="padding:0;"><div id="income-table"></div></div>
+      </div>
+    </div>
+
+    <!-- EXPENSES -->
+    <div id="page-expenses" class="page">
+      <div class="section">
+        <div class="section-header"><h2>📋 הוספת הוצאה</h2></div>
+        <div class="section-body">
+          <div class="form-row">
+            <div class="form-group"><label>חודש</label><select id="exp-month"></select></div>
+            <div class="form-group"><label>שנה</label><select id="exp-year"></select></div>
+            <div class="form-group"><label>תיאור</label><input type="text" id="exp-desc" placeholder="שכר מורים, שכירות..."></div>
+            <div class="form-group"><label>סכום (₪)</label><input type="number" id="exp-amount" min="0" placeholder="0"></div>
+            <div class="form-group">
+              <label>סכום שהוזן הוא</label>
+              <div class="half-full">
+                <button id="exp-full-btn" class="active" onclick="setExpHalf('full')">מלא ÷2</button>
+                <button id="exp-half-btn" onclick="setExpHalf('half')">כבר חצי</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>מי שילם?</label>
+              <select id="exp-payer" onchange="onExpPayerChange()">
+                <option value="me">מלכיאל</option>
+                <option value="partner">השותף</option>
+                <option value="tuition">קופת שכ"ל</option>
+                <option value="me-both">שילמתי עבור שנינו</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>קטגוריה</label>
+              <select id="exp-cat">
+                <option value="salary">שכר מורים</option>
+                <option value="rent">שכירות</option>
+                <option value="utilities">חשמל/מים/גז</option>
+                <option value="supplies">ציוד</option>
+                <option value="other">אחר</option>
+              </select>
+            </div>
+            <div class="form-group"><label>הערה</label><input type="text" id="exp-note" placeholder="הערה"></div>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-danger" onclick="addExpense()">➕ הוסף הוצאה</button>
+            <button class="btn btn-ghost" onclick="openExcelPaste('expense')">📋 הדבק מאקסל</button>
+          </div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-header">
+          <h2>📋 רשימת הוצאות</h2>
+          <div style="display:flex;gap:5px;align-items:center;">
+            <button class="btn btn-ghost btn-sm" onclick="navMonth('exp-filter-month','exp-filter-year',-1,renderExpenses)" style="padding:5px 9px">◀</button>
+            <select id="exp-filter-month" onchange="renderExpenses()"></select>
+            <select id="exp-filter-year" onchange="renderExpenses()"></select>
+            <button class="btn btn-ghost btn-sm" onclick="navMonth('exp-filter-month','exp-filter-year',1,renderExpenses)" style="padding:5px 9px">▶</button>
+          </div>
+        </div>
+        <div class="section-body" style="padding:12px;">
+          <div class="search-bar">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="exp-search" placeholder="חיפוש..." oninput="renderExpenses()">
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+            <button class="btn btn-ghost btn-sm" onclick="bulkChangePayer()">👤 שנה משלם לכל החודש</button>
+            <button class="btn btn-danger btn-sm" onclick="bulkDeleteMonth('expense')">🗑️ מחק כל החודש</button>
+          </div>
+        </div>
+        <div style="padding:0;"><div id="expense-table"></div></div>
+      </div>
+    </div>
+
+    <!-- DEBTS -->
+    <div id="page-debts" class="page">
+
+      <!-- סיכום אוטומטי -->
+      <div id="debt-summary"></div>
+
+      <!-- תשלום לשותף -->
+      <div class="section">
+        <div class="section-header"><h2>💸 תיעוד תשלום לשותף</h2></div>
+        <div class="section-body">
+          <div class="form-row">
+            <div class="form-group"><label>תאריך</label><input type="date" id="pay-date"></div>
+            <div class="form-group"><label>סכום ששילמתי (₪)</label><input type="number" id="pay-amount" min="0" placeholder="0"></div>
+            <div class="form-group"><label>הערה / פירוט</label><input type="text" id="pay-note" placeholder="למה שילמתי..."></div>
+          </div>
+          <div style="margin-top:12px;">
+            <button class="btn btn-success" onclick="addPayment()">💸 הוסף תשלום</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- היסטוריית תשלומים -->
+      <div class="section">
+        <div class="section-header"><h2>📋 היסטוריית תשלומים לשותף</h2></div>
+        <div style="padding:0;"><div id="payments-table"></div></div>
+      </div>
+
+      <!-- פירוט חובות לפי חודש -->
+      <div class="section">
+        <div class="section-header"><h2>📊 פירוט לפי חודשים</h2></div>
+        <div style="padding:0;"><div id="debt-months-table"></div></div>
+      </div>
+
+    </div>
+
+    <!-- YEARLY -->
+    <div id="page-yearly" class="page">
+      <div class="month-bar">
+        <span class="month-label">📆 סיכום שנתי</span>
+        <select id="yearly-year" onchange="renderYearly()"></select>
+        <button class="btn btn-ghost btn-sm" onclick="exportYearlyPDF()">📄 PDF</button>
+      </div>
+      <div id="yearly-cards" class="cards"></div>
+      <div id="yearly-table"></div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div id="page-settings" class="page">
+      <div class="section">
+        <div class="section-header"><h2>⚙️ הגדרות</h2></div>
+        <div class="section-body">
+          <div class="settings-row">
+            <div><div class="slabel">מספר תלמידים ברירת מחדל</div></div>
+            <div class="inline-edit"><input type="number" id="set-students" min="0"><button class="btn btn-ghost btn-sm" onclick="saveSetting('students')">שמור</button></div>
+          </div>
+          <div class="settings-row">
+            <div><div class="slabel">תשלום חודשי לתלמיד (₪)</div></div>
+            <div class="inline-edit"><input type="number" id="set-tuition" min="0"><button class="btn btn-ghost btn-sm" onclick="saveSetting('tuition')">שמור</button></div>
+          </div>
+          <div class="settings-row">
+            <div><div class="slabel">תשלום עירייה חודשי (₪)</div></div>
+            <div class="inline-edit"><input type="number" id="set-muni" min="0"><button class="btn btn-ghost btn-sm" onclick="saveSetting('muni')">שמור</button></div>
+          </div>
+          <div class="settings-row">
+            <div><div class="slabel">ניצנים — מספר תלמידים</div></div>
+            <div class="inline-edit"><input type="number" id="set-nistanim-students" min="0"><button class="btn btn-ghost btn-sm" onclick="saveSetting('nistanim_students')">שמור</button></div>
+          </div>
+          <div class="settings-row">
+            <div><div class="slabel">ניצנים — תשלום לתלמיד (₪)</div></div>
+            <div class="inline-edit"><input type="number" id="set-nistanim-rate" min="0"><button class="btn btn-ghost btn-sm" onclick="saveSetting('nistanim_rate')">שמור</button></div>
+          </div>
+          <div class="settings-row">
+            <div><div class="slabel">הוספת ניצנים לחודשים קודמים</div><div class="sdesc">מוסיף אוטומטית ניצנים לכל החודשים מנובמבר 2025 עד היום</div></div>
+            <button class="btn btn-primary btn-sm" onclick="addNistanimHistory()">➕ הוסף</button>
+          </div>
+          <div class="settings-row">
+            <div><div class="slabel">עדכון ניצנים קיימים</div><div class="sdesc">מעדכן סכום לפי ההגדרות הנוכחיות, מהחודש שנבחר ואילך</div></div>
+            <div class="inline-edit" style="flex-wrap:wrap;gap:5px;">
+              <select id="upd-nistanim-month" style="width:90px;"></select>
+              <select id="upd-nistanim-year" style="width:75px;"></select>
+              <button class="btn btn-warning btn-sm" onclick="updateNistanimFromMonth()">עדכן</button>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div>
+              <div class="slabel">יעד הכנסה חודשי (₪)</div>
+              <div class="sdesc">110 תלמידים × ₪200 = ₪22,000 — מוצג כחוסר/עודף בסיכום</div>
+            </div>
+            <div class="inline-edit"><input type="number" id="set-target" min="0"><button class="btn btn-ghost btn-sm" onclick="saveSetting('target')">שמור</button></div>
+          </div>
+          <div class="settings-row">
+            <div><div class="slabel">שמי (שותף 1)</div></div>
+            <div class="inline-edit"><input type="text" id="set-name1" style="width:140px;"><button class="btn btn-ghost btn-sm" onclick="saveSetting('name1')">שמור</button></div>
+          </div>
+          <div class="settings-row">
+            <div><div class="slabel">שם השותף (שותף 2)</div></div>
+            <div class="inline-edit"><input type="text" id="set-name2" style="width:140px;"><button class="btn btn-ghost btn-sm" onclick="saveSetting('name2')">שמור</button></div>
+          </div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-header"><h2>🔒 סיסמה</h2></div>
+        <div class="section-body">
+          <div class="settings-row">
+            <div><div class="slabel">סיסמה לכניסה</div><div class="sdesc">השאר ריק להשבתת הסיסמה</div></div>
+            <div class="inline-edit">
+              <input type="password" id="set-pwd" style="width:150px;" placeholder="סיסמה חדשה">
+              <button class="btn btn-ghost btn-sm" onclick="savePassword()">שמור</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-header"><h2>🗃️ ניהול נתונים</h2></div>
+        <div class="section-body">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn btn-ghost" onclick="exportData()">📤 ייצוא JSON</button>
+            <button class="btn btn-ghost" onclick="document.getElementById('import-file').click()">📥 ייבוא JSON</button>
+            <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(this)">
+            <button class="btn btn-danger" onclick="confirmClearAll()">🗑️ מחק הכל</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SEARCH -->
+    <div id="page-search" class="page">
+      <div class="section">
+        <div class="section-header"><h2>🔍 חיפוש גלובלי</h2></div>
+        <div class="section-body">
+          <div class="search-bar">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="global-search-input" placeholder="חפש הכנסה או הוצאה..." oninput="renderGlobalSearch()">
+          </div>
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+            <button class="btn btn-sm active" id="gs-filter-all" onclick="setGsFilter('all')" style="background:var(--accent);color:#fff">הכל</button>
+            <button class="btn btn-ghost btn-sm" id="gs-filter-income" onclick="setGsFilter('income')">💰 הכנסות</button>
+            <button class="btn btn-ghost btn-sm" id="gs-filter-expense" onclick="setGsFilter('expense')">📋 הוצאות</button>
+          </div>
+        </div>
+      </div>
+      <div id="global-search-results"></div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main-app -->
+
+<!-- FAB quick add -->
+<button class="fab" id="fab-btn" onclick="openQuickAdd()" title="הוספה מהירה">＋</button>
+
+<div id="toast"></div>
+
+<!-- EDIT INCOME MODAL -->
+<div class="modal-overlay" id="edit-inc-modal">
+  <div class="modal">
+    <h3>✏️ עריכת הכנסה</h3>
+    <div id="edit-inc-body"></div>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" onclick="closeModal('edit-inc-modal')">ביטול</button>
+      <button class="btn btn-primary" onclick="saveEditIncome()">שמור</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT EXPENSE MODAL -->
+<div class="modal-overlay" id="edit-exp-modal">
+  <div class="modal">
+    <h3>✏️ עריכת הוצאה</h3>
+    <div id="edit-exp-body"></div>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" onclick="closeModal('edit-exp-modal')">ביטול</button>
+      <button class="btn btn-primary" onclick="saveEditExpense()">שמור</button>
+    </div>
+  </div>
+</div>
+
+<!-- QUICK ADD MODAL -->
+<div class="modal-overlay" id="quick-modal">
+  <div class="modal">
+    <h3>⚡ הוספה מהירה</h3>
+    <div class="form-row" style="margin-bottom:12px;">
+      <div class="form-group">
+        <label>סוג</label>
+        <div class="half-full">
+          <button id="qa-inc-btn" class="active" onclick="setQAType('income')">💰 הכנסה</button>
+          <button id="qa-exp-btn" onclick="setQAType('expense')">📋 הוצאה</button>
+        </div>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>חודש</label><select id="qa-month"></select></div>
+      <div class="form-group"><label>שנה</label><select id="qa-year"></select></div>
+      <div class="form-group" id="qa-desc-wrap"><label>תיאור</label><input type="text" id="qa-desc" placeholder="תיאור"></div>
+      <div class="form-group"><label>סכום (₪)</label><input type="number" id="qa-amount" placeholder="0"></div>
+      <div class="form-group">
+        <label>סכום הוא</label>
+        <div class="half-full">
+          <button id="qa-full-btn" class="active" onclick="setQAHalf('full')">מלא ÷2</button>
+          <button id="qa-half-btn" onclick="setQAHalf('half')">כבר חצי</button>
+        </div>
+      </div>
+      <div class="form-group" id="qa-payer-wrap">
+        <label>מי שילם?</label>
+        <select id="qa-payer" onchange="onQAPayerChange()">
+          <option value="me">מלכיאל</option>
+          <option value="partner">השותף</option>
+          <option value="tuition">קופת שכ"ל</option>
+          <option value="me-both">שילמתי עבור שנינו</option>
+        </select>
+      </div>
+      <div class="form-group"><label>הערה</label><input type="text" id="qa-note" placeholder="הערה"></div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" onclick="closeModal('quick-modal')">ביטול</button>
+      <button class="btn btn-success" id="qa-save-btn" onclick="saveQuickAdd()">הוסף</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal">
+    <h3 id="confirm-title">אישור</h3>
+    <p id="confirm-msg"></p>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" onclick="closeModal('confirm-modal')">ביטול</button>
+      <button class="btn btn-danger" id="confirm-ok-btn">אישור</button>
+    </div>
+  </div>
+</div>
+
+<!-- BULK PAYER MODAL -->
+<div class="modal-overlay" id="bulk-payer-modal">
+  <div class="modal" style="max-width:380px;">
+    <h3>👤 שנה משלם לכל החודש</h3>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:16px;">כל ההוצאות של החודש שנבחר ישתנו למשלם החדש.</p>
+    <div class="form-group" style="margin-bottom:14px;">
+      <label>משלם חדש</label>
+      <select id="bulk-payer-select">
+        <option value="me">מלכיאל</option>
+        <option value="partner">השותף</option>
+        <option value="tuition">קופת שכ"ל</option>
+      </select>
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" onclick="closeModal('bulk-payer-modal')">ביטול</button>
+      <button class="btn btn-primary" onclick="saveBulkPayer()">שמור לכולם</button>
+    </div>
+  </div>
+</div>
+
+<!-- EXCEL PASTE MODAL -->
+<div class="modal-overlay" id="excel-modal">
+  <div class="modal" style="max-width:600px;">
+    <h3 id="excel-modal-title">📋 הדבק מאקסל</h3>
+    <div id="excel-modal-desc" class="alert alert-info" style="margin-bottom:14px;font-size:12px;"></div>
+    <div class="form-row" style="margin-bottom:12px;">
+      <div class="form-group"><label>חודש</label><select id="excel-month"></select></div>
+      <div class="form-group"><label>שנה</label><select id="excel-year"></select></div>
+      <div class="form-group" id="excel-payer-wrap">
+        <label>מי שילם?</label>
+        <select id="excel-payer">
+          <option value="me">מלכיאל</option>
+          <option value="partner">השותף</option>
+          <option value="tuition">קופת שכ"ל</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>סכום שהוזן הוא</label>
+        <div class="half-full">
+          <button id="excel-full-btn" class="active" onclick="setExcelHalf('full')">מלא ÷2</button>
+          <button id="excel-half-btn" onclick="setExcelHalf('half')">כבר חצי</button>
+        </div>
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:12px;">
+      <label>הדבק כאן את הטבלה מאקסל (Ctrl+V)</label>
+      <textarea id="excel-paste-area" rows="8" placeholder="העתק מאקסל והדבק כאן..." style="background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px;font-size:13px;font-family:'Heebo',sans-serif;direction:rtl;width:100%;resize:vertical;margin-top:4px;"></textarea>
+    </div>
+    <div id="excel-preview"></div>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" onclick="closeModal('excel-modal')">ביטול</button>
+      <button class="btn btn-ghost" onclick="previewExcel()">👁️ תצוגה מקדימה</button>
+      <button class="btn btn-success" id="excel-save-btn" onclick="saveExcelPaste()">✅ הוסף הכל</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script>
+
+const firebaseConfig = {
+  apiKey:"AIzaSyDV8U0f3L-pEi23ykg-nZKM7KbQAnMHCIk",
+  authDomain:"talmud-torah-dd876.firebaseapp.com",
+  databaseURL:"https://talmud-torah-dd876-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:"talmud-torah-dd876",
+  storageBucket:"talmud-torah-dd876.firebasestorage.app",
+  messagingSenderId:"282582646993",
+  appId:"1:282582646993:web:a417471e9d3a858eb6c5f0"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+const HEB=['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+let D={settings:{students:112,tuition:250,muni:0,nistanim_students:49,nistanim_rate:150,name1:'מלכיאל',name2:'השותף',password:''},incomes:[],expenses:[],debts:[]};
+let loggedIn=false;
+const $=id=>document.getElementById(id);
+const fmt=n=>Math.round(n||0).toLocaleString('he-IL');
+
+// ── SYNC ─────────────────────────────────────────────────
+function syncStatus(s){
+  const dot=$('sync-dot'),lbl=$('sync-label');
+  dot.className='sync-dot'+(s==='syncing'?' syncing':s==='error'?' error':'');
+  lbl.textContent=s==='syncing'?'מסנכרן...':s==='error'?'שגיאת חיבור':'מסונכרן';
+}
+async function fbSet(path,val){
+  syncStatus('syncing');
+  try{await db.ref(path).set(val);syncStatus('ok');}
+  catch(e){syncStatus('error');toast('שגיאת שמירה','error');console.error(e);}
+}
+async function fbLoad(){
+  syncStatus('syncing');
+  try{
+    const snap=await db.ref('tt').get();
+    if(snap.exists()){
+      const v=snap.val();
+      D.settings=v.settings||D.settings;
+      D.incomes=v.incomes?Object.values(v.incomes):[];
+      D.expenses=v.expenses?Object.values(v.expenses):[];
+      D.debts=v.debts?Object.values(v.debts):[];
+      D.payments=v.payments?Object.values(v.payments):[];
+      D.completions=v.completions?Object.values(v.completions):[];
+    }
+    syncStatus('ok');
+  }catch(e){syncStatus('error');toast('שגיאת טעינה','error');console.error(e);}
+}
+function listenRealtime(){
+  db.ref('tt').on('value',snap=>{
+    if(!loggedIn)return;
+    if(snap.exists()){
+      const v=snap.val();
+      D.settings=v.settings||D.settings;
+      D.incomes=v.incomes?Object.values(v.incomes):[];
+      D.expenses=v.expenses?Object.values(v.expenses):[];
+      D.debts=v.debts?Object.values(v.debts):[];
+      D.payments=v.payments?Object.values(v.payments):[];
+      D.completions=v.completions?Object.values(v.completions):[];
+    }
+    refreshCurrent();syncStatus('ok');
+  });
+}
+function refreshCurrent(){
+  const pg=document.querySelector('.tab.active')?.dataset.page;
+  if(pg==='dashboard')renderDashboard();
+  else if(pg==='income')renderIncomes();
+  else if(pg==='expenses')renderExpenses();
+  else if(pg==='debts')renderDebts();
+  else if(pg==='yearly')renderYearly();
+  else if(pg==='settings')loadSettings();
+}
+
+// ── LOGIN ─────────────────────────────────────────────────
+async function init(){
+  await fbLoad();
+  if(!D.settings.password)enterApp();
+}
+window.resetPassword=async function(){
+  await fbLoad();
+  D.settings.password='';
+  await fbSet('tt/settings',D.settings);
+  enterApp();
+};
+window.tryLogin=async function(){
+  const pwd=$('pwd-input').value;
+  await fbLoad();
+  if(D.settings.password&&pwd!==D.settings.password){$('login-err').textContent='סיסמה שגויה';return;}
+  enterApp();
+};
+function enterApp(){
+  loggedIn=true;
+  $('login-screen').style.display='none';
+  $('main-app').style.display='block';
+  populateSelects();incTypeChange();loadSettings();renderDashboard();listenRealtime();
+}
+window.doLogout=function(){
+  loggedIn=false;
+  $('main-app').style.display='none';
+  $('login-screen').style.display='flex';
+  $('pwd-input').value='';$('login-err').textContent='';
+};
+
+// ── SELECTS ───────────────────────────────────────────────
+function populateSelects(){
+  const now=new Date(),curM=now.getMonth()+1,curY=now.getFullYear();
+  const years=[];for(let y=curY-3;y<=curY+1;y++)years.push(y);
+  const mH=HEB.map((m,i)=>`<option value="${i+1}"${i+1===curM?' selected':''}>${m}</option>`).join('');
+  const yH=years.map(y=>`<option value="${y}"${y===curY?' selected':''}>${y}</option>`).join('');
+  ['dash-month','inc-month','inc-filter-month','exp-month','exp-filter-month','qa-month','upd-nistanim-month'].forEach(id=>{const el=$(id);if(el)el.innerHTML=mH;});
+  ['dash-year','inc-year','inc-filter-year','exp-year','exp-filter-year','qa-year','upd-nistanim-year'].forEach(id=>{const el=$(id);if(el)el.innerHTML=yH;});
+  const yOnlyH=years.map(y=>`<option value="${y}"${y===curY?' selected':''}>${y}</option>`).join('');
+  const yEl=$('yearly-year');if(yEl)yEl.innerHTML=yOnlyH;
+  const payDateEl=$('pay-date');if(payDateEl)payDateEl.value=now.toISOString().split('T')[0];
+}
+
+// ── SETTINGS ─────────────────────────────────────────────
+function loadSettings(){
+  const s=D.settings;
+  $('set-students').value=s.students;$('set-tuition').value=s.tuition;
+  $('set-muni').value=s.muni||0;
+  $('set-nistanim-students').value=s.nistanim_students||49;$('set-nistanim-rate').value=s.nistanim_rate||150;
+  $('set-target').value=s.target||22000;
+  $('set-name1').value=s.name1||'מלכיאל';
+  $('set-name2').value=s.name2||'השותף';$('set-pwd').value='';
+  const p=$('exp-payer');if(p){p.options[0].text=s.name1||'מלכיאל';p.options[1].text=s.name2||'השותף';}
+  const qp=$('qa-payer');if(qp){qp.options[0].text=s.name1||'מלכיאל';qp.options[1].text=s.name2||'השותף';}
+}
+window.saveSetting=async function(key){
+  const map={students:'set-students',tuition:'set-tuition',muni:'set-muni',target:'set-target',
+    name1:'set-name1',name2:'set-name2',
+    nistanim_students:'set-nistanim-students',nistanim_rate:'set-nistanim-rate'};
+  const el=$(map[key]);if(!el)return;
+  D.settings[key]=(key==='name1'||key==='name2')?el.value:(parseFloat(el.value)||0);
+  await fbSet('tt/settings',D.settings);loadSettings();toast('נשמר ✓');
+  renderDashboard();
+};
+
+window.updateNistanimFromMonth=async function(){
+  const fromMonth=parseInt($('upd-nistanim-month').value);
+  const fromYear=parseInt($('upd-nistanim-year').value);
+  const students=D.settings.nistanim_students||49;
+  const rate=D.settings.nistanim_rate||150;
+  const newAmount=students*rate;
+  const toUpdate=D.incomes.filter(i=>
+    i.type==='nistanim'&&
+    (i.year>fromYear||(i.year===fromYear&&i.month>=fromMonth))
+  );
+  if(!toUpdate.length){toast('לא נמצאו ניצנים מהחודש שנבחר','error');return;}
+  for(const item of toUpdate){
+    item.amount=newAmount;item.students=students;item.rate=rate;
+    await fbSet('tt/incomes/'+item.id,item);
+  }
+  renderDashboard();
+  toast('עודכנו '+toUpdate.length+' חודשי ניצנים ✓');
+};
+window.savePassword=async function(){
+  D.settings.password=$('set-pwd').value;
+  await fbSet('tt/settings',D.settings);$('set-pwd').value='';
+  toast(D.settings.password?'סיסמה נשמרה ✓':'סיסמה הוסרה ✓');
+};
+
+// ── HALF/FULL ─────────────────────────────────────────────
+let incHalf='full',expHalf='full',qaHalf='full',qaType='income';
+window.setIncHalf=function(m){incHalf=m;$('inc-full-btn').className=m==='full'?'active':'';$('inc-half-btn').className=m==='half'?'active':'';};
+window.setExpHalf=function(m){expHalf=m;$('exp-full-btn').className=m==='full'?'active':'';$('exp-half-btn').className=m==='half'?'active':'';};
+window.setQAHalf=function(m){qaHalf=m;$('qa-full-btn').className=m==='full'?'active':'';$('qa-half-btn').className=m==='half'?'active':'';};
+window.setQAType=function(t){
+  qaType=t;
+  $('qa-inc-btn').className=t==='income'?'active':'';
+  $('qa-exp-btn').className=t==='expense'?'active':'';
+  $('qa-desc-wrap').style.display=t==='expense'?'':'none';
+  $('qa-payer-wrap').style.display=t==='expense'?'':'none';
+  $('qa-save-btn').className=t==='income'?'btn btn-success':'btn btn-danger';
+};
+
+// ── INCOME ────────────────────────────────────────────────
+// ── MONTH NAVIGATION ─────────────────────────────────────
+window.navMonth=function(monthId,yearId,dir,callback){
+  const mEl=document.getElementById(monthId),yEl=document.getElementById(yearId);
+  if(!mEl||!yEl)return;
+  let m=parseInt(mEl.value),y=parseInt(yEl.value);
+  m+=dir;
+  if(m<1){m=12;y--;}
+  else if(m>12){m=1;y++;}
+  // update selects
+  for(const opt of mEl.options){if(parseInt(opt.value)===m){mEl.value=m;break;}}
+  for(const opt of yEl.options){if(parseInt(opt.value)===y){yEl.value=y;break;}}
+  if(callback)callback();
+};
+
+// ── GLOBAL SEARCH ─────────────────────────────────────────
+let gsFilter='all';
+window.setGsFilter=function(f){
+  gsFilter=f;
+  ['all','income','expense'].forEach(x=>{
+    const b=document.getElementById('gs-filter-'+x);
+    if(!b)return;
+    b.className=x===f?'btn btn-sm':'btn btn-ghost btn-sm';
+    if(x===f)b.style.cssText='background:var(--accent);color:#fff';
+    else b.style.cssText='';
+  });
+  renderGlobalSearch();
+};
+window.renderGlobalSearch=function(){
+  const q=(document.getElementById('global-search-input')?.value||'').toLowerCase().trim();
+  const el=document.getElementById('global-search-results');
+  if(!el)return;
+  const tl={tuition:'שכ"ל',nistanim:'ניצנים',municipality:'עירייה',other:'אחר'};
+  const tb={tuition:'badge-green',nistanim:'badge-purple',municipality:'badge-blue',other:'badge-yellow'};
+  const catLabel={salary:'שכר מורים',rent:'שכירות',utilities:'חשמל/מים',supplies:'ציוד',other:'אחר',tuition:'שכ"ל',activities:'פעילויות',operation:'תפעול'};
+
+  let incomes=[], expenses=[];
+  if(gsFilter!=='expense'){
+    incomes=(D.incomes||[]).filter(i=>{
+      if(!q)return true;
+      return (i.note||'').toLowerCase().includes(q)||(tl[i.type]||'').includes(q)||String(i.amount).includes(q)||(HEB[i.month-1]||'').includes(q)||String(i.year).includes(q);
+    }).sort((a,b)=>b.year!==a.year?b.year-a.year:b.month-a.month||(b.id-a.id));
+  }
+  if(gsFilter!=='income'){
+    expenses=(D.expenses||[]).filter(e=>{
+      if(!q)return true;
+      return (e.desc||'').toLowerCase().includes(q)||(e.note||'').toLowerCase().includes(q)||String(e.amount).includes(q)||(HEB[e.month-1]||'').includes(q)||String(e.year).includes(q);
+    }).sort((a,b)=>b.year!==a.year?b.year-a.year:b.month-a.month||(b.id-a.id));
+  }
+
+  if(!q&&!incomes.length&&!expenses.length){
+    el.innerHTML='<div class="empty-state">הקלד כדי לחפש</div>';return;
+  }
+  let html='';
+  if(incomes.length){
+    html+=`<div class="section"><div class="section-header"><h2>💰 הכנסות (${incomes.length})</h2></div><div style="padding:0"><table><thead><tr><th>חודש</th><th>סוג</th><th>פירוט</th><th>סכום</th></tr></thead><tbody>`;
+    html+=incomes.map(i=>`<tr>
+      <td style="white-space:nowrap">${HEB[i.month-1]} ${i.year}</td>
+      <td><span class="badge ${tb[i.type]||'badge-yellow'}">${tl[i.type]||i.type}</span></td>
+      <td class="text-muted">${(i.type==='tuition'||i.type==='nistanim')&&i.students?`${i.students}×₪${i.rate}`:(i.note||'-')}</td>
+      <td class="text-green" style="font-weight:700">₪${fmt(i.amount)}</td>
+    </tr>`).join('');
+    html+=`</tbody></table></div></div>`;
+  }
+  if(expenses.length){
+    html+=`<div class="section" style="margin-top:12px"><div class="section-header"><h2>📋 הוצאות (${expenses.length})</h2></div><div style="padding:0"><table><thead><tr><th>חודש</th><th>תיאור</th><th>קטגוריה</th><th>סכום</th></tr></thead><tbody>`;
+    html+=expenses.map(e=>`<tr>
+      <td style="white-space:nowrap">${HEB[e.month-1]} ${e.year}</td>
+      <td>${e.desc||'-'}</td>
+      <td class="text-muted">${catLabel[e.cat]||e.cat||'-'}</td>
+      <td class="text-red" style="font-weight:700">₪${fmt(e.amount)}</td>
+    </tr>`).join('');
+    html+=`</tbody></table></div></div>`;
+  }
+  if(!html)html='<div class="empty-state">לא נמצאו תוצאות</div>';
+  el.innerHTML=html;
+};
+
+window.addNistanimHistory=async function(){
+  const now=new Date();
+  let m=11,y=2025;
+  const toAdd=[];
+  while(y<now.getFullYear()||(y===now.getFullYear()&&m<=now.getMonth()+1)){
+    const exists=D.incomes.some(i=>i.month===m&&i.year===y&&i.type==='nistanim');
+    if(!exists)toAdd.push({month:m,year:y});
+    m++;if(m>12){m=1;y++;}
+  }
+  if(!toAdd.length){toast('ניצנים כבר קיים בכל החודשים');return;}
+  const students=D.settings.nistanim_students||49;
+  const rate=D.settings.nistanim_rate||150;
+  const amount=students*rate;
+  for(const {month,year} of toAdd){
+    const id=Date.now()+Math.floor(Math.random()*1000);
+    const item={id,month,year,type:'nistanim',amount,students,rate,note:'ניצנים'};
+    D.incomes.push(item);
+    await fbSet('tt/incomes/'+id,item);
+    await new Promise(r=>setTimeout(r,50));
+  }
+  renderDashboard();renderIncomes();
+  toast('נוספו '+toAdd.length+' חודשי ניצנים ✓');
+};
+
+window.incTypeChange=function(){
+  const t=$('inc-type').value;
+  $('inc-students-wrap').style.display=(t==='tuition'||t==='nistanim')?'':'none';
+  $('inc-rate-wrap').style.display=(t==='tuition'||t==='nistanim')?'':'none';
+  if(t==='tuition'){$('inc-students').value=D.settings.students;$('inc-rate').value=D.settings.tuition;calcTuition();}
+  else if(t==='nistanim'){$('inc-students').value=D.settings.nistanim_students||49;$('inc-rate').value=D.settings.nistanim_rate||150;calcTuition();}
+  else if(t==='municipality'){$('inc-amount').value=D.settings.muni||'';}
+  else{$('inc-amount').value='';}
+};
+window.calcTuition=function(){$('inc-amount').value=(parseFloat($('inc-students').value)||0)*(parseFloat($('inc-rate').value)||0);};
+
+window.addIncome=async function(){
+  let amount=parseFloat($('inc-amount').value)||0;
+  if(!amount){toast('הכנס סכום','error');return;}
+  if(incHalf==='full')amount=amount/2;
+  const id=Date.now();
+  const item={id,month:parseInt($('inc-month').value),year:parseInt($('inc-year').value),
+    type:$('inc-type').value,amount,note:$('inc-note').value.trim(),
+    students:parseInt($('inc-students').value)||null,rate:parseFloat($('inc-rate').value)||null};
+  D.incomes.push(item);await fbSet('tt/incomes/'+id,item);
+  $('inc-note').value='';incTypeChange();renderIncomes();toast('הכנסה נוספה ✓ — ₪'+fmt(amount));
+};
+window.deleteIncome=async function(id){
+  id=parseInt(id);
+  confirmAction('מחיקת הכנסה','האם למחוק הכנסה זו?',async()=>{
+    D.incomes=D.incomes.filter(i=>i.id!==id&&String(i.id)!==String(id));
+    await db.ref('tt/incomes/'+id).remove();
+    renderIncomes();renderDashboard();toast('נמחק');
+  });
+};
+window.openEditIncome=function(id){
+  id=parseInt(id);
+  const item=D.incomes.find(i=>i.id===id||String(i.id)===String(id));if(!item)return;
+  window._editIncId=id;
+  const yrs=[2022,2023,2024,2025,2026].map(y=>`<option value="${y}"${y===item.year?' selected':''}>${y}</option>`).join('');
+  $('edit-inc-body').innerHTML=`<div class="form-row">
+    <div class="form-group"><label>חודש</label><select id="ei-month">${HEB.map((m,i)=>`<option value="${i+1}"${i+1===item.month?' selected':''}>${m}</option>`).join('')}</select></div>
+    <div class="form-group"><label>שנה</label><select id="ei-year">${yrs}</select></div>
+    <div class="form-group"><label>סוג</label><select id="ei-type">
+      <option value="tuition"${item.type==='tuition'?' selected':''}>שכר לימוד</option>
+      <option value="nistanim"${item.type==='nistanim'?' selected':''}>ניצנים</option>
+      <option value="municipality"${item.type==='municipality'?' selected':''}>עירייה</option>
+      <option value="other"${item.type==='other'?' selected':''}>אחר</option>
+    </select></div>
+    <div class="form-group"><label>סכום (₪)</label><input type="number" id="ei-amount" value="${item.amount}"></div>
+    <div class="form-group"><label>הערה</label><input type="text" id="ei-note" value="${item.note||''}"></div>
+  </div>`;
+  $('edit-inc-modal').classList.add('open');
+};
+window.saveEditIncome=async function(){
+  const id=window._editIncId;const item=D.incomes.find(i=>i.id===id);if(!item)return;
+  item.month=parseInt($('ei-month').value);item.year=parseInt($('ei-year').value);
+  item.type=$('ei-type').value;item.amount=parseFloat($('ei-amount').value)||0;
+  item.note=$('ei-note').value.trim();
+  await fbSet('tt/incomes/'+id,item);
+  closeModal('edit-inc-modal');renderIncomes();renderDashboard();toast('עודכן ✓');
+};
+
+function renderIncomes(){
+  const m=parseInt($('inc-filter-month').value),y=parseInt($('inc-filter-year').value);
+  const search=($('inc-search').value||'').toLowerCase();
+  let items=D.incomes.filter(i=>i.month===m&&i.year===y);
+  if(search)items=items.filter(i=>(i.note||'').toLowerCase().includes(search)||(i.type||'').toLowerCase().includes(search));
+  items.sort((a,b)=>b.id-a.id);
+  const el=$('income-table');
+  if(!items.length){el.innerHTML='<div class="empty-state">אין הכנסות לחודש זה</div>';return;}
+  const tl={tuition:'שכ"ל תלמידים',nistanim:'ניצנים',municipality:'עירייה',other:'אחר'};
+  const tb={tuition:'badge-green',nistanim:'badge-purple',municipality:'badge-blue',other:'badge-yellow'};
+  el.innerHTML=`<table><thead><tr>
+    <th>סוג</th>
+    <th class="col-hide-mobile">פירוט</th>
+    <th>סכום</th>
+    <th class="col-hide-mobile">הערה</th>
+    <th></th>
+  </tr></thead><tbody>
+  ${items.map(i=>`<tr>
+    <td><span class="badge ${tb[i.type]}">${tl[i.type]}</span></td>
+    <td class="col-hide-mobile text-muted">${(i.type==='tuition'||i.type==='nistanim')&&i.students?`${i.students}×₪${i.rate}`:'-'}</td>
+    <td class="text-green" style="font-weight:700">₪${fmt(i.amount)}</td>
+    <td class="col-hide-mobile text-muted">${i.note||'-'}</td>
+    <td>
+      <div style="display:flex;gap:4px;">
+        <button class="btn btn-ghost btn-sm" onclick="openEditIncome(${i.id})">✏️</button>
+        <button class="btn btn-ghost btn-sm" onclick="deleteIncome(${i.id})">🗑️</button>
+      </div>
+    </td>
+  </tr>`).join('')}
+  </tbody><tfoot><tr>
+    <td colspan="2" style="font-weight:600;padding:10px 11px;">סה"כ</td>
+    <td style="font-weight:800;color:var(--green);font-size:14px;padding:10px 11px;">₪${fmt(items.reduce((s,i)=>s+i.amount,0))}</td>
+    <td colspan="2"></td>
+  </tr></tfoot></table>`;
+}
+
+// ── EXPENSES ─────────────────────────────────────────────
+window.onExpPayerChange=function(){
+  const p=$('exp-payer').value;
+  const halfWrap=$('exp-full-btn')?.closest('.half-full');
+  if(halfWrap)halfWrap.style.opacity=p==='me-both'?'0.4':'1';
+};
+window.onQAPayerChange=function(){
+  const p=$('qa-payer').value;
+  const halfWrap=$('qa-full-btn')?.closest('.half-full');
+  if(halfWrap)halfWrap.style.opacity=p==='me-both'?'0.4':'1';
+};
+window.addExpense=async function(){
+  const desc=$('exp-desc').value.trim();
+  let amount=parseFloat($('exp-amount').value)||0;
+  if(!desc){toast('הכנס תיאור','error');return;}
+  if(!amount){toast('הכנס סכום','error');return;}
+  const payer=$('exp-payer').value;
+  if(expHalf==='full')amount=amount/2;
+  const id=Date.now();
+  const item={id,month:parseInt($('exp-month').value),year:parseInt($('exp-year').value),
+    desc,amount,payer,cat:$('exp-cat').value,note:$('exp-note').value.trim()};
+  D.expenses.push(item);await fbSet('tt/expenses/'+id,item);
+  $('exp-desc').value='';$('exp-amount').value='';$('exp-note').value='';
+  renderExpenses();toast('הוצאה נוספה ✓ — ₪'+fmt(amount));
+};
+window.deleteExpense=async function(id){
+  id=parseInt(id);
+  confirmAction('מחיקת הוצאה','האם למחוק הוצאה זו?',async()=>{
+    D.expenses=D.expenses.filter(e=>e.id!==id&&String(e.id)!==String(id));
+    await db.ref('tt/expenses/'+id).remove();
+    renderExpenses();renderDashboard();toast('נמחק');
+  });
+};
+window.openEditExpense=function(id){
+  id=parseInt(id);
+  const item=D.expenses.find(e=>e.id===id||String(e.id)===String(id));if(!item)return;
+  window._editExpId=id;
+  const n1=D.settings.name1||'מלכיאל',n2=D.settings.name2||'השותף';
+  const yrs=[2022,2023,2024,2025,2026].map(y=>`<option value="${y}"${y===item.year?' selected':''}>${y}</option>`).join('');
+  $('edit-exp-body').innerHTML=`<div class="form-row">
+    <div class="form-group"><label>חודש</label><select id="ee-month">${HEB.map((m,i)=>`<option value="${i+1}"${i+1===item.month?' selected':''}>${m}</option>`).join('')}</select></div>
+    <div class="form-group"><label>שנה</label><select id="ee-year">${yrs}</select></div>
+    <div class="form-group"><label>תיאור</label><input type="text" id="ee-desc" value="${item.desc}"></div>
+    <div class="form-group"><label>סכום (₪)</label><input type="number" id="ee-amount" value="${item.amount}"></div>
+    <div class="form-group"><label>מי שילם?</label><select id="ee-payer">
+      <option value="me"${item.payer==='me'?' selected':''}>${n1}</option>
+      <option value="partner"${item.payer==='partner'?' selected':''}>${n2}</option>
+      <option value="tuition"${item.payer==='tuition'?' selected':''}>קופת שכ"ל</option>
+      <option value="me-both"${item.payer==='me-both'?' selected':''}>שילמתי עבור שנינו</option>
+    </select></div>
+    <div class="form-group"><label>קטגוריה</label><select id="ee-cat">
+      <option value="salary"${item.cat==='salary'?' selected':''}>שכר מורים</option>
+      <option value="rent"${item.cat==='rent'?' selected':''}>שכירות</option>
+      <option value="utilities"${item.cat==='utilities'?' selected':''}>חשמל/מים/גז</option>
+      <option value="supplies"${item.cat==='supplies'?' selected':''}>ציוד</option>
+      <option value="other"${item.cat==='other'?' selected':''}>אחר</option>
+    </select></div>
+    <div class="form-group"><label>הערה</label><input type="text" id="ee-note" value="${item.note||''}"></div>
+  </div>`;
+  $('edit-exp-modal').classList.add('open');
+};
+window.saveEditExpense=async function(){
+  const id=window._editExpId;const item=D.expenses.find(e=>e.id===id);if(!item)return;
+  item.month=parseInt($('ee-month').value);item.year=parseInt($('ee-year').value);
+  item.desc=$('ee-desc').value.trim();item.amount=parseFloat($('ee-amount').value)||0;
+  item.payer=$('ee-payer').value;item.cat=$('ee-cat').value;item.note=$('ee-note').value.trim();
+  await fbSet('tt/expenses/'+id,item);
+  closeModal('edit-exp-modal');renderExpenses();renderDashboard();toast('עודכן ✓');
+};
+
+function payerBadge(p,n1,n2){
+  return p==='me'?`<span class="badge badge-blue">${n1}</span>`
+    :p==='partner'?`<span class="badge badge-purple">${n2}</span>`
+    :p==='me-both'?`<span class="badge badge-yellow">שנינו (${n1})</span>`
+    :`<span class="badge badge-green">קופת שכ"ל</span>`;
+}
+
+function renderExpenses(){
+  const m=parseInt($('exp-filter-month').value),y=parseInt($('exp-filter-year').value);
+  const search=($('exp-search').value||'').toLowerCase();
+  const n1=D.settings.name1||'מלכיאל',n2=D.settings.name2||'השותף';
+  let items=D.expenses.filter(e=>e.month===m&&e.year===y);
+  if(search)items=items.filter(e=>(e.desc||'').toLowerCase().includes(search)||(e.note||'').toLowerCase().includes(search));
+  items.sort((a,b)=>b.id-a.id);
+  const el=$('expense-table');
+  if(!items.length){el.innerHTML='<div class="empty-state">אין הוצאות לחודש זה</div>';return;}
+  const cl={salary:'שכר מורים',rent:'שכירות',utilities:'חשמל/מים',supplies:'ציוד',other:'אחר'};
+  const cb={salary:'badge-purple',rent:'badge-blue',utilities:'badge-yellow',supplies:'badge-green',other:''};
+  el.innerHTML=`<table><thead><tr>
+    <th class="col-hide-mobile">קטג'</th>
+    <th>תיאור</th>
+    <th class="col-hide-mobile">שילם</th>
+    <th>סכום</th>
+    <th class="col-hide-mobile">הערה</th>
+    <th></th>
+  </tr></thead><tbody>
+  ${items.map(e=>`<tr>
+    <td class="col-hide-mobile"><span class="badge ${cb[e.cat]||''}">${cl[e.cat]||'אחר'}</span></td>
+    <td>
+      ${e.desc}
+      <div class="col-show-mobile" style="display:none;font-size:11px;color:var(--muted);margin-top:2px;">${payerBadge(e.payer,n1,n2)}</div>
+    </td>
+    <td class="col-hide-mobile">${payerBadge(e.payer,n1,n2)}</td>
+    <td class="text-red" style="font-weight:700">₪${fmt(e.amount)}</td>
+    <td class="col-hide-mobile text-muted">${e.note||'-'}</td>
+    <td>
+      <div style="display:flex;gap:4px;">
+        <button class="btn btn-ghost btn-sm" onclick="openEditExpense(${e.id})">✏️</button>
+        <button class="btn btn-ghost btn-sm" onclick="deleteExpense(${e.id})">🗑️</button>
+      </div>
+    </td>
+  </tr>`).join('')}
+  </tbody><tfoot><tr>
+    <td colspan="3" style="font-weight:600;padding:10px 11px;">סה"כ</td>
+    <td style="font-weight:800;color:var(--red);font-size:14px;padding:10px 11px;">₪${fmt(items.reduce((s,e)=>s+e.amount,0))}</td>
+    <td colspan="2"></td>
+  </tr></tfoot></table>`;
+}
+
+// ── DEBTS (חדש — חישוב אוטומטי) ─────────────────────────
+
+// מחשב את כל המאזן מכל הנתונים
+function calcDebtSummary(){
+  const n2=D.settings.name2||'השותף';
+
+  // 1. חובות מהוצאות: כל הוצאה על שם השותף = חוב שלי של 50%
+  let partnerExpDebt=0;
+  const monthlyData={};
+
+  // איסוף נתונים לפי חודש
+  const allMonths=new Set();
+  D.incomes.forEach(i=>allMonths.add(`${i.year}-${String(i.month).padStart(2,'0')}`));
+  D.expenses.forEach(e=>allMonths.add(`${e.year}-${String(e.month).padStart(2,'0')}`));
+
+  const monthRows=[];
+  [...allMonths].sort().forEach(key=>{
+    const [y,m]=[parseInt(key.split('-')[0]),parseInt(key.split('-')[1])];
+    const inc=D.incomes.filter(i=>i.month===m&&i.year===y).reduce((s,i)=>s+i.amount,0);
+    const expTotal=D.expenses.filter(e=>e.month===m&&e.year===y).reduce((s,e)=>s+e.amount,0);
+    const expByPartner=D.expenses.filter(e=>e.month===m&&e.year===y&&e.payer==='partner').reduce((s,e)=>s+e.amount,0);
+    const expByMeBoth=D.expenses.filter(e=>e.month===m&&e.year===y&&(e.payer==='me'||e.payer==='me-both')).reduce((s,e)=>s+e.amount,0);
+    const profit=inc-expTotal;
+    const myProfit=profit/2;
+    const myDebtFromPartnerExp=expByPartner;
+
+    monthRows.push({key,y,m,inc,expTotal,expByPartner,expByMeBoth,profit,myProfit,myDebtFromPartnerExp,
+      label:`${HEB[m-1]} ${y}`});
+  });
+
+  // סה"כ חוב שנצבר מהוצאות השותף
+  const totalDebtFromExp=monthRows.reduce((s,r)=>s+r.myDebtFromPartnerExp,0);
+
+  // סה"כ זכות מרווחים
+  const totalMyProfit=monthRows.reduce((s,r)=>s+r.myProfit,0);
+
+  // סה"כ חלק שותף שכיסיתי עבורו (מקזז מהחוב שלי)
+  const totalPartnerShareCovered=monthRows.reduce((s,r)=>s+r.expByMeBoth,0);
+
+  // תשלומים ששילמתי לשותף
+  const totalPaid=(D.payments||[]).reduce((s,p)=>s+p.amount,0);
+
+  // חוב גולמי = חוב מהוצאות - זכות מרווחים - מה שכיסיתי עבורו
+  const grossDebt=totalDebtFromExp - totalMyProfit - totalPartnerShareCovered;
+  // יתרה סופית אחרי תשלומים
+  const finalBalance=grossDebt - totalPaid;
+
+  return{totalDebtFromExp,totalMyProfit,totalPaid,totalPartnerShareCovered,grossDebt,finalBalance,monthRows};
+}
+
+function renderDebts(){
+  const n1=D.settings.name1||'מלכיאל',n2=D.settings.name2||'השותף';
+  const {totalDebtFromExp,totalMyProfit,totalPaid,totalPartnerShareCovered,grossDebt,finalBalance,monthRows}=calcDebtSummary();
+
+  // כרטיסי סיכום
+  const balColor=finalBalance>0?'red':finalBalance<0?'green':'blue';
+  const balMsg=finalBalance>0?`אתה חייב ל${n2}`:finalBalance<0?`${n2} חייב לך`:'מאוזן';
+
+  $('debt-summary').innerHTML=`
+    <div class="cards" style="margin-bottom:14px;">
+      <div class="card red">
+        <div class="label">חוב מהוצאות השותף</div>
+        <div class="val">₪${fmt(totalDebtFromExp)}</div>
+        <div class="sub-val">50% ממה ששילם ${n2} (הסכום כבר מחולק)</div>
+      </div>
+      <div class="card ${totalMyProfit>=0?'green':'red'}">
+        <div class="label">${totalMyProfit>=0?'זכות מרווחים':'חוב מהפסדים'}</div>
+        <div class="val">₪${fmt(Math.abs(totalMyProfit))}</div>
+        <div class="sub-val">${totalMyProfit>=0?'מקזז את החוב':'מוסיף לחוב'}</div>
+      </div>
+      ${totalPartnerShareCovered>0?`
+      <div class="card green">
+        <div class="label">כיסיתי חלק השותף</div>
+        <div class="val">₪${fmt(totalPartnerShareCovered)}</div>
+        <div class="sub-val">מכל הוצאה ששילמתי — מקוזז אוטומטית</div>
+      </div>`:''}
+      <div class="card blue">
+        <div class="label">שילמתי לשותף</div>
+        <div class="val">₪${fmt(totalPaid)}</div>
+        <div class="sub-val">סה"כ תשלומים</div>
+      </div>
+      <div class="card ${balColor}">
+        <div class="label">יתרה סופית</div>
+        <div class="val">₪${fmt(Math.abs(finalBalance))}</div>
+        <div class="sub-val">${balMsg}</div>
+      </div>
+    </div>
+    <div class="alert ${finalBalance>0?'alert-warning':finalBalance<0?'alert-success':'alert-info'}" style="margin-bottom:14px;font-size:14px;">
+      ${finalBalance>0
+        ?`⚠️ <strong>אתה חייב ל${n2}: ₪${fmt(finalBalance)}</strong>`
+        :finalBalance<0
+        ?`✅ <strong>${n2} חייב לך: ₪${fmt(Math.abs(finalBalance))}</strong>`
+        :`✅ <strong>החשבון מאוזן לגמרי</strong>`}
+    </div>`;
+
+  // היסטוריית תשלומים
+  const payments=[...(D.payments||[])].sort((a,b)=>b.id-a.id);
+  const pEl=$('payments-table');
+  if(!payments.length){
+    pEl.innerHTML='<div class="empty-state">אין תשלומים מתועדים עדיין</div>';
+  } else {
+    pEl.innerHTML=`<table><thead><tr><th>תאריך</th><th>סכום</th><th>הערה</th><th></th></tr></thead><tbody>
+    ${payments.map(p=>`<tr>
+      <td class="text-muted">${p.date||'-'}</td>
+      <td class="text-green" style="font-weight:700">₪${fmt(p.amount)}</td>
+      <td>${p.note||'-'}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="deletePayment(${p.id})">🗑️</button></td>
+    </tr>`).join('')}
+    </tbody><tfoot><tr>
+      <td style="font-weight:600;padding:10px 11px;">סה"כ שולם</td>
+      <td style="font-weight:800;color:var(--green);padding:10px 11px;">₪${fmt(payments.reduce((s,p)=>s+p.amount,0))}</td>
+      <td colspan="2"></td>
+    </tr></tfoot></table>`;
+  }
+
+  // פירוט לפי חודשים
+  const mEl=$('debt-months-table');
+  const activeMonths=monthRows.filter(r=>r.inc>0||r.expTotal>0);
+  if(!activeMonths.length){
+    mEl.innerHTML='<div class="empty-state">אין נתונים עדיין</div>';
+  } else {
+    mEl.innerHTML=`<table><thead><tr>
+      <th>חודש</th><th>הכנסות</th><th>הוצאות</th>
+      <th>שילם ${n2}</th><th>חוב מהוצאות</th>
+      <th>חלקי ברווח</th><th>מאזן חודש</th>
+    </tr></thead><tbody>
+    ${activeMonths.map(r=>{
+      const monthBalance=r.myProfit - r.myDebtFromPartnerExp;
+      return `<tr>
+        <td style="font-weight:600">${r.label}</td>
+        <td class="text-green">₪${fmt(r.inc)}</td>
+        <td class="text-red">₪${fmt(r.expTotal)}</td>
+        <td style="color:var(--accent2)">₪${fmt(r.expByPartner*2)}</td>
+        <td class="text-red">−₪${fmt(r.myDebtFromPartnerExp)}</td>
+        <td class="${r.myProfit>=0?'text-green':'text-red'}">${r.myProfit>=0?'+':''} ₪${fmt(r.myProfit)}</td>
+        <td style="font-weight:700;color:${monthBalance>=0?'var(--green)':'var(--red)'}">
+          ${monthBalance>=0?'+':''}₪${fmt(monthBalance)}
+        </td>
+      </tr>`;
+    }).join('')}
+    </tbody><tfoot><tr>
+      <td style="font-weight:700;padding:10px 11px;">סה"כ</td>
+      <td style="color:var(--green);font-weight:700;padding:10px 11px;">₪${fmt(activeMonths.reduce((s,r)=>s+r.inc,0))}</td>
+      <td style="color:var(--red);font-weight:700;padding:10px 11px;">₪${fmt(activeMonths.reduce((s,r)=>s+r.expTotal,0))}</td>
+      <td style="color:var(--accent2);font-weight:700;padding:10px 11px;">₪${fmt(activeMonths.reduce((s,r)=>s+r.expByPartner*2,0))}</td>
+      <td style="color:var(--red);font-weight:700;padding:10px 11px;">−₪${fmt(totalDebtFromExp)}</td>
+      <td style="font-weight:700;padding:10px 11px;" class="${totalMyProfit>=0?'text-green':'text-red'}">${totalMyProfit>=0?'+':''}₪${fmt(totalMyProfit)}</td>
+      <td style="font-weight:800;padding:10px 11px;color:${(totalMyProfit-totalDebtFromExp)>=0?'var(--green)':'var(--red)'}">
+        ${(totalMyProfit-totalDebtFromExp)>=0?'+':''}₪${fmt(totalMyProfit-totalDebtFromExp)}
+      </td>
+    </tr></tfoot></table>`;
+  }
+}
+
+// תשלומים לשותף
+window.addPayment=async function(){
+  const amount=parseFloat($('pay-amount').value)||0;
+  if(!amount){toast('הכנס סכום','error');return;}
+  const id=Date.now();
+  if(!D.payments)D.payments=[];
+  const item={id,date:$('pay-date').value,amount,note:$('pay-note').value.trim()};
+  D.payments.push(item);
+  await fbSet('tt/payments/'+id,item);
+  $('pay-amount').value='';$('pay-note').value='';
+  renderDebts();toast('תשלום נרשם ✓');
+};
+
+window.deletePayment=async function(id){
+  id=parseInt(id);
+  confirmAction('מחיקת תשלום','האם למחוק תשלום זה?',async()=>{
+    D.payments=(D.payments||[]).filter(p=>p.id!==id&&String(p.id)!==String(id));
+    await db.ref('tt/payments/'+id).remove();
+    renderDebts();toast('נמחק');
+  });
+};
+
+// ── COMPLETIONS (השלמות יעד) ──────────────────────────────
+window.applyCompletion=async function(m,y,amount){
+  if(!D.completions)D.completions=[];
+  const existing=D.completions.find(c=>c.month===m&&c.year===y);
+  if(existing){toast('כבר קיימת השלמה לחודש זה','error');return;}
+  const id=Date.now();
+  const comp={id,month:m,year:y,amount,date:new Date().toISOString().split('T')[0]};
+  D.completions.push(comp);
+  await fbSet('tt/completions/'+id,comp);
+  // גם מוסיף הכנסה מסוג tuition עם autoComplete=true
+  const incId=Date.now()+1;
+  const incItem={id:incId,month:m,year:y,type:'tuition',amount,
+    note:`השלמה ליעד ${HEB[m-1]} ${y}`,students:null,rate:null,autoComplete:true};
+  D.incomes.push(incItem);
+  await fbSet('tt/incomes/'+incId,incItem);
+  renderDashboard();toast(`השלמה נוספה: ₪${fmt(amount)} ✓`);
+};
+
+window.removeCompletion=async function(m,y){
+  confirmAction('ביטול השלמה',`האם לבטל את השלמת היעד של ${HEB[m-1]} ${y}?`,async()=>{
+    const comp=(D.completions||[]).find(c=>c.month===m&&c.year===y);
+    if(comp){
+      D.completions=D.completions.filter(c=>!(c.month===m&&c.year===y));
+      await db.ref('tt/completions/'+comp.id).remove();
+    }
+    // מסיר גם את הכנסת ה-autoComplete
+    const autoInc=D.incomes.filter(i=>i.month===m&&i.year===y&&i.autoComplete);
+    for(const i of autoInc){
+      D.incomes=D.incomes.filter(x=>x.id!==i.id);
+      await db.ref('tt/incomes/'+i.id).remove();
+    }
+    renderDashboard();toast('השלמה בוטלה');
+  });
+};
+
+// ── DASHBOARD ─────────────────────────────────────────────
+function renderDashboard(){
+  const m=parseInt($('dash-month').value),y=parseInt($('dash-year').value);
+  const n1=D.settings.name1||'מלכיאל',n2=D.settings.name2||'השותף';
+  const inc=D.incomes.filter(i=>i.month===m&&i.year===y);
+  const exp=D.expenses.filter(e=>e.month===m&&e.year===y);
+  const totalInc=inc.reduce((s,i)=>s+i.amount,0);
+  const totalExp=exp.reduce((s,e)=>s+e.amount,0);
+  const profit=totalInc-totalExp;
+  const half=profit/2;
+  const active=D.debts.filter(x=>!x.settled);
+  const pPaid=active.filter(x=>x.type==='partner_paid_for_me').reduce((s,x)=>s+x.amount,0);
+  const iPaid=active.filter(x=>x.type==='i_paid_for_partner').reduce((s,x)=>s+x.amount,0);
+  const netDebt=pPaid-iPaid;
+  const myActual=half-netDebt;
+  const target=D.settings.target||22000;
+  const tuitionInc=inc.filter(i=>i.type==='tuition').reduce((s,i)=>s+i.amount,0);
+  const autoCompleteInc=inc.filter(i=>i.autoComplete).reduce((s,i)=>s+i.amount,0);
+  const targetDiff=tuitionInc-target;
+  const tuitionExp=exp.filter(e=>e.payer==='tuition').reduce((s,e)=>s+e.amount,0);
+
+  // חישוב רווח כולל ההשלמה
+  const effectiveInc=totalInc+(target>0&&targetDiff<0?-targetDiff:0);
+  const effectiveProfit=effectiveInc-totalExp;
+  const effectiveHalf=effectiveProfit/2;
+
+  $('dash-cards').innerHTML=`
+    <div class="card green"><div class="label">הכנסות בפועל</div><div class="val">₪${fmt(totalInc)}</div><div class="sub-val">${inc.length} רשומות</div></div>
+    <div class="card red"><div class="label">הוצאות</div><div class="val">₪${fmt(totalExp)}</div><div class="sub-val">שכ"ל: ₪${fmt(tuitionExp)}</div></div>
+    <div class="card ${effectiveProfit>=0?'blue':'red'}"><div class="label">רווח (כולל יעד)</div><div class="val">₪${fmt(effectiveProfit)}</div><div class="sub-val">לפני חלוקה</div></div>
+    <div class="card yellow"><div class="label">חלק לכל שותף</div><div class="val">₪${fmt(effectiveHalf)}</div><div class="sub-val">50% / 50%</div></div>`;
+
+  // קטע יעד + כפתור השלמה
+  const hasAutoComplete=(D.completions||[]).some(c=>c.month===m&&c.year===y);
+  const completion=(D.completions||[]).find(c=>c.month===m&&c.year===y);
+  const targetSection=target>0?`<div class="section" style="margin-bottom:14px;">
+    <div class="section-header"><h2>🎯 יעד שכר לימוד — ${HEB[m-1]} ${y}</h2></div>
+    <div class="section-body">
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+        <div style="flex:1;min-width:100px;text-align:center;">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">יעד</div>
+          <div style="font-size:18px;font-weight:700;">₪${fmt(target)}</div>
+        </div>
+        <div style="color:var(--muted);">→</div>
+        <div style="flex:1;min-width:100px;text-align:center;">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">התקבל</div>
+          <div style="font-size:18px;font-weight:700;color:var(--green);">₪${fmt(tuitionInc)}</div>
+        </div>
+        <div style="color:var(--muted);">→</div>
+        <div style="flex:1;min-width:100px;text-align:center;">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">${targetDiff>=0?'✅ עודף':'⚠️ חוסר'}</div>
+          <div style="font-size:18px;font-weight:800;color:${targetDiff>=0?'var(--green)':'var(--red)'};">
+            ${targetDiff>=0?'+':''}₪${fmt(targetDiff)}
+          </div>
+        </div>
+        <div style="flex:2;min-width:150px;">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:5px;">${Math.round(Math.min(100,tuitionInc/target*100))}% מהיעד</div>
+          <div style="background:var(--border);border-radius:20px;height:8px;overflow:hidden;">
+            <div style="height:100%;width:${Math.min(100,Math.round(tuitionInc/target*100))}%;background:${targetDiff>=0?'var(--green)':'var(--yellow)'};border-radius:20px;"></div>
+          </div>
+        </div>
+      </div>
+      ${targetDiff!==0?`
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          ${!hasAutoComplete&&targetDiff<0?`
+            <button class="btn btn-success btn-sm" onclick="applyCompletion(${m},${y},${-targetDiff})">
+              ✅ השלם ל-₪${fmt(target)} (+₪${fmt(-targetDiff)})
+            </button>`:
+            hasAutoComplete?`
+            <span class="badge badge-green">✓ הושלם — נוסף ₪${fmt(completion?completion.amount:0)}</span>
+            <button class="btn btn-ghost btn-sm" onclick="removeCompletion(${m},${y})">בטל השלמה</button>
+            `:''}
+          ${targetDiff>0&&!hasAutoComplete?`
+            <button class="btn btn-warning btn-sm" onclick="applyCompletion(${m},${y},${targetDiff})">
+              📝 תעד עודף +₪${fmt(targetDiff)}
+            </button>`:''}
+        </div>`:'<div class="alert alert-success" style="margin-top:0;font-size:12px;">✅ בדיוק ביעד!</div>'}
+    </div>
+  </div>`:'';
+
+  // עדכן half לפי effectiveHalf
+  const myActualEffective=effectiveHalf-netDebt;
+  $('dash-split').innerHTML=targetSection+`<div class="section" style="margin-bottom:14px;">
+    <div class="section-header"><h2>💸 חלוקת רווח — ${HEB[m-1]} ${y}</h2></div>
+    <div class="section-body">
+      <div class="big-split">
+        <div class="split-box mine">
+          <div class="sname">👤 ${n1}</div>
+          <div class="sval">₪${fmt(myActualEffective)}</div>
+          <div class="sadj">בסיס ₪${fmt(effectiveHalf)} | חובות ${netDebt>0?'-':'+'} ₪${fmt(Math.abs(netDebt))}</div>
+        </div>
+        <div class="split-box partner">
+          <div class="sname">🤝 ${n2}</div>
+          <div class="sval">₪${fmt(effectiveHalf+netDebt)}</div>
+          <div class="sadj">בסיס ₪${fmt(effectiveHalf)} | חובות ${netDebt>0?'+':'-'} ₪${fmt(Math.abs(netDebt))}</div>
+        </div>
+      </div>
+      ${netDebt!==0?`<div class="alert alert-warning" style="margin-top:10px;">⚠️ חובות פעילים (₪${fmt(Math.abs(netDebt))}) משפיעים על החלוקה.</div>`:''}
+    </div>
+  </div>`;
+
+  // Quick add shortcut on dashboard
+  $('dash-quick-add').innerHTML=`<div style="display:flex;gap:8px;margin-bottom:14px;">
+    <button class="btn btn-success" style="flex:1" onclick="openQuickAddType('income',${m},${y})">💰 הוסף הכנסה מהירה</button>
+    <button class="btn btn-danger" style="flex:1" onclick="openQuickAddType('expense',${m},${y})">📋 הוסף הוצאה מהירה</button>
+  </div>`;
+
+  const tl={tuition:'שכ"ל',nistanim:'ניצנים',municipality:'עירייה',other:'אחר'};
+  const tb={tuition:'badge-green',nistanim:'badge-purple',municipality:'badge-blue',other:'badge-yellow'};
+  $('dash-detail').innerHTML=`
+    <div class="section">
+      <div class="section-header"><h2>📊 פירוט הכנסות</h2></div>
+      <div style="padding:0;">
+        ${inc.length?`<table><thead><tr><th>סוג</th><th>פירוט</th><th>סכום</th></tr></thead><tbody>
+        ${inc.map(i=>`<tr>
+          <td><span class="badge ${tb[i.type]}">${tl[i.type]}</span></td>
+          <td class="text-muted">${i.type==='tuition'&&i.students?`${i.students}×₪${i.rate}`:(i.note||'-')}</td>
+          <td class="text-green" style="font-weight:700">₪${fmt(i.amount)}</td>
+        </tr>`).join('')}
+        </tbody></table>`:'<div class="empty-state">אין הכנסות לחודש זה</div>'}
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-header"><h2>📊 פירוט הוצאות</h2></div>
+      <div style="padding:0;">
+        ${exp.length?`<table><thead><tr><th>תיאור</th><th>שילם</th><th>סכום</th></tr></thead><tbody>
+        ${exp.map(e=>`<tr>
+          <td>${e.desc}</td>
+          <td>${payerBadge(e.payer,n1,n2)}</td>
+          <td class="text-red" style="font-weight:700">₪${fmt(e.amount)}</td>
+        </tr>`).join('')}
+        </tbody></table>`:'<div class="empty-state">אין הוצאות לחודש זה</div>'}
+      </div>
+    </div>`;
+}
+
+// ── YEARLY ────────────────────────────────────────────────
+function renderYearly(){
+  const y=parseInt($('yearly-year').value);
+  const n1=D.settings.name1||'מלכיאל',n2=D.settings.name2||'השותף';
+  const target=D.settings.target||22000;
+  let totalInc=0,totalExp=0,totalProfit=0,totalTuitionInc=0;
+  const rows=HEB.map((mName,idx)=>{
+    const m=idx+1;
+    const inc=D.incomes.filter(i=>i.month===m&&i.year===y).reduce((s,i)=>s+i.amount,0);
+    const tuitionInc=D.incomes.filter(i=>i.month===m&&i.year===y&&i.type==='tuition').reduce((s,i)=>s+i.amount,0);
+    const exp=D.expenses.filter(e=>e.month===m&&e.year===y).reduce((s,e)=>s+e.amount,0);
+    const profit=inc-exp;
+    totalInc+=inc;totalExp+=exp;totalProfit+=profit;totalTuitionInc+=tuitionInc;
+    return{mName,inc,tuitionInc,exp,profit};
+  });
+
+  const totalTargetDiff=totalTuitionInc-(target*12);
+
+  $('yearly-cards').innerHTML=`
+    <div class="card green"><div class="label">סה"כ הכנסות ${y}</div><div class="val">₪${fmt(totalInc)}</div></div>
+    <div class="card red"><div class="label">סה"כ הוצאות ${y}</div><div class="val">₪${fmt(totalExp)}</div></div>
+    <div class="card ${totalProfit>=0?'blue':'red'}"><div class="label">רווח שנתי</div><div class="val">₪${fmt(totalProfit)}</div></div>
+    <div class="card yellow"><div class="label">חלקך השנתי</div><div class="val">₪${fmt(totalProfit/2)}</div></div>
+    <div class="card ${totalTargetDiff>=0?'green':'red'}"><div class="label">${totalTargetDiff>=0?'עודף':'חוסר'} שכ"ל שנתי</div><div class="val">${totalTargetDiff>=0?'+':''}₪${fmt(totalTargetDiff)}</div><div class="sub-val">יעד: ₪${fmt(target*12)}</div></div>`;
+
+  $('yearly-table').innerHTML=`<div class="section">
+    <div class="section-header"><h2>📆 פירוט חודשי — ${y}</h2></div>
+    <div style="padding:0;">
+      <table><thead><tr><th>חודש</th><th>הכנסות</th><th>בפועל (ללא השלמה)</th><th>יעד</th><th>פער</th><th>הוצאות</th><th>רווח</th><th>חלקך</th></tr></thead><tbody>
+      ${rows.map(r=>{
+        const diff=r.tuitionInc-target;
+        return `<tr>
+          <td style="font-weight:600">${r.mName}</td>
+          <td class="text-green">₪${fmt(r.inc)}</td>
+          <td>₪${fmt(r.tuitionInc)}</td>
+          <td class="text-muted">₪${fmt(target)}</td>
+          <td style="font-weight:700;color:${diff>=0?'var(--green)':'var(--red)'};">${diff>=0?'+':''}₪${fmt(diff)}</td>
+          <td class="text-red">₪${fmt(r.exp)}</td>
+          <td class="${r.profit>=0?'text-green':'text-red'}" style="font-weight:700">₪${fmt(r.profit)}</td>
+          <td style="color:var(--accent);font-weight:700">₪${fmt(r.profit/2)}</td>
+        </tr>`;
+      }).join('')}
+      </tbody><tfoot>
+        <tr class="yearly-row-total">
+          <td>סה"כ</td>
+          <td class="text-green" style="font-size:13px;">₪${fmt(totalInc)}</td>
+          <td style="font-size:13px;">₪${fmt(totalTuitionInc)}</td>
+          <td class="text-muted" style="font-size:13px;">₪${fmt(target*12)}</td>
+          <td style="font-weight:800;color:${totalTargetDiff>=0?'var(--green)':'var(--red)'};">${totalTargetDiff>=0?'+':''}₪${fmt(totalTargetDiff)}</td>
+          <td class="text-red" style="font-size:13px;">₪${fmt(totalExp)}</td>
+          <td class="${totalProfit>=0?'text-green':'text-red'}" style="font-size:13px;">₪${fmt(totalProfit)}</td>
+          <td style="color:var(--accent);font-size:13px;">₪${fmt(totalProfit/2)}</td>
+        </tr>
+      </tfoot></table>
+    </div>
+  </div>`;
+}
+
+// ── QUICK ADD ─────────────────────────────────────────────
+window.openQuickAdd=function(){
+  const now=new Date();
+  $('qa-month').value=now.getMonth()+1;
+  $('qa-year').value=now.getFullYear();
+  setQAType('income');setQAHalf('full');
+  $('qa-amount').value='';$('qa-desc').value='';$('qa-note').value='';
+  $('quick-modal').classList.add('open');
+};
+window.openQuickAddType=function(type,m,y){
+  $('qa-month').value=m;$('qa-year').value=y;
+  setQAType(type);setQAHalf('full');
+  $('qa-amount').value='';$('qa-desc').value='';$('qa-note').value='';
+  $('quick-modal').classList.add('open');
+};
+window.saveQuickAdd=async function(){
+  let amount=parseFloat($('qa-amount').value)||0;
+  if(!amount){toast('הכנס סכום','error');return;}
+  if(qaHalf==='full')amount=amount/2;
+  const m=parseInt($('qa-month').value),y=parseInt($('qa-year').value);
+  const id=Date.now();
+  if(qaType==='income'){
+    const item={id,month:m,year:y,type:'other',amount,note:$('qa-note').value.trim(),students:null,rate:null};
+    D.incomes.push(item);await fbSet('tt/incomes/'+id,item);
+    toast('הכנסה נוספה ✓ — ₪'+fmt(amount));
+  } else {
+    const desc=$('qa-desc').value.trim()||'הוצאה';
+    const item={id,month:m,year:y,desc,amount,payer:$('qa-payer').value,cat:'other',note:$('qa-note').value.trim()};
+    D.expenses.push(item);await fbSet('tt/expenses/'+id,item);
+    toast('הוצאה נוספה ✓ — ₪'+fmt(amount));
+  }
+  closeModal('quick-modal');
+  renderDashboard();
+};
+
+// ── CONFIRM ───────────────────────────────────────────────
+let _confirmCb=null;
+function confirmAction(title,msg,cb){
+  $('confirm-title').textContent=title;
+  $('confirm-msg').textContent=msg;
+  _confirmCb=cb;
+  $('confirm-modal').classList.add('open');
+}
+$('confirm-ok-btn').onclick=async function(){
+  closeModal('confirm-modal');
+  if(_confirmCb)await _confirmCb();
+  _confirmCb=null;
+};
+window.confirmClearAll=function(){
+  confirmAction('מחיקת כל הנתונים','פעולה זו תמחק את כל ההכנסות, ההוצאות והחובות. האם להמשיך?',async()=>{
+    D.incomes=[];D.expenses=[];D.debts=[];
+    await db.ref('tt/incomes').remove();
+    await db.ref('tt/expenses').remove();
+    await db.ref('tt/debts').remove();
+    renderDashboard();toast('כל הנתונים נמחקו');
+  });
+};
+
+// ── MODAL ─────────────────────────────────────────────────
+window.closeModal=function(id){$(id).classList.remove('open');};
+// Close on overlay click
+document.querySelectorAll('.modal-overlay').forEach(o=>{
+  o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');});
+});
+
+// ── TABS ─────────────────────────────────────────────────
+window.showPage=function(id,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  $('page-'+id).classList.add('active');btn.classList.add('active');
+  if(id==='income')renderIncomes();
+  else if(id==='expenses')renderExpenses();
+  else if(id==='debts')renderDebts();
+  else if(id==='dashboard')renderDashboard();
+  else if(id==='yearly')renderYearly();
+  else if(id==='settings')loadSettings();
+  // hide FAB on settings
+  $('fab-btn').style.display=id==='settings'?'none':'flex';
+};
+
+// ── EXPORT PDF ────────────────────────────────────────────
+window.exportMonthPDF=function(){
+  const m=parseInt($('dash-month').value),y=parseInt($('dash-year').value);
+  const n1=D.settings.name1||'מלכיאל',n2=D.settings.name2||'השותף';
+  const inc=D.incomes.filter(i=>i.month===m&&i.year===y);
+  const exp=D.expenses.filter(e=>e.month===m&&e.year===y);
+  const totalInc=inc.reduce((s,i)=>s+i.amount,0);
+  const totalExp=exp.reduce((s,e)=>s+e.amount,0);
+  const profit=totalInc-totalExp;
+  const tl={tuition:'שכ"ל תלמידים',municipality:'עירייה',other:'אחר'};
+  const html=`<html dir="rtl"><head><meta charset="UTF-8">
+  <style>body{font-family:Arial,sans-serif;padding:30px;direction:rtl;}
+  h1{font-size:20px;margin-bottom:6px;}h2{font-size:15px;margin:20px 0 8px;border-bottom:1px solid #ccc;padding-bottom:4px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px;}
+  th,td{border:1px solid #ddd;padding:7px 10px;text-align:right;}th{background:#f5f5f5;}
+  .summary{display:flex;gap:20px;margin:16px 0;}.box{flex:1;border:1px solid #ddd;border-radius:8px;padding:12px;text-align:center;}
+  .box .lbl{font-size:11px;color:#888;}.box .vl{font-size:20px;font-weight:bold;}
+  </style></head><body>
+  <h1>📚 דוח חודשי — ${HEB[m-1]} ${y}</h1>
+  <p style="color:#888;font-size:12px;">הופק: ${new Date().toLocaleDateString('he-IL')}</p>
+  <div class="summary">
+    <div class="box"><div class="lbl">הכנסות</div><div class="vl">₪${fmt(totalInc)}</div></div>
+    <div class="box"><div class="lbl">הוצאות</div><div class="vl">₪${fmt(totalExp)}</div></div>
+    <div class="box"><div class="lbl">רווח</div><div class="vl">₪${fmt(profit)}</div></div>
+    <div class="box"><div class="lbl">חלק ${n1}</div><div class="vl">₪${fmt(profit/2)}</div></div>
+  </div>
+  <h2>הכנסות</h2>
+  <table><tr><th>סוג</th><th>סכום</th><th>הערה</th></tr>
+  ${inc.map(i=>`<tr><td>${tl[i.type]}</td><td>₪${fmt(i.amount)}</td><td>${i.note||''}</td></tr>`).join('')}
+  <tr><td><b>סה"כ</b></td><td><b>₪${fmt(totalInc)}</b></td><td></td></tr></table>
+  <h2>הוצאות</h2>
+  <table><tr><th>תיאור</th><th>שילם</th><th>סכום</th></tr>
+  ${exp.map(e=>`<tr><td>${e.desc}</td><td>${e.payer==='me'?n1:e.payer==='partner'?n2:'קופת שכ"ל'}</td><td>₪${fmt(e.amount)}</td></tr>`).join('')}
+  <tr><td><b>סה"כ</b></td><td></td><td><b>₪${fmt(totalExp)}</b></td></tr></table>
+  </body></html>`;
+  const w=window.open('','_blank');w.document.write(html);w.document.close();setTimeout(()=>w.print(),400);
+};
+
+window.exportYearlyPDF=function(){
+  const y=parseInt($('yearly-year').value);
+  const n1=D.settings.name1||'מלכיאל';
+  let totalInc=0,totalExp=0;
+  const rows=HEB.map((mName,idx)=>{
+    const m=idx+1;
+    const inc=D.incomes.filter(i=>i.month===m&&i.year===y).reduce((s,i)=>s+i.amount,0);
+    const exp=D.expenses.filter(e=>e.month===m&&e.year===y).reduce((s,e)=>s+e.amount,0);
+    totalInc+=inc;totalExp+=exp;
+    return{mName,inc,exp,profit:inc-exp};
+  });
+  const html=`<html dir="rtl"><head><meta charset="UTF-8">
+  <style>body{font-family:Arial,sans-serif;padding:30px;direction:rtl;}
+  h1{font-size:20px;}table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{border:1px solid #ddd;padding:7px 10px;text-align:right;}th{background:#f5f5f5;}
+  .tot{font-weight:bold;background:#f0f0f0;}
+  </style></head><body>
+  <h1>📆 דוח שנתי — ${y}</h1>
+  <p style="color:#888;font-size:12px;">הופק: ${new Date().toLocaleDateString('he-IL')}</p>
+  <table><tr><th>חודש</th><th>הכנסות</th><th>הוצאות</th><th>רווח</th><th>חלק ${n1}</th></tr>
+  ${rows.map(r=>`<tr><td>${r.mName}</td><td>₪${fmt(r.inc)}</td><td>₪${fmt(r.exp)}</td><td>₪${fmt(r.profit)}</td><td>₪${fmt(r.profit/2)}</td></tr>`).join('')}
+  <tr class="tot"><td>סה"כ</td><td>₪${fmt(totalInc)}</td><td>₪${fmt(totalExp)}</td><td>₪${fmt(totalInc-totalExp)}</td><td>₪${fmt((totalInc-totalExp)/2)}</td></tr>
+  </table></body></html>`;
+  const w=window.open('','_blank');w.document.write(html);w.document.close();setTimeout(()=>w.print(),400);
+};
+
+// ── DATA MGMT ─────────────────────────────────────────────
+window.exportData=function(){
+  const b=new Blob([JSON.stringify(D,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);
+  a.download=`talmud-torah-${new Date().toISOString().split('T')[0]}.json`;a.click();
+};
+window.importData=async function(input){
+  const file=input.files[0];if(!file)return;
+  const r=new FileReader();
+  r.onload=async e=>{
+    try{
+      D=JSON.parse(e.target.result);
+      await fbSet('tt',{settings:D.settings,
+        incomes:Object.fromEntries((D.incomes||[]).map(i=>[i.id,i])),
+        expenses:Object.fromEntries((D.expenses||[]).map(e=>[e.id,e])),
+        debts:Object.fromEntries((D.debts||[]).map(d=>[d.id,d]))});
+      renderDashboard();toast('יובא בהצלחה ✓');
+    }catch{toast('שגיאה בייבוא','error');}
+  };
+  r.readAsText(file);input.value='';
+};
+
+// ── TOAST ─────────────────────────────────────────────────
+let toastTimer;
+window.toast=function(msg,type='success'){
+  clearTimeout(toastTimer);
+  const t=$('toast');t.style.opacity='1';
+  t.style.borderColor=type==='error'?'var(--red)':'var(--green)';
+  t.textContent=msg;
+  toastTimer=setTimeout(()=>{t.style.opacity='0';},2800);
+};
+
+// ── BULK ACTIONS ─────────────────────────────────────────
+window.bulkChangePayer=function(){
+  const n1=D.settings.name1||'מלכיאל',n2=D.settings.name2||'השותף';
+  const p=$('bulk-payer-select');
+  p.options[0].text=n1;p.options[1].text=n2;
+  $('bulk-payer-modal').classList.add('open');
+};
+
+window.saveBulkPayer=async function(){
+  const m=parseInt($('exp-filter-month').value);
+  const y=parseInt($('exp-filter-year').value);
+  const newPayer=$('bulk-payer-select').value;
+  const items=D.expenses.filter(e=>e.month===m&&e.year===y);
+  if(!items.length){toast('אין הוצאות לחודש זה','error');closeModal('bulk-payer-modal');return;}
+  for(const item of items){
+    item.payer=newPayer;
+    await fbSet('tt/expenses/'+item.id,item);
+  }
+  closeModal('bulk-payer-modal');
+  renderExpenses();renderDashboard();
+  toast(`עודכן משלם ל-${items.length} הוצאות ✓`);
+};
+
+window.bulkDeleteMonth=function(type){
+  const filterM=type==='expense'?$('exp-filter-month'):$('inc-filter-month');
+  const filterY=type==='expense'?$('exp-filter-year'):$('inc-filter-year');
+  const m=parseInt(filterM.value),y=parseInt(filterY.value);
+  const HEB_M=['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+  const label=type==='expense'?'הוצאות':'הכנסות';
+  confirmAction(
+    `מחיקת ${label} — ${HEB_M[m-1]} ${y}`,
+    `האם למחוק את כל ה${label} של ${HEB_M[m-1]} ${y}? פעולה זו בלתי הפיכה.`,
+    async()=>{
+      if(type==='expense'){
+        const toDelete=D.expenses.filter(e=>e.month===m&&e.year===y);
+        D.expenses=D.expenses.filter(e=>!(e.month===m&&e.year===y));
+        for(const e of toDelete) await db.ref('tt/expenses/'+e.id).remove();
+        renderExpenses();
+      } else {
+        const toDelete=D.incomes.filter(i=>i.month===m&&i.year===y);
+        D.incomes=D.incomes.filter(i=>!(i.month===m&&i.year===y));
+        for(const i of toDelete) await db.ref('tt/incomes/'+i.id).remove();
+        renderIncomes();
+      }
+      renderDashboard();
+      toast('נמחק בהצלחה ✓');
+    }
+  );
+};
+
+// ── EXCEL PASTE ───────────────────────────────────────────
+let excelMode='expense'; // 'income' or 'expense'
+let excelHalf='full';
+
+window.setExcelHalf=function(m){
+  excelHalf=m;
+  $('excel-full-btn').className=m==='full'?'active':'';
+  $('excel-half-btn').className=m==='half'?'active':'';
+};
+
+window.openExcelPaste=function(mode){
+  excelMode=mode;
+  excelHalf='full';
+  $('excel-full-btn').className='active';
+  $('excel-half-btn').className='';
+  const now=new Date();
+  $('excel-month').innerHTML=$('inc-filter-month').innerHTML;
+  $('excel-year').innerHTML=$('inc-filter-year').innerHTML;
+  $('excel-month').value=now.getMonth()+1;
+  $('excel-year').value=now.getFullYear();
+  $('excel-payer-wrap').style.display=mode==='expense'?'':'none';
+  if(mode==='income'){
+    $('excel-modal-title').textContent='📋 הדבק הכנסות מאקסל';
+    $('excel-modal-desc').textContent='העתק מאקסל שורות עם 5 עמודות: A=תיאור, B=שכר, C=פעילויות, D=תפעול, E=הכנסות. רק שורות עם סכום בעמודה E יתווספו כהכנסות.';
+  } else {
+    $('excel-modal-title').textContent='📋 הדבק הוצאות מאקסל';
+    $('excel-modal-desc').textContent='העתק מאקסל שורות עם 5 עמודות: A=תיאור, B=שכר, C=פעילויות, D=תפעול, E=הכנסות. רק שורות עם סכום ב-B/C/D יתווספו כהוצאות.';
+  }
+  $('excel-paste-area').value='';
+  $('excel-preview').innerHTML='';
+  $('excel-modal').classList.add('open');
+  setTimeout(()=>$('excel-paste-area').focus(),300);
+};
+
+function parseExcelText(text){
+  // Split into rows, handle both \n and \r\n
+  return text.trim().split(/\r?\n/).map(row=>
+    row.split('\t').map(cell=>cell.trim().replace(/[,]/g,'').replace(/[\u200b-\u200f\uFEFF]/g,''))
+  );
+}
+
+function parseNum(val){
+  if(!val||val==='')return 0;
+  const n=parseFloat(val.replace(/[^\d.-]/g,''));
+  return isNaN(n)?0:n;
+}
+
+window.previewExcel=function(){
+  const text=$('excel-paste-area').value.trim();
+  if(!text){$('excel-preview').innerHTML='<div class="alert alert-warning">אין טקסט להצגה</div>';return;}
+  const rows=parseExcelText(text);
+  const month=parseInt($('excel-month').value);
+  const year=parseInt($('excel-year').value);
+  const payer=$('excel-payer').value;
+  const items=buildExcelItems(rows,month,year,payer);
+  if(!items.length){
+    $('excel-preview').innerHTML='<div class="alert alert-warning">לא נמצאו שורות עם סכומים רלוונטיים. בדוק שהמבנה הוא: A=תיאור, B=שכר, C=פעילויות, D=תפעול, E=הכנסות</div>';
+    return;
+  }
+  const catLabel={salary:'שכר מורים',activities:'פעילויות ותחזוקה',operation:'תפעול עמותה',tuition:'שכ"ל'};
+  $('excel-preview').innerHTML=`<div style="margin-bottom:8px;font-size:12px;color:var(--muted);">נמצאו <strong style="color:var(--text)">${items.length}</strong> שורות לייבוא:</div>
+  <div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;">
+  <table style="font-size:12px;">
+    <thead><tr><th>תיאור</th><th>סכום</th><th>קטגוריה</th></tr></thead>
+    <tbody>
+    ${items.map(i=>`<tr>
+      <td>${i.desc}</td>
+      <td style="font-weight:700;color:${excelMode==='income'?'var(--green)':'var(--red)'}">₪${fmt(i.amount)}</td>
+      <td><span class="badge badge-blue">${catLabel[i.cat]||i.cat}</span></td>
+    </tr>`).join('')}
+    </tbody>
+    <tfoot><tr>
+      <td style="font-weight:700;padding:8px 11px;">סה"כ</td>
+      <td style="font-weight:800;color:${excelMode==='income'?'var(--green)':'var(--red)'};padding:8px 11px;">₪${fmt(items.reduce((s,i)=>s+i.amount,0))}</td>
+      <td></td>
+    </tr></tfoot>
+  </table></div>`;
+};
+
+function buildExcelItems(rows,month,year,payer){
+  const items=[];
+  const catMap={0:'salary',1:'activities',2:'operation'}; // B=0,C=1,D=2
+  rows.forEach(cols=>{
+    if(cols.length<2)return;
+    const desc=(cols[0]||'').trim();
+    if(!desc)return;
+    if(excelMode==='expense'){
+      // Check cols B(1), C(2), D(3)
+      for(let ci=0;ci<=2;ci++){
+        const val=parseNum(cols[ci+1]||'');
+        if(val>0){
+          let amount=val;
+          if(excelHalf==='full')amount=val/2;
+          items.push({desc,amount,cat:catMap[ci],payer,month,year});
+          break; // one entry per row — take first non-zero
+        }
+      }
+    } else {
+      // income: check col E (index 4)
+      const val=parseNum(cols[4]||'');
+      if(val>0){
+        let amount=val;
+        if(excelHalf==='full')amount=val/2;
+        items.push({desc,amount,cat:'tuition',month,year});
+      }
+    }
+  });
+  return items;
+}
+
+window.saveExcelPaste=async function(){
+  const text=$('excel-paste-area').value.trim();
+  if(!text){toast('אין טקסט להדבקה','error');return;}
+  const rows=parseExcelText(text);
+  const month=parseInt($('excel-month').value);
+  const year=parseInt($('excel-year').value);
+  const payer=$('excel-payer').value;
+  const items=buildExcelItems(rows,month,year,payer);
+  if(!items.length){toast('לא נמצאו שורות עם סכומים','error');return;}
+
+  $('excel-save-btn').textContent='שומר...';
+  $('excel-save-btn').disabled=true;
+
+  for(let i=0;i<items.length;i++){
+    const item=items[i];
+    const id=Date.now()+i; // שלם ייחודי
+    if(excelMode==='expense'){
+      const exp={id,month:item.month,year:item.year,desc:item.desc,amount:item.amount,
+        payer:item.payer,cat:item.cat,note:''};
+      D.expenses.push(exp);
+      await fbSet('tt/expenses/'+id,exp);
+    } else {
+      const inc={id,month:item.month,year:item.year,type:'tuition',amount:item.amount,
+        note:item.desc,students:null,rate:null};
+      D.incomes.push(inc);
+      await fbSet('tt/incomes/'+id,inc);
+    }
+  }
+
+  $('excel-save-btn').textContent='✅ הוסף הכל';
+  $('excel-save-btn').disabled=false;
+  closeModal('excel-modal');
+  if(excelMode==='expense'){renderExpenses();}else{renderIncomes();}
+  renderDashboard();
+  toast(`נוספו ${items.length} שורות בהצלחה ✓`);
+};
+
+// ── START ─────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
