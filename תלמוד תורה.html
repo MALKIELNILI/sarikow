@@ -665,7 +665,7 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 const HEB=['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
-let D={settings:{students:112,tuition:250,muni:0,nistanim_students:49,nistanim_rate:150,name1:'מלכיאל',name2:'השותף',password:''},incomes:[],expenses:[],debts:[]};
+let D={settings:{students:112,tuition:250,muni:0,nistanim_students:49,nistanim_rate:150,name1:'מלכיאל',name2:'השותף',password:''},incomes:[],expenses:[],debts:[],transfers:[]};
 let loggedIn=false;
 const $=id=>document.getElementById(id);
 const fmt=n=>Math.round(n||0).toLocaleString('he-IL');
@@ -693,6 +693,7 @@ async function fbLoad(){
       D.debts=v.debts?Object.values(v.debts):[];
       D.payments=v.payments?Object.values(v.payments):[];
       D.completions=v.completions?Object.values(v.completions):[];
+      D.transfers=v.transfers?Object.values(v.transfers):[];
     }
     syncStatus('ok');
   }catch(e){syncStatus('error');toast('שגיאת טעינה','error');console.error(e);}
@@ -708,6 +709,7 @@ function listenRealtime(){
       D.debts=v.debts?Object.values(v.debts):[];
       D.payments=v.payments?Object.values(v.payments):[];
       D.completions=v.completions?Object.values(v.completions):[];
+      D.transfers=v.transfers?Object.values(v.transfers):[];
     }
     refreshCurrent();syncStatus('ok');
   });
@@ -1330,6 +1332,29 @@ window.removeCompletion=async function(m,y){
   });
 };
 
+// ── CARRY FORWARD ─────────────────────────────────────────
+window.addCarryForward=async function(m,y,amount){
+  if((D.transfers||[]).some(t=>t.fromMonth===m&&t.fromYear===y)){
+    toast('כבר קיימת העברה מחודש זה','error');return;
+  }
+  const nextM=m===12?1:m+1, nextY=m===12?y+1:y;
+  const id=Date.now();
+  const item={id,fromMonth:m,fromYear:y,toMonth:nextM,toYear:nextY,amount};
+  if(!D.transfers)D.transfers=[];
+  D.transfers.push(item);
+  await fbSet('tt/transfers/'+id,item);
+  renderDashboard();
+  toast(`הועבר ₪${fmt(amount)} ל${HEB[nextM-1]} ${nextY} ✓`);
+};
+window.removeCarryForward=async function(id){
+  id=parseInt(id);
+  confirmAction('ביטול העברה','האם לבטל את ההעברה לחודש הבא?',async()=>{
+    D.transfers=(D.transfers||[]).filter(t=>t.id!==id);
+    await db.ref('tt/transfers/'+id).remove();
+    renderDashboard();toast('ההעברה בוטלה');
+  });
+};
+
 // ── DASHBOARD ─────────────────────────────────────────────
 function renderDashboard(){
   const m=parseInt($('dash-month').value),y=parseInt($('dash-year').value);
@@ -1351,7 +1376,13 @@ function renderDashboard(){
   const target=D.settings.target||22000;
   const tuitionInc=inc.filter(i=>i.type==='tuition').reduce((s,i)=>s+i.amount,0);
   const autoCompleteInc=inc.filter(i=>i.autoComplete).reduce((s,i)=>s+i.amount,0);
-  const targetDiff=tuitionInc-target;
+  const nextM=m===12?1:m+1, nextY=m===12?y+1:y;
+  const transferOut=(D.transfers||[]).find(t=>t.fromMonth===m&&t.fromYear===y);
+  const transferIn=(D.transfers||[]).find(t=>t.toMonth===m&&t.toYear===y);
+  const transferredOut=transferOut?transferOut.amount:0;
+  const transferredIn=transferIn?transferIn.amount:0;
+  const effectiveTuitionInc=tuitionInc-transferredOut+transferredIn;
+  const targetDiff=effectiveTuitionInc-target;
 
   // חישוב רווח קופה כולל השלמה (הוצאות שלי לא משפיעות על רווח)
   const effectiveInc=totalInc+(target>0&&targetDiff<0?-targetDiff:0);
@@ -1369,9 +1400,18 @@ function renderDashboard(){
   // קטע יעד + כפתור השלמה
   const hasAutoComplete=(D.completions||[]).some(c=>c.month===m&&c.year===y);
   const completion=(D.completions||[]).find(c=>c.month===m&&c.year===y);
+  const rawExcess=tuitionInc-target;
   const targetSection=target>0?`<div class="section" style="margin-bottom:14px;">
     <div class="section-header"><h2>🎯 יעד שכר לימוד — ${HEB[m-1]} ${y}</h2></div>
     <div class="section-body">
+      ${transferredIn>0?`<div class="alert alert-info" style="margin-bottom:10px;font-size:13px;">
+        ➡️ הועבר מחודש קודם: <strong>+₪${fmt(transferredIn)}</strong>
+        <button class="btn btn-ghost btn-sm" style="margin-right:8px;" onclick="removeCarryForward(${transferIn.id})">בטל</button>
+      </div>`:''}
+      ${transferredOut>0?`<div class="alert alert-warning" style="margin-bottom:10px;font-size:13px;">
+        ⬅️ הועבר ל${HEB[nextM-1]} ${nextY}: <strong>−₪${fmt(transferredOut)}</strong>
+        <button class="btn btn-ghost btn-sm" style="margin-right:8px;" onclick="removeCarryForward(${transferOut.id})">בטל</button>
+      </div>`:''}
       <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
         <div style="flex:1;min-width:100px;text-align:center;">
           <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">יעד</div>
@@ -1379,8 +1419,8 @@ function renderDashboard(){
         </div>
         <div style="color:var(--muted);">→</div>
         <div style="flex:1;min-width:100px;text-align:center;">
-          <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">התקבל</div>
-          <div style="font-size:18px;font-weight:700;color:var(--green);">₪${fmt(tuitionInc)}</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">התקבל${transferredOut>0||transferredIn>0?' (אחרי העברה)':''}</div>
+          <div style="font-size:18px;font-weight:700;color:var(--green);">₪${fmt(effectiveTuitionInc)}</div>
         </div>
         <div style="color:var(--muted);">→</div>
         <div style="flex:1;min-width:100px;text-align:center;">
@@ -1390,13 +1430,13 @@ function renderDashboard(){
           </div>
         </div>
         <div style="flex:2;min-width:150px;">
-          <div style="font-size:11px;color:var(--muted);margin-bottom:5px;">${Math.round(Math.min(100,tuitionInc/target*100))}% מהיעד</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:5px;">${Math.round(Math.min(100,effectiveTuitionInc/target*100))}% מהיעד</div>
           <div style="background:var(--border);border-radius:20px;height:8px;overflow:hidden;">
-            <div style="height:100%;width:${Math.min(100,Math.round(tuitionInc/target*100))}%;background:${targetDiff>=0?'var(--green)':'var(--yellow)'};border-radius:20px;"></div>
+            <div style="height:100%;width:${Math.min(100,Math.round(effectiveTuitionInc/target*100))}%;background:${targetDiff>=0?'var(--green)':'var(--yellow)'};border-radius:20px;"></div>
           </div>
         </div>
       </div>
-      ${targetDiff!==0?`
+      ${targetDiff!==0||rawExcess>0?`
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           ${!hasAutoComplete&&targetDiff<0?`
             <button class="btn btn-success btn-sm" onclick="applyCompletion(${m},${y},${-targetDiff})">
@@ -1406,9 +1446,9 @@ function renderDashboard(){
             <span class="badge badge-green">✓ הושלם — נוסף ₪${fmt(completion?completion.amount:0)}</span>
             <button class="btn btn-ghost btn-sm" onclick="removeCompletion(${m},${y})">בטל השלמה</button>
             `:''}
-          ${targetDiff>0&&!hasAutoComplete?`
-            <button class="btn btn-warning btn-sm" onclick="applyCompletion(${m},${y},${targetDiff})">
-              📝 תעד עודף +₪${fmt(targetDiff)}
+          ${rawExcess>0&&!transferredOut?`
+            <button class="btn btn-sm" style="background:#0ea5e9;color:#fff;" onclick="addCarryForward(${m},${y},${rawExcess})">
+              ➡️ הקדם עודף לחודש הבא (₪${fmt(rawExcess)})
             </button>`:''}
         </div>`:'<div class="alert alert-success" style="margin-top:0;font-size:12px;">✅ בדיוק ביעד!</div>'}
     </div>
