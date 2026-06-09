@@ -1620,10 +1620,7 @@ function renderKupa(){
   const allKeys=new Set();
   D.incomes.forEach(i=>allKeys.add(`${i.year}-${String(i.month).padStart(2,'0')}`));
   D.expenses.forEach(e=>allKeys.add(`${e.year}-${String(e.month).padStart(2,'0')}`));
-  const months=[...allKeys].sort().filter(k=>{
-    const [y,m]=[parseInt(k.split('-')[0]),parseInt(k.split('-')[1])];
-    return y>2025||(y===2025&&m>=9);
-  });
+  const months=[...allKeys].sort();
 
   if(!months.length){
     $('kupa-table').innerHTML='<div class="empty-state">אין נתונים עדיין</div>';
@@ -1633,14 +1630,15 @@ function renderKupa(){
   let cumBalance=0;
   const rows=months.map(key=>{
     const [y,m]=[parseInt(key.split('-')[0]),parseInt(key.split('-')[1])];
+    const isSchoolMonth=y>2025||(y===2025&&m>=9);
     const inc    = D.incomes.filter(i=>i.month===m&&i.year===y&&i.type!=='nistanim').reduce((s,i)=>s+i.amount,0);
     const tuition= D.incomes.filter(i=>i.month===m&&i.year===y&&i.type==='tuition').reduce((s,i)=>s+i.amount,0);
     const kupaExp= D.expenses.filter(e=>e.month===m&&e.year===y&&(e.payer==='partner'||e.payer==='tuition')).reduce((s,e)=>s+e.amount,0);
     const profit = Math.max(0,inc-kupaExp);
     const deficit= Math.max(0,kupaExp-inc);
-    const vsTarget= tuition-target;
+    const vsTarget= isSchoolMonth?tuition-target:null;
     cumBalance  += (inc-kupaExp);
-    return{key,y,m,label:`${HEB[m-1]} ${y}`,inc,tuition,kupaExp,profit,deficit,vsTarget,cumBalance};
+    return{key,y,m,isSchoolMonth,label:`${HEB[m-1]} ${y}`,inc,tuition,kupaExp,profit,deficit,vsTarget,cumBalance};
   });
 
   // כרטיסי סיכום
@@ -1649,7 +1647,8 @@ function renderKupa(){
   const totExp   =rows.reduce((s,r)=>s+r.kupaExp,0);
   const totProfit=rows.reduce((s,r)=>s+r.profit,0);
   const totDeficit=rows.reduce((s,r)=>s+r.deficit,0);
-  const expectedTotal=rows.length*target;
+  const schoolMonths=rows.filter(r=>r.isSchoolMonth).length;
+  const expectedTotal=schoolMonths*target;
 
   $('kupa-cards').innerHTML=`
     <div class="card green">
@@ -1689,7 +1688,7 @@ function renderKupa(){
     <td class="text-green">₪${fmt(r.inc)}</td>
     <td class="text-green">₪${fmt(r.tuition)}</td>
     <td class="text-muted">₪${fmt(target)}</td>
-    <td class="${r.vsTarget>=0?'text-green':'text-red'}" style="font-weight:700">${r.vsTarget>=0?'+':'-'}₪${fmt(Math.abs(r.vsTarget))}</td>
+    <td class="${r.vsTarget===null?'text-muted':r.vsTarget>=0?'text-green':'text-red'}" style="font-weight:700">${r.vsTarget===null?'—':r.vsTarget>=0?'+₪'+fmt(r.vsTarget):'-₪'+fmt(Math.abs(r.vsTarget))}</td>
     <td class="text-red">₪${fmt(r.kupaExp)}</td>
     <td class="${r.profit>0?'text-green':r.deficit>0?'text-red':'text-muted'}" style="font-weight:700">${r.profit>0?'+₪'+fmt(r.profit):r.deficit>0?'−₪'+fmt(r.deficit):'₪0'}</td>
     <td style="font-weight:800;color:${r.cumBalance>=0?'var(--green)':'var(--red)'};">${r.cumBalance>=0?'+':'-'}₪${fmt(Math.abs(r.cumBalance))}</td>
