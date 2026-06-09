@@ -211,6 +211,7 @@ tr:hover td{background:rgba(255,255,255,0.02);}
     <button class="tab" data-page="income" onclick="showPage('income',this)">💰 הכנסות</button>
     <button class="tab" data-page="expenses" onclick="showPage('expenses',this)">📋 הוצאות</button>
     <button class="tab" data-page="debts" onclick="showPage('debts',this)">🔄 חובות</button>
+    <button class="tab" data-page="loans" onclick="showPage('loans',this);renderLoans()">💳 הלוואות</button>
     <button class="tab" data-page="yearly" onclick="showPage('yearly',this)">📆 שנתי</button>
     <button class="tab" data-page="search" onclick="showPage('search',this);renderGlobalSearch()">🔍 חיפוש</button>
     <button class="tab" data-page="settings" onclick="showPage('settings',this)">⚙️ הגדרות</button>
@@ -404,6 +405,51 @@ tr:hover td{background:rgba(255,255,255,0.02);}
       </div>
       <div id="yearly-cards" class="cards"></div>
       <div id="yearly-table"></div>
+    </div>
+
+    <!-- LOANS -->
+    <div id="page-loans" class="page">
+      <div id="loans-summary"></div>
+      <div class="section">
+        <div class="section-header"><h2>➕ הלוואה חדשה</h2></div>
+        <div class="section-body">
+          <div class="form-row">
+            <div class="form-group"><label>שם הלווה</label><input type="text" id="loan-borrower" placeholder="שם הלווה..."></div>
+            <div class="form-group"><label>מקור הכסף</label>
+              <select id="loan-source">
+                <option value="tuition">שכר לימוד</option>
+                <option value="me">ממני</option>
+                <option value="shabbatot">שבתות</option>
+                <option value="tiferet">תפארת מישאל</option>
+              </select>
+            </div>
+            <div class="form-group"><label>סכום (₪)</label><input type="number" id="loan-amount" min="0" placeholder="0"></div>
+            <div class="form-group"><label>תאריך</label><input type="date" id="loan-date"></div>
+            <div class="form-group" style="flex:2"><label>הערה</label><input type="text" id="loan-note" placeholder="פירוט..."></div>
+          </div>
+          <div style="margin-top:12px;"><button class="btn btn-success" onclick="addLoan()">➕ הוסף הלוואה</button></div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-header"><h2>📋 רשימת הלוואות</h2></div>
+        <div style="padding:0;"><div id="loans-table"></div></div>
+      </div>
+      <!-- מודל החזר -->
+      <div id="repay-modal" class="modal-overlay">
+        <div class="modal-box" style="max-width:360px;">
+          <div class="modal-header"><h3>💵 תיעוד החזר</h3></div>
+          <div class="modal-body">
+            <input type="hidden" id="repay-loan-id">
+            <div class="form-group"><label>סכום שהוחזר (₪)</label><input type="number" id="repay-amount" min="0" placeholder="0"></div>
+            <div class="form-group"><label>תאריך</label><input type="date" id="repay-date"></div>
+            <div class="form-group"><label>הערה</label><input type="text" id="repay-note" placeholder="פירוט..."></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-success" onclick="saveRepayment()">שמור</button>
+            <button class="btn btn-ghost" onclick="closeModal('repay-modal')">ביטול</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- SETTINGS -->
@@ -665,7 +711,7 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 const HEB=['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
-let D={settings:{students:112,tuition:250,muni:0,nistanim_students:49,nistanim_rate:150,name1:'מלכיאל',name2:'השותף',password:''},incomes:[],expenses:[],debts:[],transfers:[]};
+let D={settings:{students:112,tuition:250,muni:0,nistanim_students:49,nistanim_rate:150,name1:'מלכיאל',name2:'השותף',password:''},incomes:[],expenses:[],debts:[],transfers:[],loans:[],loanRepayments:[]};
 let loggedIn=false;
 const $=id=>document.getElementById(id);
 const fmt=n=>Math.round(n||0).toLocaleString('he-IL');
@@ -694,6 +740,8 @@ async function fbLoad(){
       D.payments=v.payments?Object.values(v.payments):[];
       D.completions=v.completions?Object.values(v.completions):[];
       D.transfers=v.transfers?Object.values(v.transfers):[];
+      D.loans=v.loans?Object.values(v.loans):[];
+      D.loanRepayments=v.loanRepayments?Object.values(v.loanRepayments):[];
     }
     syncStatus('ok');
   }catch(e){syncStatus('error');toast('שגיאת טעינה','error');console.error(e);}
@@ -710,6 +758,8 @@ function listenRealtime(){
       D.payments=v.payments?Object.values(v.payments):[];
       D.completions=v.completions?Object.values(v.completions):[];
       D.transfers=v.transfers?Object.values(v.transfers):[];
+      D.loans=v.loans?Object.values(v.loans):[];
+      D.loanRepayments=v.loanRepayments?Object.values(v.loanRepayments):[];
     }
     refreshCurrent();syncStatus('ok');
   });
@@ -721,6 +771,7 @@ function refreshCurrent(){
   else if(pg==='expenses')renderExpenses();
   else if(pg==='debts')renderDebts();
   else if(pg==='yearly')renderYearly();
+  else if(pg==='loans')renderLoans();
   else if(pg==='settings')loadSettings();
 }
 
@@ -1726,6 +1777,125 @@ window.exportYearlyPDF=function(){
   <tr class="tot"><td>סה"כ</td><td>₪${fmt(totalInc)}</td><td>₪${fmt(totalExp)}</td><td>₪${fmt(totalInc-totalExp)}</td><td>₪${fmt((totalInc-totalExp)/2)}</td></tr>
   </table></body></html>`;
   const w=window.open('','_blank');w.document.write(html);w.document.close();setTimeout(()=>w.print(),400);
+};
+
+// ── LOANS ─────────────────────────────────────────────────
+const LOAN_SRC={tuition:'שכר לימוד',me:'ממני',shabbatot:'שבתות',tiferet:'תפארת מישאל'};
+const LOAN_SRC_COLOR={tuition:'badge-green',me:'badge-blue',shabbatot:'badge-yellow',tiferet:'badge-purple'};
+
+function renderLoans(){
+  const loans=[...(D.loans||[])].sort((a,b)=>b.id-a.id);
+  const repayments=D.loanRepayments||[];
+
+  // סיכום לפי מקור
+  const sources=['tuition','me','shabbatot','tiferet'];
+  let totalLoaned=0,totalRepaid=0;
+  const bySource=sources.map(src=>{
+    const srcLoans=loans.filter(l=>l.source===src);
+    const loaned=srcLoans.reduce((s,l)=>s+l.amount,0);
+    const repaid=srcLoans.reduce((s,l)=>s+repayments.filter(r=>r.loanId===l.id).reduce((a,r)=>a+r.amount,0),0);
+    totalLoaned+=loaned;totalRepaid+=repaid;
+    return{src,loaned,repaid,remaining:loaned-repaid};
+  }).filter(x=>x.loaned>0);
+
+  const remaining=totalLoaned-totalRepaid;
+  $('loans-summary').innerHTML=`<div class="cards" style="margin-bottom:14px;">
+    <div class="card green"><div class="label">סה"כ הלוואות</div><div class="val">₪${fmt(totalLoaned)}</div></div>
+    <div class="card blue"><div class="label">הוחזר</div><div class="val">₪${fmt(totalRepaid)}</div></div>
+    <div class="card ${remaining>0?'red':'green'}"><div class="label">יתרה לגבייה</div><div class="val">₪${fmt(remaining)}</div></div>
+    ${bySource.filter(x=>x.remaining>0).map(x=>`
+    <div class="card" style="background:rgba(0,0,0,0.04);border:1px solid var(--border);">
+      <div class="label"><span class="badge ${LOAN_SRC_COLOR[x.src]}">${LOAN_SRC[x.src]}</span></div>
+      <div class="val">₪${fmt(x.remaining)}</div>
+      <div class="sub-val">מתוך ₪${fmt(x.loaned)}</div>
+    </div>`).join('')}
+  </div>`;
+
+  const el=$('loans-table');
+  if(!loans.length){el.innerHTML='<div class="empty-state">אין הלוואות מתועדות</div>';return;}
+  el.innerHTML=`<table><thead><tr>
+    <th>לווה</th><th>מקור</th><th>ניתן</th><th>הוחזר</th><th>יתרה</th><th>תאריך</th><th>הערה</th><th></th>
+  </tr></thead><tbody>
+  ${loans.map(l=>{
+    const repaid=repayments.filter(r=>r.loanId===l.id).reduce((s,r)=>s+r.amount,0);
+    const rem=l.amount-repaid;
+    const repList=repayments.filter(r=>r.loanId===l.id).sort((a,b)=>a.id-b.id);
+    return `<tr>
+      <td style="font-weight:600">${l.borrower}</td>
+      <td><span class="badge ${LOAN_SRC_COLOR[l.source]||'badge-yellow'}">${LOAN_SRC[l.source]||l.source}</span></td>
+      <td class="text-red">₪${fmt(l.amount)}</td>
+      <td class="text-green">₪${fmt(repaid)}</td>
+      <td style="font-weight:700;color:${rem>0?'var(--red)':'var(--green)'}">₪${fmt(rem)}</td>
+      <td class="text-muted">${l.date||'-'}</td>
+      <td class="text-muted">${l.note||'-'}</td>
+      <td style="white-space:nowrap;">
+        ${rem>0?`<button class="btn btn-success btn-sm" onclick="openRepayModal(${l.id})">💵 החזר</button> `:'<span class="badge badge-green">✓ סולק</span> '}
+        <button class="btn btn-ghost btn-sm" onclick="deleteLoan(${l.id})">🗑️</button>
+      </td>
+    </tr>
+    ${repList.length?`<tr style="background:rgba(0,0,0,0.02);">
+      <td colspan="8" style="padding:4px 12px;font-size:12px;color:var(--muted);">
+        החזרים: ${repList.map(r=>`₪${fmt(r.amount)} (${r.date||'-'})${r.note?' — '+r.note:''} <button class="btn btn-ghost" style="padding:0 4px;font-size:11px;" onclick="deleteRepayment(${r.id},${l.id})">✕</button>`).join(' | ')}
+      </td>
+    </tr>`:''}`;
+  }).join('')}
+  </tbody></table>`;
+}
+
+window.addLoan=async function(){
+  const borrower=$('loan-borrower').value.trim();
+  const source=$('loan-source').value;
+  const amount=parseFloat($('loan-amount').value)||0;
+  const date=$('loan-date').value;
+  const note=$('loan-note').value.trim();
+  if(!borrower){toast('הכנס שם לווה','error');return;}
+  if(!amount){toast('הכנס סכום','error');return;}
+  const id=Date.now();
+  const item={id,borrower,source,amount,date,note};
+  if(!D.loans)D.loans=[];
+  D.loans.push(item);
+  await fbSet('tt/loans/'+id,item);
+  $('loan-borrower').value='';$('loan-amount').value='';$('loan-note').value='';
+  renderLoans();toast(`הלוואה ל${borrower} נוספה ✓`);
+};
+
+window.openRepayModal=function(loanId){
+  $('repay-loan-id').value=loanId;
+  $('repay-amount').value='';$('repay-note').value='';
+  const today=new Date().toISOString().split('T')[0];
+  $('repay-date').value=today;
+  $('repay-modal').classList.add('open');
+};
+window.saveRepayment=async function(){
+  const loanId=parseInt($('repay-loan-id').value);
+  const amount=parseFloat($('repay-amount').value)||0;
+  if(!amount){toast('הכנס סכום','error');return;}
+  const id=Date.now();
+  const item={id,loanId,amount,date:$('repay-date').value,note:$('repay-note').value.trim()};
+  if(!D.loanRepayments)D.loanRepayments=[];
+  D.loanRepayments.push(item);
+  await fbSet('tt/loanRepayments/'+id,item);
+  closeModal('repay-modal');renderLoans();
+  toast(`החזר ₪${fmt(amount)} נרשם ✓`);
+};
+window.deleteRepayment=async function(id,loanId){
+  id=parseInt(id);
+  confirmAction('מחיקת החזר','האם למחוק החזר זה?',async()=>{
+    D.loanRepayments=(D.loanRepayments||[]).filter(r=>r.id!==id);
+    await db.ref('tt/loanRepayments/'+id).remove();
+    renderLoans();toast('נמחק');
+  });
+};
+window.deleteLoan=async function(id){
+  id=parseInt(id);
+  confirmAction('מחיקת הלוואה','האם למחוק הלוואה זו וכל החזריה?',async()=>{
+    D.loans=(D.loans||[]).filter(l=>l.id!==id);
+    D.loanRepayments=(D.loanRepayments||[]).filter(r=>r.loanId!==id);
+    await db.ref('tt/loans/'+id).remove();
+    const toDelRep=(D.loanRepayments||[]).filter(r=>r.loanId===id);
+    for(const r of toDelRep)await db.ref('tt/loanRepayments/'+r.id).remove();
+    renderLoans();toast('נמחק');
+  });
 };
 
 // ── DATA MGMT ─────────────────────────────────────────────
