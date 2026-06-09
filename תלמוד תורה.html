@@ -1158,11 +1158,12 @@ function calcDebtSummary(){
     const myExp=D.expenses.filter(e=>e.month===m&&e.year===y&&(e.payer==='me'||e.payer==='me-both')).reduce((s,e)=>s+e.amount,0);
     // רווח קופה = אפס כשיש גירעון (אין רווח שלילי לחלק)
     const kupaProfit=Math.max(0,inc-kupaExp);
+    const kupaDeficit=Math.max(0,kupaExp-inc);
     const myProfitShare=kupaProfit/2;
     // מה שמגיע לי = חלק ברווח + מה ששילמתי מכיסי
     const owedToMe=myProfitShare+myExp;
 
-    monthRows.push({key,y,m,inc,kupaExp,myExp,kupaProfit,myProfitShare,owedToMe,
+    monthRows.push({key,y,m,inc,kupaExp,myExp,kupaProfit,kupaDeficit,myProfitShare,owedToMe,
       label:`${HEB[m-1]} ${y}`});
   });
 
@@ -1243,9 +1244,10 @@ function renderDebts(){
   if(!activeMonths.length){
     mEl.innerHTML='<div class="empty-state">אין נתונים עדיין</div>';
   } else {
+    const totalDeficit=activeMonths.reduce((s,r)=>s+r.kupaDeficit,0);
     mEl.innerHTML=`<table><thead><tr>
       <th>חודש</th><th>הכנסות</th><th>הוצ' קופה</th>
-      <th>רווח קופה</th><th>חלקי</th>
+      <th>רווח קופה</th><th>גירעון</th><th>חלקי</th>
       <th>שילמתי</th><th>מגיע לי</th>
     </tr></thead><tbody>
     ${activeMonths.map(r=>`<tr>
@@ -1253,6 +1255,7 @@ function renderDebts(){
       <td class="text-green">₪${fmt(r.inc)}</td>
       <td class="text-red">₪${fmt(r.kupaExp)}</td>
       <td class="${r.kupaProfit>0?'text-green':'text-muted'}">₪${fmt(r.kupaProfit)}</td>
+      <td class="${r.kupaDeficit>0?'text-red':'text-muted'}" style="${r.kupaDeficit>0?'font-weight:700;':''}">${r.kupaDeficit>0?'−₪'+fmt(r.kupaDeficit):'-'}</td>
       <td class="text-green">₪${fmt(r.myProfitShare)}</td>
       <td class="${r.myExp>0?'text-green':'text-muted'}">₪${fmt(r.myExp)}</td>
       <td style="font-weight:700;color:var(--green)">₪${fmt(r.owedToMe)}</td>
@@ -1262,6 +1265,7 @@ function renderDebts(){
       <td style="color:var(--green);font-weight:700;padding:10px 11px;">₪${fmt(activeMonths.reduce((s,r)=>s+r.inc,0))}</td>
       <td style="color:var(--red);font-weight:700;padding:10px 11px;">₪${fmt(activeMonths.reduce((s,r)=>s+r.kupaExp,0))}</td>
       <td style="font-weight:700;padding:10px 11px;">₪${fmt(activeMonths.reduce((s,r)=>s+r.kupaProfit,0))}</td>
+      <td style="${totalDeficit>0?'color:var(--red);':'color:var(--muted);'}font-weight:700;padding:10px 11px;">${totalDeficit>0?'−₪'+fmt(totalDeficit):'-'}</td>
       <td style="color:var(--green);font-weight:700;padding:10px 11px;">₪${fmt(totalMyProfit)}</td>
       <td style="color:var(--green);font-weight:700;padding:10px 11px;">₪${fmt(totalMyExp)}</td>
       <td style="color:var(--green);font-weight:800;padding:10px 11px;">₪${fmt(totalOwedToMe)}</td>
