@@ -776,6 +776,8 @@ function loadSettings(){
   $('set-name2').value=s.name2||'השותף';$('set-pwd').value='';
   const p=$('exp-payer');if(p){p.options[0].text=s.name1||'מלכיאל';p.options[1].text=s.name2||'השותף';}
   const qp=$('qa-payer');if(qp){qp.options[0].text=s.name1||'מלכיאל';qp.options[1].text=s.name2||'השותף';}
+  const um=$('upd-nistanim-month');if(um)um.value=11;
+  const uy=$('upd-nistanim-year');if(uy)uy.value=2025;
 }
 window.saveSetting=async function(key){
   const map={students:'set-students',tuition:'set-tuition',muni:'set-muni',target:'set-target',
