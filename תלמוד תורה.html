@@ -1172,17 +1172,19 @@ function calcDebtSummary(){
   const totalMyProfit=monthRows.reduce((s,r)=>s+r.myProfitShare,0);
   const totalMyExp=monthRows.reduce((s,r)=>s+r.myExp,0);
   const totalOwedToMe=monthRows.reduce((s,r)=>s+r.owedToMe,0);
+  // חובות אישיים: יוסף חיים שילם עבורי (מפחית מהיתרה)
+  const personalDebts=(D.debts||[]).filter(x=>!x.settled&&x.type==='partner_paid_for_me').reduce((s,x)=>s+x.amount,0);
   // תשלומים שקיבלתי מהשותף
   const totalPaid=(D.payments||[]).reduce((s,p)=>s+p.amount,0);
   // יתרה: חיובי = השותף חייב לי, שלילי = אני חייב לשותף
-  const finalBalance=totalOwedToMe-totalPaid;
+  const finalBalance=totalOwedToMe-totalPaid-personalDebts;
 
-  return{totalMyProfit,totalMyExp,totalOwedToMe,totalPaid,finalBalance,monthRows};
+  return{totalMyProfit,totalMyExp,totalOwedToMe,totalPaid,personalDebts,finalBalance,monthRows};
 }
 
 function renderDebts(){
   const n1=D.settings.name1||'מלכיאל',n2=D.settings.name2||'השותף';
-  const {totalMyProfit,totalMyExp,totalOwedToMe,totalPaid,finalBalance,monthRows}=calcDebtSummary();
+  const {totalMyProfit,totalMyExp,totalOwedToMe,totalPaid,personalDebts,finalBalance,monthRows}=calcDebtSummary();
 
   // כרטיסי סיכום — חיובי = השותף חייב לי
   const balColor=finalBalance>0?'green':finalBalance<0?'red':'blue';
@@ -1200,6 +1202,12 @@ function renderDebts(){
         <div class="label">שילמתי מכיסי</div>
         <div class="val">₪${fmt(totalMyExp)}</div>
         <div class="sub-val">${n2} חייב להחזיר לי</div>
+      </div>`:''}
+      ${personalDebts>0?`
+      <div class="card red">
+        <div class="label">חובות אישיים</div>
+        <div class="val">₪${fmt(personalDebts)}</div>
+        <div class="sub-val">${n2} שילם עבורי (מפחית מהיתרה)</div>
       </div>`:''}
       <div class="card blue">
         <div class="label">קיבלתי מ${n2}</div>
