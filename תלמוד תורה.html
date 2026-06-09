@@ -213,6 +213,7 @@ tr:hover td{background:rgba(255,255,255,0.02);}
     <button class="tab" data-page="debts" onclick="showPage('debts',this)">🔄 חובות</button>
     <button class="tab" data-page="loans" onclick="showPage('loans',this);renderLoans()">💳 הלוואות</button>
     <button class="tab" data-page="yearly" onclick="showPage('yearly',this)">📆 שנתי</button>
+    <button class="tab" data-page="kupa" onclick="showPage('kupa',this);renderKupa()">📈 מאזן קופה</button>
     <button class="tab" data-page="search" onclick="showPage('search',this);renderGlobalSearch()">🔍 חיפוש</button>
     <button class="tab" data-page="settings" onclick="showPage('settings',this)">⚙️ הגדרות</button>
   </div>
@@ -400,6 +401,17 @@ tr:hover td{background:rgba(255,255,255,0.02);}
         <div style="padding:0;"><div id="my-expenses-detail-table"></div></div>
       </div>
 
+    </div>
+
+    <!-- KUPA BALANCE -->
+    <div id="page-kupa" class="page">
+      <div class="month-bar">
+        <span class="month-label">📈 מאזן קופה — כל החודשים</span>
+      </div>
+      <div id="kupa-cards" class="cards" style="margin-bottom:14px;"></div>
+      <div class="section">
+        <div style="padding:0;"><div id="kupa-table"></div></div>
+      </div>
     </div>
 
     <!-- YEARLY -->
@@ -1600,6 +1612,97 @@ function renderDashboard(){
     </div>`;
 }
 
+// ── KUPA BALANCE ──────────────────────────────────────────
+function renderKupa(){
+  const target=D.settings.target||21600;
+
+  // בנה רשימת כל החודשים שיש בהם נתונים, ממוינת
+  const allKeys=new Set();
+  D.incomes.forEach(i=>allKeys.add(`${i.year}-${String(i.month).padStart(2,'0')}`));
+  D.expenses.forEach(e=>allKeys.add(`${e.year}-${String(e.month).padStart(2,'0')}`));
+  const months=[...allKeys].sort();
+
+  if(!months.length){
+    $('kupa-table').innerHTML='<div class="empty-state">אין נתונים עדיין</div>';
+    return;
+  }
+
+  let cumBalance=0;
+  const rows=months.map(key=>{
+    const [y,m]=[parseInt(key.split('-')[0]),parseInt(key.split('-')[1])];
+    const inc    = D.incomes.filter(i=>i.month===m&&i.year===y&&i.type!=='nistanim').reduce((s,i)=>s+i.amount,0);
+    const tuition= D.incomes.filter(i=>i.month===m&&i.year===y&&i.type==='tuition').reduce((s,i)=>s+i.amount,0);
+    const kupaExp= D.expenses.filter(e=>e.month===m&&e.year===y&&(e.payer==='partner'||e.payer==='tuition')).reduce((s,e)=>s+e.amount,0);
+    const profit = Math.max(0,inc-kupaExp);
+    const deficit= Math.max(0,kupaExp-inc);
+    const vsTarget= tuition-target;
+    cumBalance  += (inc-kupaExp);
+    return{key,y,m,label:`${HEB[m-1]} ${y}`,inc,tuition,kupaExp,profit,deficit,vsTarget,cumBalance};
+  });
+
+  // כרטיסי סיכום
+  const totInc   =rows.reduce((s,r)=>s+r.inc,0);
+  const totTuition=rows.reduce((s,r)=>s+r.tuition,0);
+  const totExp   =rows.reduce((s,r)=>s+r.kupaExp,0);
+  const totProfit=rows.reduce((s,r)=>s+r.profit,0);
+  const totDeficit=rows.reduce((s,r)=>s+r.deficit,0);
+  const expectedTotal=rows.length*target;
+
+  $('kupa-cards').innerHTML=`
+    <div class="card green">
+      <div class="label">סה"כ הכנסות</div>
+      <div class="val">₪${fmt(totInc)}</div>
+      <div class="sub-val">${rows.length} חודשים</div>
+    </div>
+    <div class="card ${totTuition>=expectedTotal?'green':'red'}">
+      <div class="label">שכר לימוד בפועל</div>
+      <div class="val">₪${fmt(totTuition)}</div>
+      <div class="sub-val">יעד: ₪${fmt(expectedTotal)} | ${totTuition>=expectedTotal?'עודף':'חסר'}: ₪${fmt(Math.abs(totTuition-expectedTotal))}</div>
+    </div>
+    <div class="card red">
+      <div class="label">סה"כ הוצאות קופה</div>
+      <div class="val">₪${fmt(totExp)}</div>
+      <div class="sub-val">מהקופה בלבד</div>
+    </div>
+    <div class="card ${totProfit>0?'green':'blue'}">
+      <div class="label">סה"כ רווח</div>
+      <div class="val">₪${fmt(totProfit)}</div>
+      <div class="sub-val">${totDeficit>0?'גירעון מצטבר: ₪'+fmt(totDeficit):''}</div>
+    </div>`;
+
+  // טבלה
+  $('kupa-table').innerHTML=`<table><thead><tr>
+    <th>חודש</th>
+    <th>הכנסות</th>
+    <th>שכ"ל</th>
+    <th>יעד ₪${fmt(target)}</th>
+    <th>פער מיעד</th>
+    <th>הוצ' קופה</th>
+    <th>רווח/גירעון</th>
+    <th>מאזן מצטבר</th>
+  </tr></thead><tbody>
+  ${rows.map(r=>`<tr>
+    <td style="font-weight:600;white-space:nowrap">${r.label}</td>
+    <td class="text-green">₪${fmt(r.inc)}</td>
+    <td class="text-green">₪${fmt(r.tuition)}</td>
+    <td class="text-muted">₪${fmt(target)}</td>
+    <td class="${r.vsTarget>=0?'text-green':'text-red'}" style="font-weight:700">${r.vsTarget>=0?'+':'-'}₪${fmt(Math.abs(r.vsTarget))}</td>
+    <td class="text-red">₪${fmt(r.kupaExp)}</td>
+    <td class="${r.profit>0?'text-green':r.deficit>0?'text-red':'text-muted'}" style="font-weight:700">${r.profit>0?'+₪'+fmt(r.profit):r.deficit>0?'−₪'+fmt(r.deficit):'₪0'}</td>
+    <td style="font-weight:800;color:${r.cumBalance>=0?'var(--green)':'var(--red)'};">${r.cumBalance>=0?'+':'-'}₪${fmt(Math.abs(r.cumBalance))}</td>
+  </tr>`).join('')}
+  </tbody><tfoot><tr>
+    <td style="font-weight:700;padding:10px 11px;">סה"כ</td>
+    <td style="color:var(--green);font-weight:700;padding:10px 11px;">₪${fmt(totInc)}</td>
+    <td style="color:var(--green);font-weight:700;padding:10px 11px;">₪${fmt(totTuition)}</td>
+    <td style="color:var(--muted);font-weight:700;padding:10px 11px;">₪${fmt(expectedTotal)}</td>
+    <td style="color:${totTuition>=expectedTotal?'var(--green)':'var(--red)'};font-weight:700;padding:10px 11px;">${totTuition>=expectedTotal?'+':'-'}₪${fmt(Math.abs(totTuition-expectedTotal))}</td>
+    <td style="color:var(--red);font-weight:700;padding:10px 11px;">₪${fmt(totExp)}</td>
+    <td style="color:${totProfit>totDeficit?'var(--green)':'var(--red)'};font-weight:700;padding:10px 11px;">${totProfit>=totDeficit?'+₪'+fmt(totProfit-totDeficit):'−₪'+fmt(totDeficit-totProfit)}</td>
+    <td style="color:${rows[rows.length-1].cumBalance>=0?'var(--green)':'var(--red)'};font-weight:800;padding:10px 11px;">${rows[rows.length-1].cumBalance>=0?'+':'-'}₪${fmt(Math.abs(rows[rows.length-1].cumBalance))}</td>
+  </tr></tfoot></table>`;
+}
+
 // ── YEARLY ────────────────────────────────────────────────
 function renderYearly(){
   const y=parseInt($('yearly-year').value);
@@ -1733,6 +1836,7 @@ window.showPage=function(id,btn){
   else if(id==='debts')renderDebts();
   else if(id==='dashboard')renderDashboard();
   else if(id==='yearly')renderYearly();
+  else if(id==='kupa')renderKupa();
   else if(id==='settings')loadSettings();
   // hide FAB on settings
   $('fab-btn').style.display=id==='settings'?'none':'flex';
