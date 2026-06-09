@@ -1620,7 +1620,10 @@ function renderKupa(){
   const allKeys=new Set();
   D.incomes.forEach(i=>allKeys.add(`${i.year}-${String(i.month).padStart(2,'0')}`));
   D.expenses.forEach(e=>allKeys.add(`${e.year}-${String(e.month).padStart(2,'0')}`));
-  const months=[...allKeys].sort();
+  const months=[...allKeys].sort().filter(k=>{
+    const [y,m]=[parseInt(k.split('-')[0]),parseInt(k.split('-')[1])];
+    return y>2025||(y===2025&&m>=9);
+  });
 
   if(!months.length){
     $('kupa-table').innerHTML='<div class="empty-state">אין נתונים עדיין</div>';
