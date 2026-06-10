@@ -1231,29 +1231,32 @@ function calcDebtSummary(){
     const kupaProfit=Math.max(0,inc-kupaExp);
     const kupaDeficit=Math.max(0,kupaExp-inc);
     const myProfitShare=kupaProfit/2;
+    // חלקי בגירעון הקופה (מחציתו - מפחית מהיתרה)
+    const myDeficitShare=kupaDeficit/2;
     // מה שמגיע לי = חלק ברווח + מה ששילמתי מכיסי
     const owedToMe=myProfitShare+myExp;
 
-    monthRows.push({key,y,m,inc,kupaExp,myExp,kupaProfit,kupaDeficit,myProfitShare,owedToMe,
+    monthRows.push({key,y,m,inc,kupaExp,myExp,kupaProfit,kupaDeficit,myProfitShare,myDeficitShare,owedToMe,
       label:`${HEB[m-1]} ${y}`});
   });
 
   const totalMyProfit=monthRows.reduce((s,r)=>s+r.myProfitShare,0);
   const totalMyExp=monthRows.reduce((s,r)=>s+r.myExp,0);
+  const totalMyDeficitShare=monthRows.reduce((s,r)=>s+r.myDeficitShare,0);
   const totalOwedToMe=monthRows.reduce((s,r)=>s+r.owedToMe,0);
   // חובות אישיים: יוסף חיים שילם עבורי (מפחית מהיתרה)
   const personalDebts=(D.debts||[]).filter(x=>!x.settled&&x.type==='partner_paid_for_me').reduce((s,x)=>s+x.amount,0);
   // תשלומים שקיבלתי מהשותף
   const totalPaid=(D.payments||[]).reduce((s,p)=>s+p.amount,0);
   // יתרה: חיובי = השותף חייב לי, שלילי = אני חייב לשותף
-  const finalBalance=totalOwedToMe-totalPaid-personalDebts;
+  const finalBalance=totalOwedToMe-totalPaid-personalDebts-totalMyDeficitShare;
 
-  return{totalMyProfit,totalMyExp,totalOwedToMe,totalPaid,personalDebts,finalBalance,monthRows};
+  return{totalMyProfit,totalMyExp,totalMyDeficitShare,totalOwedToMe,totalPaid,personalDebts,finalBalance,monthRows};
 }
 
 function renderDebts(){
   const n1=D.settings.name1||'מלכיאל',n2=D.settings.name2||'השותף';
-  const {totalMyProfit,totalMyExp,totalOwedToMe,totalPaid,personalDebts,finalBalance,monthRows}=calcDebtSummary();
+  const {totalMyProfit,totalMyExp,totalMyDeficitShare,totalOwedToMe,totalPaid,personalDebts,finalBalance,monthRows}=calcDebtSummary();
 
   // כרטיסי סיכום — חיובי = השותף חייב לי
   const balColor=finalBalance>0?'green':finalBalance<0?'red':'blue';
@@ -1277,6 +1280,12 @@ function renderDebts(){
         <div class="label">חובות אישיים</div>
         <div class="val">₪${fmt(personalDebts)}</div>
         <div class="sub-val">${n2} שילם עבורי (מפחית מהיתרה)</div>
+      </div>`:''}
+      ${totalMyDeficitShare>0?`
+      <div class="card red">
+        <div class="label">חלקי בגירעון הקופה</div>
+        <div class="val">₪${fmt(totalMyDeficitShare)}</div>
+        <div class="sub-val">50% מגירעון הקופה כל החודשים (מפחית מהיתרה)</div>
       </div>`:''}
       <div class="card blue">
         <div class="label">קיבלתי מ${n2}</div>
@@ -1326,7 +1335,7 @@ function renderDebts(){
     const totalDeficit=activeMonths.reduce((s,r)=>s+r.kupaDeficit,0);
     mEl.innerHTML=`<table><thead><tr>
       <th>חודש</th><th>הכנסות</th><th>הוצ' קופה</th>
-      <th>רווח קופה</th><th>גירעון</th><th>חלקי</th>
+      <th>רווח קופה</th><th>גירעון</th><th>חלקי ברווח</th><th>חלקי בגירעון</th>
       <th>שילמתי</th><th>מגיע לי</th>
     </tr></thead><tbody>
     ${activeMonths.map(r=>`<tr>
@@ -1336,6 +1345,7 @@ function renderDebts(){
       <td class="${r.kupaProfit>0?'text-green':'text-muted'}">₪${fmt(r.kupaProfit)}</td>
       <td class="${r.kupaDeficit>0?'text-red':'text-muted'}" style="${r.kupaDeficit>0?'font-weight:700;':''}">${r.kupaDeficit>0?'−₪'+fmt(r.kupaDeficit):'-'}</td>
       <td class="text-green">₪${fmt(r.myProfitShare)}</td>
+      <td class="${r.myDeficitShare>0?'text-red':'text-muted'}">${r.myDeficitShare>0?'−₪'+fmt(r.myDeficitShare):'-'}</td>
       <td class="${r.myExp>0?'text-green':'text-muted'}">₪${fmt(r.myExp)}</td>
       <td style="font-weight:700;color:var(--green)">₪${fmt(r.owedToMe)}</td>
     </tr>`).join('')}
@@ -1346,6 +1356,7 @@ function renderDebts(){
       <td style="font-weight:700;padding:10px 11px;">₪${fmt(activeMonths.reduce((s,r)=>s+r.kupaProfit,0))}</td>
       <td style="${totalDeficit>0?'color:var(--red);':'color:var(--muted);'}font-weight:700;padding:10px 11px;">${totalDeficit>0?'−₪'+fmt(totalDeficit):'-'}</td>
       <td style="color:var(--green);font-weight:700;padding:10px 11px;">₪${fmt(totalMyProfit)}</td>
+      <td style="${totalMyDeficitShare>0?'color:var(--red);':'color:var(--muted);'}font-weight:700;padding:10px 11px;">${totalMyDeficitShare>0?'−₪'+fmt(totalMyDeficitShare):'-'}</td>
       <td style="color:var(--green);font-weight:700;padding:10px 11px;">₪${fmt(totalMyExp)}</td>
       <td style="color:var(--green);font-weight:800;padding:10px 11px;">₪${fmt(totalOwedToMe)}</td>
     </tr></tfoot></table>`;
