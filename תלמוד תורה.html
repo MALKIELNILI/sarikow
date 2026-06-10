@@ -1283,6 +1283,22 @@ function renderDebts(){
         </div>
       </div>
     </div>
+    <div class="section" style="margin-bottom:14px;">
+      <div style="padding:14px;">
+        <div style="font-weight:700;font-size:15px;margin-bottom:10px;">📊 החלק של ${n2} בקופה (למידע)</div>
+        <table style="width:100%;font-size:14px;border-collapse:collapse;">
+          <tbody>
+            <tr><td style="padding:4px 0;">חלקו ברווח הקופה (חודשים טובים)</td><td style="text-align:left;color:var(--green);font-weight:700;">+₪${fmt(totalMyProfit)}</td></tr>
+            ${personalDebts>0?`<tr><td style="padding:4px 0;">מה ששילם מכיסו (חוב חצר)</td><td style="text-align:left;color:var(--green);font-weight:700;">+₪${fmt(personalDebts)}</td></tr>`:''}
+            <tr style="border-top:1px solid var(--border);"><td style="padding:6px 0;font-weight:700;">= מגיע לו סה"כ (לפני קיזוזים)</td><td style="text-align:left;padding:6px 0;font-weight:700;">₪${fmt(totalMyProfit+personalDebts)}</td></tr>
+            ${totalMyDeficitShare>0?`<tr><td style="padding:4px 0;">חלקו בגירעון הקופה (חודשים גרועים)</td><td style="text-align:left;color:var(--red);font-weight:700;">−₪${fmt(totalMyDeficitShare)}</td></tr>`:''}
+          </tbody>
+        </table>
+        <div style="margin-top:10px;font-size:13px;color:var(--muted);">
+          ℹ️ זה פירוט מידע בלבד — היתרה הסופית האחת (למעלה) כבר משקפת את ההפרש בין שני הצדדים.
+        </div>
+      </div>
+    </div>
     <div class="cards" style="margin-bottom:14px;">
       <div class="card green">
         <div class="label">חלקי ברווח הקופה</div>
