@@ -1304,7 +1304,19 @@ function renderDebts(){
         :finalBalance<0
         ?`⚠️ <strong>אתה חייב ל${n2}: ₪${fmt(Math.abs(finalBalance))}</strong>`
         :`✅ <strong>החשבון מאוזן לגמרי</strong>`}
-    </div>`;
+    </div>
+    ${(()=>{
+      const yardDebt=(D.debts||[]).filter(x=>!x.settled&&x.type==='partner_paid_for_me').reduce((s,x)=>s+x.amount,0);
+      const yardPaidIds=[1774391339974,1774869196126,1779116867202];
+      const yardPaid=(D.expenses||[]).filter(e=>yardPaidIds.includes(e.id)).reduce((s,e)=>s+e.amount,0);
+      if(yardDebt<=0||yardPaid<=0)return'';
+      const excess=yardPaid-yardDebt;
+      if(excess<=0)return'';
+      return `<div class="alert alert-info" style="margin-bottom:14px;font-size:13px;">
+        💡 <strong>מאזן חוב החצר:</strong> ${n2} שילם עבורך ₪${fmt(yardDebt)} עבור החצר, ואתה שילמת בחזרה ₪${fmt(yardPaid)} —
+        עודף של <strong>₪${fmt(excess)}</strong> שכבר נכלל בחישוב ומקזז חלק מחלקך בגירעון הקופה.
+      </div>`;
+    })()}`;
 
   // היסטוריית תשלומים
   const payments=[...(D.payments||[])].sort((a,b)=>b.id-a.id);
