@@ -458,7 +458,14 @@ tr:hover td{background:rgba(255,255,255,0.02);}
           <div class="modal-header"><h3>💵 תיעוד החזר</h3></div>
           <div class="modal-body">
             <input type="hidden" id="repay-loan-id">
-            <div class="form-group"><label>סכום שהוחזר (₪)</label><input type="number" id="repay-amount" min="0" placeholder="0"></div>
+            <div id="repay-remaining-info" style="font-size:13px;color:var(--muted);margin-bottom:8px;"></div>
+            <div class="form-group">
+              <label>סכום שהוחזר (₪) — אפשר חלקי, לדוגמה 477 מתוך 6,477</label>
+              <div style="display:flex;gap:6px;">
+                <input type="number" id="repay-amount" min="0" placeholder="0" style="flex:1;">
+                <button type="button" class="btn btn-ghost btn-sm" onclick="fillFullRepayAmount()">מלא הכל</button>
+              </div>
+            </div>
             <div class="form-group"><label>תאריך</label><input type="date" id="repay-date"></div>
             <div class="form-group"><label>הערה</label><input type="text" id="repay-note" placeholder="פירוט..."></div>
           </div>
@@ -2092,7 +2099,21 @@ window.openRepayModal=function(loanId){
   $('repay-amount').value='';$('repay-note').value='';
   const today=new Date().toISOString().split('T')[0];
   $('repay-date').value=today;
+  const loan=(D.loans||[]).find(l=>l.id===parseInt(loanId));
+  if(loan){
+    const repaid=(D.loanRepayments||[]).filter(r=>r.loanId===loan.id).reduce((s,r)=>s+r.amount,0);
+    const rem=loan.amount-repaid;
+    $('repay-remaining-info').textContent=`${loan.borrower}: יתרה לגבייה ₪${fmt(rem)} מתוך ₪${fmt(loan.amount)}`;
+  } else {
+    $('repay-remaining-info').textContent='';
+  }
   $('repay-modal').classList.add('open');
+};
+window.fillFullRepayAmount=function(){
+  const loanId=parseInt($('repay-loan-id').value);
+  const loan=(D.loans||[]).find(l=>l.id===loanId);if(!loan)return;
+  const repaid=(D.loanRepayments||[]).filter(r=>r.loanId===loan.id).reduce((s,r)=>s+r.amount,0);
+  $('repay-amount').value=loan.amount-repaid;
 };
 window.saveRepayment=async function(){
   const loanId=parseInt($('repay-loan-id').value);
