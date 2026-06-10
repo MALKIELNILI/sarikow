@@ -1075,8 +1075,8 @@ function renderIncomes(){
     <th class="col-hide-mobile">הערה</th>
     <th></th>
   </tr></thead><tbody>
-  ${items.map(i=>`<tr>
-    <td><span class="badge ${tb[i.type]}">${tl[i.type]}</span></td>
+  ${items.map(i=>`<tr${i.isLoan?' style="background:rgba(124,58,237,0.06);"':''}>
+    <td><span class="badge ${tb[i.type]}">${tl[i.type]}</span>${i.isLoan?' <span class="badge badge-purple">🏦 הלוואה</span>':''}</td>
     <td class="col-hide-mobile text-muted">${(i.type==='tuition'||i.type==='nistanim')&&i.students?`${i.students}×₪${i.rate}`:'-'}</td>
     <td class="text-green" style="font-weight:700">₪${fmt(i.amount)}</td>
     <td class="col-hide-mobile text-muted">${i.note||'-'}</td>
@@ -1190,11 +1190,11 @@ function renderExpenses(){
     <th class="col-hide-mobile">הערה</th>
     <th></th>
   </tr></thead><tbody>
-  ${items.map(e=>`<tr>
-    <td class="col-hide-mobile"><span class="badge ${cb[e.cat]||''}">${cl[e.cat]||'אחר'}</span></td>
+  ${items.map(e=>`<tr${e.isLoan?' style="background:rgba(124,58,237,0.06);"':''}>
+    <td class="col-hide-mobile"><span class="badge ${cb[e.cat]||''}">${cl[e.cat]||'אחר'}</span>${e.isLoan?' <span class="badge badge-purple">🏦 הלוואה</span>':''}</td>
     <td>
       ${e.desc}
-      <div class="col-show-mobile" style="display:none;font-size:11px;color:var(--muted);margin-top:2px;">${payerBadge(e.payer,n1,n2)}</div>
+      <div class="col-show-mobile" style="display:none;font-size:11px;color:var(--muted);margin-top:2px;">${payerBadge(e.payer,n1,n2)}${e.isLoan?' <span class="badge badge-purple">🏦 הלוואה</span>':''}</div>
     </td>
     <td class="col-hide-mobile">${payerBadge(e.payer,n1,n2)}</td>
     <td class="text-red" style="font-weight:700">₪${fmt(e.amount)}</td>
@@ -2011,6 +2011,16 @@ window.addLoan=async function(){
   if(!amount){toast('הכנס סכום','error');return;}
   const id=Date.now();
   const item={id,borrower,source,amount,date,note};
+  // אם ההלוואה ניתנה משכר לימוד - רושמים אותה גם כהוצאת קופה (מסומנת כהלוואה)
+  if(source==='tuition'){
+    const [y,m]=date?date.split('-').map(Number):[new Date().getFullYear(),new Date().getMonth()+1];
+    const expId=id+1;
+    const expItem={id:expId,month:m||new Date().getMonth()+1,year:y||new Date().getFullYear(),
+      desc:`🏦 הלוואה ל${borrower}`,amount,payer:'tuition',cat:'other',note:note||'',isLoan:true,loanId:id};
+    D.expenses.push(expItem);
+    await fbSet('tt/expenses/'+expId,expItem);
+    item.expenseId=expId;
+  }
   if(!D.loans)D.loans=[];
   D.loans.push(item);
   await fbSet('tt/loans/'+id,item);
@@ -2030,7 +2040,21 @@ window.saveRepayment=async function(){
   const amount=parseFloat($('repay-amount').value)||0;
   if(!amount){toast('הכנס סכום','error');return;}
   const id=Date.now();
-  const item={id,loanId,amount,date:$('repay-date').value,note:$('repay-note').value.trim()};
+  const date=$('repay-date').value;
+  const note=$('repay-note').value.trim();
+  const item={id,loanId,amount,date,note};
+  // אם ההלוואה ניתנה משכר לימוד - ההחזר נרשם גם כהכנסת קופה (מסומנת כהחזר הלוואה)
+  const loan=(D.loans||[]).find(l=>l.id===loanId);
+  if(loan&&loan.source==='tuition'){
+    const [y,m]=date?date.split('-').map(Number):[new Date().getFullYear(),new Date().getMonth()+1];
+    const incId=id+1;
+    const incItem={id:incId,month:m||new Date().getMonth()+1,year:y||new Date().getFullYear(),
+      type:'tuition',amount,note:`🏦 החזר הלוואה - ${loan.borrower}${note?' — '+note:''}`,
+      students:null,rate:null,isLoan:true,loanId,repaymentId:id};
+    D.incomes.push(incItem);
+    await fbSet('tt/incomes/'+incId,incItem);
+    item.incomeId=incId;
+  }
   if(!D.loanRepayments)D.loanRepayments=[];
   D.loanRepayments.push(item);
   await fbSet('tt/loanRepayments/'+id,item);
@@ -2040,20 +2064,36 @@ window.saveRepayment=async function(){
 window.deleteRepayment=async function(id,loanId){
   id=parseInt(id);
   confirmAction('מחיקת החזר','האם למחוק החזר זה?',async()=>{
+    const rep=(D.loanRepayments||[]).find(r=>r.id===id);
+    if(rep&&rep.incomeId){
+      D.incomes=D.incomes.filter(i=>i.id!==rep.incomeId);
+      await db.ref('tt/incomes/'+rep.incomeId).remove();
+    }
     D.loanRepayments=(D.loanRepayments||[]).filter(r=>r.id!==id);
     await db.ref('tt/loanRepayments/'+id).remove();
-    renderLoans();toast('נמחק');
+    renderLoans();renderIncomes();toast('נמחק');
   });
 };
 window.deleteLoan=async function(id){
   id=parseInt(id);
   confirmAction('מחיקת הלוואה','האם למחוק הלוואה זו וכל החזריה?',async()=>{
+    const loan=(D.loans||[]).find(l=>l.id===id);
+    if(loan&&loan.expenseId){
+      D.expenses=D.expenses.filter(e=>e.id!==loan.expenseId);
+      await db.ref('tt/expenses/'+loan.expenseId).remove();
+    }
+    const toDelRep=(D.loanRepayments||[]).filter(r=>r.loanId===id);
+    for(const r of toDelRep){
+      if(r.incomeId){
+        D.incomes=D.incomes.filter(i=>i.id!==r.incomeId);
+        await db.ref('tt/incomes/'+r.incomeId).remove();
+      }
+      await db.ref('tt/loanRepayments/'+r.id).remove();
+    }
     D.loans=(D.loans||[]).filter(l=>l.id!==id);
     D.loanRepayments=(D.loanRepayments||[]).filter(r=>r.loanId!==id);
     await db.ref('tt/loans/'+id).remove();
-    const toDelRep=(D.loanRepayments||[]).filter(r=>r.loanId===id);
-    for(const r of toDelRep)await db.ref('tt/loanRepayments/'+r.id).remove();
-    renderLoans();toast('נמחק');
+    renderLoans();renderExpenses();renderIncomes();toast('נמחק');
   });
 };
 
