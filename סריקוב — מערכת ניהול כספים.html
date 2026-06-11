@@ -618,8 +618,15 @@ function MainTab({ selKey, selYear, selMonth, baseBalance, setBaseBalance, liveB
                   onChange={e=>setMonthField(selKey,"datot",Math.round((Number(e.target.value)||0)*datotCount))} />
               </div>
             )}
-            <BalanceConfirm draft={getMD(selKey,"datot")} confirmed={getMD(selKey,"datotConfirmed")}
-              onConfirm={()=>setMonthField(selKey,"datotConfirmed",Number(getMD(selKey,"datot"))||0)} />
+            <BalanceConfirm draft={getMD(selKey,"datot")} confirmed={getMD(selKey,"datotConfirmed")} prevConfirmed={getMD(selKey,"datotConfirmedPrev",null)}
+              onConfirm={()=>{
+                setMonthField(selKey,"datotConfirmedPrev",Number(getMD(selKey,"datotConfirmed"))||0);
+                setMonthField(selKey,"datotConfirmed",Number(getMD(selKey,"datot"))||0);
+              }}
+              onUndo={()=>{
+                setMonthField(selKey,"datotConfirmed",Number(getMD(selKey,"datotConfirmedPrev"))||0);
+                setMonthField(selKey,"datotConfirmedPrev",null);
+              }} />
           </div>
           <div>
             <IField label="📚 קרן התורה (₪)"   value={getMD(selKey,"keren")}  onChange={v=>setMonthField(selKey,"keren",Number(v)||0)} />
@@ -630,8 +637,15 @@ function MainTab({ selKey, selYear, selMonth, baseBalance, setBaseBalance, liveB
                   onChange={e=>setMonthField(selKey,"keren",Math.round((Number(e.target.value)||0)*kerenCount))} />
               </div>
             )}
-            <BalanceConfirm draft={getMD(selKey,"keren")} confirmed={getMD(selKey,"kerenConfirmed")}
-              onConfirm={()=>setMonthField(selKey,"kerenConfirmed",Number(getMD(selKey,"keren"))||0)} />
+            <BalanceConfirm draft={getMD(selKey,"keren")} confirmed={getMD(selKey,"kerenConfirmed")} prevConfirmed={getMD(selKey,"kerenConfirmedPrev",null)}
+              onConfirm={()=>{
+                setMonthField(selKey,"kerenConfirmedPrev",Number(getMD(selKey,"kerenConfirmed"))||0);
+                setMonthField(selKey,"kerenConfirmed",Number(getMD(selKey,"keren"))||0);
+              }}
+              onUndo={()=>{
+                setMonthField(selKey,"kerenConfirmed",Number(getMD(selKey,"kerenConfirmedPrev"))||0);
+                setMonthField(selKey,"kerenConfirmedPrev",null);
+              }} />
           </div>
         </div>
       </div>
@@ -2074,15 +2088,19 @@ function Chip({label,val,pos,neg}){
     <span style={{opacity:.7,fontSize:10}}>{label}</span><span style={{fontWeight:700}}>{val}</span>
   </div>;
 }
-function BalanceConfirm({draft,confirmed,onConfirm}){
+function BalanceConfirm({draft,confirmed,prevConfirmed,onConfirm,onUndo}){
   const d=Number(draft)||0, c=Number(confirmed)||0;
   const diff=d-c;
+  const hasPrev = prevConfirmed!==null && prevConfirmed!==undefined;
   return (
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:5,marginTop:4}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:5,marginTop:4,flexWrap:"wrap"}}>
       <span style={{fontSize:11,color:diff!==0?"#dc2626":"#16a34a",whiteSpace:"nowrap"}}>
         {diff!==0 ? `ממתין ליתרה: ${fmtSigned(diff)} ₪` : "✓ מעודכן ביתרה"}
       </span>
-      <button style={{...smallBtn,whiteSpace:"nowrap",opacity:diff===0?0.5:1}} disabled={diff===0} onClick={onConfirm}>+ הוסף לסכום</button>
+      <div style={{display:"flex",gap:5}}>
+        {hasPrev && <button style={{...smallBtn,whiteSpace:"nowrap",background:"#fef2f2",color:"#dc2626",border:"1px solid #fecaca"}} onClick={onUndo}>↩ בטל</button>}
+        <button style={{...smallBtn,whiteSpace:"nowrap",opacity:diff===0?0.5:1}} disabled={diff===0} onClick={onConfirm}>+ הוסף לסכום</button>
+      </div>
     </div>
   );
 }
