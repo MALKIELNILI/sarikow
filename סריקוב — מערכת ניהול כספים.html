@@ -79,7 +79,7 @@ const defaultAvrechim = [
 
 const mkMonthKey = (y,m) => `${y}-${String(m+1).padStart(2,'0')}`;
 const mkMonthLabel = (y,m) => `${MONTHS_HE[m]} ${y}`;
-const emptyMonthData = () => ({ donors:[], datot:0, keren:0, sent2000:0, sent1000:0, sentKeren:0, adjustment:0, adjustmentNote:"" });
+const emptyMonthData = () => ({ donors:[], datot:0, keren:0, datotConfirmed:0, kerenConfirmed:0, sent2000:0, sent1000:0, sentKeren:0, adjustment:0, adjustmentNote:"" });
 
 // ── BEIN HAZMANIM & HOLIDAYS ─────────────────────────────────
 const BEIN_HAZMANIM = [
@@ -390,8 +390,10 @@ function App(){
   const calcMonthTotals = (monthKey) => {
     const prevKey = getPrevMonthKey(monthKey);
     const donors  = (allMonths[monthKey]?.donors||[]).reduce((s,d)=>s+Number(d.amount||0),0);
-    const datot   = Number(getMD(monthKey,"datot"));
-    const keren   = Number(getMD(monthKey,"keren"));
+    const datotDraft = Number(getMD(monthKey,"datot"));
+    const kerenDraft = Number(getMD(monthKey,"keren"));
+    const datot   = Number(getMD(monthKey,"datotConfirmed"));
+    const keren   = Number(getMD(monthKey,"kerenConfirmed"));
     const income  = donors+datot+keren;
     const totalRounding = avrechim.filter(a=>a.active).reduce((s,av)=>{
       const c=calcAvrechMonth(av,monthKey,prevKey);
@@ -400,7 +402,7 @@ function App(){
     const sent = Number(getMD(monthKey,"sent2000"))*2000+Number(getMD(monthKey,"sent1000"))*1000+Number(getMD(monthKey,"sentKeren"))*1000;
     const adjustment = Number(getMD(monthKey,"adjustment"))||0;
     const net = income - sent + adjustment;
-    return { donors, datot, keren, income, totalRounding, sent, adjustment, net };
+    return { donors, datot, keren, datotDraft, kerenDraft, income, totalRounding, sent, adjustment, net };
   };
 
   const baseMonthKey = baseBalance.monthKey || "0000-00";
@@ -409,8 +411,8 @@ function App(){
   const monthHasActivity = k => {
     const md = allMonths[k]||{};
     return (md.donors||[]).length > 0 ||
-      Number(md.datot||0)    > 0 ||
-      Number(md.keren||0)    > 0 ||
+      Number(md.datotConfirmed||0) > 0 ||
+      Number(md.kerenConfirmed||0) > 0 ||
       Number(md.sent2000||0) > 0 ||
       Number(md.sent1000||0) > 0 ||
       Number(md.sentKeren||0)> 0 ||
@@ -514,10 +516,6 @@ function MainTab({ selKey, selYear, selMonth, baseBalance, setBaseBalance, liveB
   const [showDonor,setShowDonor]=useState(false);
   const [newDonor,setNewDonor]=useState({name:"",amount:""});
   const [showAdj,setShowAdj]=useState(false);
-  const [addDatot,setAddDatot]=useState("");
-  const [addKeren,setAddKeren]=useState("");
-  const [perDatotInput,setPerDatotInput]=useState("");
-  const [perKerenInput,setPerKerenInput]=useState("");
   const donors=(allMonths[selKey]?.donors)||[];
 
   // לכל אברך בקבוצה — חלוקה שווה של הכנסת דתות / קרן
@@ -616,50 +614,24 @@ function MainTab({ selKey, selYear, selMonth, baseBalance, setBaseBalance, liveB
             {datotCount>0 && (
               <div style={{display:"flex",alignItems:"center",gap:5,marginTop:4}}>
                 <span style={{fontSize:11,color:"#b45309",whiteSpace:"nowrap"}}>לאברך אחד ({datotCount}):</span>
-                <input style={{...iinp,textAlign:"left"}} type="number" value={perDatotInput} placeholder={String(perDatot||0)}
-                  onChange={e=>setPerDatotInput(e.target.value)} />
-                <button style={{...smallBtn,whiteSpace:"nowrap"}}
-                  onClick={()=>{
-                    if(perDatotInput!=="") setMonthField(selKey,"datot",Math.round((Number(perDatotInput)||0)*datotCount));
-                    setPerDatotInput("");
-                  }}>✓ עדכן</button>
+                <input style={{...iinp,textAlign:"left"}} type="number" value={perDatot||""} placeholder="0"
+                  onChange={e=>setMonthField(selKey,"datot",Math.round((Number(e.target.value)||0)*datotCount))} />
               </div>
             )}
-            <div style={{display:"flex",alignItems:"center",gap:5,marginTop:4}}>
-              <input style={{...iinp,textAlign:"left"}} type="number" value={addDatot} placeholder="הוספה בפגישה..."
-                onChange={e=>setAddDatot(e.target.value)} />
-              <button style={{...smallBtn,background:"#fefce8",color:"#92400e",border:"1px solid #fde68a",whiteSpace:"nowrap"}}
-                onClick={()=>{
-                  const v=Number(addDatot)||0;
-                  if(v) setMonthField(selKey,"datot",(Number(getMD(selKey,"datot"))||0)+v);
-                  setAddDatot("");
-                }}>+ הוסף לסכום</button>
-            </div>
+            <BalanceConfirm draft={getMD(selKey,"datot")} confirmed={getMD(selKey,"datotConfirmed")}
+              onConfirm={()=>setMonthField(selKey,"datotConfirmed",Number(getMD(selKey,"datot"))||0)} />
           </div>
           <div>
             <IField label="📚 קרן התורה (₪)"   value={getMD(selKey,"keren")}  onChange={v=>setMonthField(selKey,"keren",Number(v)||0)} />
             {kerenCount>0 && (
               <div style={{display:"flex",alignItems:"center",gap:5,marginTop:4}}>
                 <span style={{fontSize:11,color:"#059669",whiteSpace:"nowrap"}}>לאברך אחד ({kerenCount}):</span>
-                <input style={{...iinp,textAlign:"left"}} type="number" value={perKerenInput} placeholder={String(perKeren||0)}
-                  onChange={e=>setPerKerenInput(e.target.value)} />
-                <button style={{...smallBtn,whiteSpace:"nowrap"}}
-                  onClick={()=>{
-                    if(perKerenInput!=="") setMonthField(selKey,"keren",Math.round((Number(perKerenInput)||0)*kerenCount));
-                    setPerKerenInput("");
-                  }}>✓ עדכן</button>
+                <input style={{...iinp,textAlign:"left"}} type="number" value={perKeren||""} placeholder="0"
+                  onChange={e=>setMonthField(selKey,"keren",Math.round((Number(e.target.value)||0)*kerenCount))} />
               </div>
             )}
-            <div style={{display:"flex",alignItems:"center",gap:5,marginTop:4}}>
-              <input style={{...iinp,textAlign:"left"}} type="number" value={addKeren} placeholder="הוספה בפגישה..."
-                onChange={e=>setAddKeren(e.target.value)} />
-              <button style={{...smallBtn,background:"#fefce8",color:"#92400e",border:"1px solid #fde68a",whiteSpace:"nowrap"}}
-                onClick={()=>{
-                  const v=Number(addKeren)||0;
-                  if(v) setMonthField(selKey,"keren",(Number(getMD(selKey,"keren"))||0)+v);
-                  setAddKeren("");
-                }}>+ הוסף לסכום</button>
-            </div>
+            <BalanceConfirm draft={getMD(selKey,"keren")} confirmed={getMD(selKey,"kerenConfirmed")}
+              onConfirm={()=>setMonthField(selKey,"kerenConfirmed",Number(getMD(selKey,"keren"))||0)} />
           </div>
         </div>
       </div>
@@ -2101,6 +2073,18 @@ function Chip({label,val,pos,neg}){
   return <div style={{background:bg,borderRadius:8,padding:"4px 10px",fontSize:12,display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
     <span style={{opacity:.7,fontSize:10}}>{label}</span><span style={{fontWeight:700}}>{val}</span>
   </div>;
+}
+function BalanceConfirm({draft,confirmed,onConfirm}){
+  const d=Number(draft)||0, c=Number(confirmed)||0;
+  const diff=d-c;
+  return (
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:5,marginTop:4}}>
+      <span style={{fontSize:11,color:diff!==0?"#dc2626":"#16a34a",whiteSpace:"nowrap"}}>
+        {diff!==0 ? `ממתין ליתרה: ${fmtSigned(diff)} ₪` : "✓ מעודכן ביתרה"}
+      </span>
+      <button style={{...smallBtn,whiteSpace:"nowrap",opacity:diff===0?0.5:1}} disabled={diff===0} onClick={onConfirm}>+ הוסף לסכום</button>
+    </div>
+  );
 }
 function IField({label,value,onChange}){
   return <div style={{display:"flex",flexDirection:"column",gap:4}}>
