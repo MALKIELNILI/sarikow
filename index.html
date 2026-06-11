@@ -514,6 +514,8 @@ function MainTab({ selKey, selYear, selMonth, baseBalance, setBaseBalance, liveB
   const [showDonor,setShowDonor]=useState(false);
   const [newDonor,setNewDonor]=useState({name:"",amount:""});
   const [showAdj,setShowAdj]=useState(false);
+  const [addDatot,setAddDatot]=useState("");
+  const [addKeren,setAddKeren]=useState("");
   const donors=(allMonths[selKey]?.donors)||[];
 
   // לכל אברך בקבוצה — חלוקה שווה של הכנסת דתות / קרן
@@ -616,6 +618,16 @@ function MainTab({ selKey, selYear, selMonth, baseBalance, setBaseBalance, liveB
                   onChange={e=>setMonthField(selKey,"datot",Math.round((Number(e.target.value)||0)*datotCount))} />
               </div>
             )}
+            <div style={{display:"flex",alignItems:"center",gap:5,marginTop:4}}>
+              <input style={{...iinp,textAlign:"left"}} type="number" value={addDatot} placeholder="הוספה בפגישה..."
+                onChange={e=>setAddDatot(e.target.value)} />
+              <button style={{...smallBtn,background:"#fefce8",color:"#92400e",border:"1px solid #fde68a",whiteSpace:"nowrap"}}
+                onClick={()=>{
+                  const v=Number(addDatot)||0;
+                  if(v) setMonthField(selKey,"datot",(Number(getMD(selKey,"datot"))||0)+v);
+                  setAddDatot("");
+                }}>+ הוסף לסכום</button>
+            </div>
           </div>
           <div>
             <IField label="📚 קרן התורה (₪)"   value={getMD(selKey,"keren")}  onChange={v=>setMonthField(selKey,"keren",Number(v)||0)} />
@@ -626,6 +638,16 @@ function MainTab({ selKey, selYear, selMonth, baseBalance, setBaseBalance, liveB
                   onChange={e=>setMonthField(selKey,"keren",Math.round((Number(e.target.value)||0)*kerenCount))} />
               </div>
             )}
+            <div style={{display:"flex",alignItems:"center",gap:5,marginTop:4}}>
+              <input style={{...iinp,textAlign:"left"}} type="number" value={addKeren} placeholder="הוספה בפגישה..."
+                onChange={e=>setAddKeren(e.target.value)} />
+              <button style={{...smallBtn,background:"#fefce8",color:"#92400e",border:"1px solid #fde68a",whiteSpace:"nowrap"}}
+                onClick={()=>{
+                  const v=Number(addKeren)||0;
+                  if(v) setMonthField(selKey,"keren",(Number(getMD(selKey,"keren"))||0)+v);
+                  setAddKeren("");
+                }}>+ הוסף לסכום</button>
+            </div>
           </div>
         </div>
       </div>
