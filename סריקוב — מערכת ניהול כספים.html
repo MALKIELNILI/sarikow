@@ -519,8 +519,8 @@ function MainTab({ selKey, selYear, selMonth, baseBalance, setBaseBalance, liveB
   // לכל אברך בקבוצה — חלוקה שווה של הכנסת דתות / קרן
   const datotCount = avrechim.filter(a=>a.active && (a.incomeGroup||(a.track==="keren"?"keren":"datot"))==="datot").length;
   const kerenCount = avrechim.filter(a=>a.active && (a.incomeGroup||(a.track==="keren"?"keren":"datot"))==="keren").length;
-  const perDatot = datotCount>0 ? Number(getMD(selKey,"datot"))/datotCount : 0;
-  const perKeren = kerenCount>0 ? Number(getMD(selKey,"keren"))/kerenCount : 0;
+  const perDatot = datotCount>0 ? Math.round(Number(getMD(selKey,"datot"))/datotCount) : 0;
+  const perKeren = kerenCount>0 ? Math.round(Number(getMD(selKey,"keren"))/kerenCount) : 0;
 
   return (
     <div style={col}>
@@ -609,11 +609,23 @@ function MainTab({ selKey, selYear, selMonth, baseBalance, setBaseBalance, liveB
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
           <div>
             <IField label="🏛️ הכנסת דתות (₪)" value={getMD(selKey,"datot")}  onChange={v=>setMonthField(selKey,"datot",Number(v)||0)} />
-            {datotCount>0 && <div style={{fontSize:11,color:"#b45309",marginTop:3}}>לכל אברך ({datotCount}): {fmt(perDatot)} ₪</div>}
+            {datotCount>0 && (
+              <div style={{display:"flex",alignItems:"center",gap:5,marginTop:4}}>
+                <span style={{fontSize:11,color:"#b45309",whiteSpace:"nowrap"}}>לאברך אחד ({datotCount}):</span>
+                <input style={{...iinp,textAlign:"left"}} type="number" value={perDatot||""} placeholder="0"
+                  onChange={e=>setMonthField(selKey,"datot",Math.round((Number(e.target.value)||0)*datotCount))} />
+              </div>
+            )}
           </div>
           <div>
             <IField label="📚 קרן התורה (₪)"   value={getMD(selKey,"keren")}  onChange={v=>setMonthField(selKey,"keren",Number(v)||0)} />
-            {kerenCount>0 && <div style={{fontSize:11,color:"#059669",marginTop:3}}>לכל אברך ({kerenCount}): {fmt(perKeren)} ₪</div>}
+            {kerenCount>0 && (
+              <div style={{display:"flex",alignItems:"center",gap:5,marginTop:4}}>
+                <span style={{fontSize:11,color:"#059669",whiteSpace:"nowrap"}}>לאברך אחד ({kerenCount}):</span>
+                <input style={{...iinp,textAlign:"left"}} type="number" value={perKeren||""} placeholder="0"
+                  onChange={e=>setMonthField(selKey,"keren",Math.round((Number(e.target.value)||0)*kerenCount))} />
+              </div>
+            )}
           </div>
         </div>
       </div>
