@@ -516,6 +516,8 @@ function MainTab({ selKey, selYear, selMonth, baseBalance, setBaseBalance, liveB
   const [showAdj,setShowAdj]=useState(false);
   const [addDatot,setAddDatot]=useState("");
   const [addKeren,setAddKeren]=useState("");
+  const [perDatotInput,setPerDatotInput]=useState("");
+  const [perKerenInput,setPerKerenInput]=useState("");
   const donors=(allMonths[selKey]?.donors)||[];
 
   // לכל אברך בקבוצה — חלוקה שווה של הכנסת דתות / קרן
@@ -614,8 +616,13 @@ function MainTab({ selKey, selYear, selMonth, baseBalance, setBaseBalance, liveB
             {datotCount>0 && (
               <div style={{display:"flex",alignItems:"center",gap:5,marginTop:4}}>
                 <span style={{fontSize:11,color:"#b45309",whiteSpace:"nowrap"}}>לאברך אחד ({datotCount}):</span>
-                <input style={{...iinp,textAlign:"left"}} type="number" value={perDatot||""} placeholder="0"
-                  onChange={e=>setMonthField(selKey,"datot",Math.round((Number(e.target.value)||0)*datotCount))} />
+                <input style={{...iinp,textAlign:"left"}} type="number" value={perDatotInput} placeholder={String(perDatot||0)}
+                  onChange={e=>setPerDatotInput(e.target.value)} />
+                <button style={{...smallBtn,whiteSpace:"nowrap"}}
+                  onClick={()=>{
+                    if(perDatotInput!=="") setMonthField(selKey,"datot",Math.round((Number(perDatotInput)||0)*datotCount));
+                    setPerDatotInput("");
+                  }}>✓ עדכן</button>
               </div>
             )}
             <div style={{display:"flex",alignItems:"center",gap:5,marginTop:4}}>
@@ -634,8 +641,13 @@ function MainTab({ selKey, selYear, selMonth, baseBalance, setBaseBalance, liveB
             {kerenCount>0 && (
               <div style={{display:"flex",alignItems:"center",gap:5,marginTop:4}}>
                 <span style={{fontSize:11,color:"#059669",whiteSpace:"nowrap"}}>לאברך אחד ({kerenCount}):</span>
-                <input style={{...iinp,textAlign:"left"}} type="number" value={perKeren||""} placeholder="0"
-                  onChange={e=>setMonthField(selKey,"keren",Math.round((Number(e.target.value)||0)*kerenCount))} />
+                <input style={{...iinp,textAlign:"left"}} type="number" value={perKerenInput} placeholder={String(perKeren||0)}
+                  onChange={e=>setPerKerenInput(e.target.value)} />
+                <button style={{...smallBtn,whiteSpace:"nowrap"}}
+                  onClick={()=>{
+                    if(perKerenInput!=="") setMonthField(selKey,"keren",Math.round((Number(perKerenInput)||0)*kerenCount));
+                    setPerKerenInput("");
+                  }}>✓ עדכן</button>
               </div>
             )}
             <div style={{display:"flex",alignItems:"center",gap:5,marginTop:4}}>
