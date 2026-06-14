@@ -332,8 +332,13 @@ function App(){
 
     // עיגול אוטומטי: מסלול − דתות − קרן
     const rounding = Math.max(0, trackNum - datot - keren);
-    // בנק בסיסי: מגיע לו − עיגול + בחינות
-    const bank = monthly - rounding + exams;
+    // כמה הכניס סריקוב בפועל לאברך (ברירת מחדל: לפי המסלול)
+    const sarikowGivenRaw = getAV(monthKey,av.id,"sarikowGiven");
+    const sarikowGiven = sarikowGivenRaw!==""?Number(sarikowGivenRaw):trackNum;
+    // מה מתוך מה שסריקוב הכניס מקורו בקופה (אחרי קיזוז דתות/קרן)
+    const kupaPortion = sarikowGiven - datot - keren;
+    // בנק בסיסי: מגיע לו − מה שמקורו בקופה + בחינות
+    const bank = monthly - kupaPortion + exams;
     // אין העברת פערים לחודש הבא — כל חודש עומד בפני עצמו
     const prevBankGap = 0;
     const effectiveBank = bank;
@@ -367,7 +372,7 @@ function App(){
     const taanitDays   = Number(getAV(monthKey,av.id,"taanitDays"))||0;
     const taanitAmount = taanitDays * 15;
 
-    return { monthly, datot, keren, autoDatot, autoKeren, datotRaw, kerenRaw, rounding, exams, bank, prevBankGap, effectiveBank, actualBank, holiday, depositRounding, totalToBank, bankDeposit, cashAmount, bankGapAuto, bankGap, trackNum, datotCount, kerenCount, incomeGroup, totalDatot, totalKeren, taanitDays, taanitAmount, suppAmt, externalPerAvrech, totalReceived, settlementBalance };
+    return { monthly, datot, keren, autoDatot, autoKeren, datotRaw, kerenRaw, rounding, sarikowGivenRaw, sarikowGiven, kupaPortion, exams, bank, prevBankGap, effectiveBank, actualBank, holiday, depositRounding, totalToBank, bankDeposit, cashAmount, bankGapAuto, bankGap, trackNum, datotCount, kerenCount, incomeGroup, totalDatot, totalKeren, taanitDays, taanitAmount, suppAmt, externalPerAvrech, totalReceived, settlementBalance };
   };
 
   // Get sorted month keys
@@ -1004,9 +1009,10 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, getAV, setAvMonth
             )}
 
             {/* שדות חודשיים */}
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:5,marginTop:10}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:5,marginTop:10}}>
               <AvF label="💰 מגיע לו" val={getAV(selKey,av.id,"monthlyStipend")} onChange={v=>setAvMonthField(selKey,av.id,"monthlyStipend",v)} placeholder={`עד ${fmt(maxS)}`} hi />
               <AvF label="🎓 בחינות"  val={getAV(selKey,av.id,"exams")}           onChange={v=>setAvMonthField(selKey,av.id,"exams",v)} />
+              <AvF label="💵 הכניס סריקוב" val={getAV(selKey,av.id,"sarikowGiven")} onChange={v=>setAvMonthField(selKey,av.id,"sarikowGiven",v)} placeholder={`${fmt(c.trackNum)}`} />
             </div>
             {/* תענית דיבור */}
             <div style={{background:"#f0f9ff",border:"1.5px solid #bae6fd",borderRadius:8,padding:"8px 10px",marginTop:6}}>
@@ -1094,6 +1100,14 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, getAV, setAvMonth
                   <span style={{color:"#2563eb",fontSize:14}}>{fmt(c.rounding)} ₪</span>
                 </span>
               </div>
+              {c.sarikowGiven!==c.trackNum && (
+                <div style={{marginTop:4,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span style={{color:"#7c3aed",fontWeight:600}}>
+                    💵 סריקוב הכניס בפועל {fmt(c.sarikowGiven)} ₪ ⇒ מהקופה:
+                  </span>
+                  <span style={{color:"#7c3aed",fontWeight:700,fontSize:13}}>{fmt(c.kupaPortion)} ₪</span>
+                </div>
+              )}
             </div>
 
             {/* נוסחת בנק — מוצגת רק כשיש ערך */}
@@ -1101,7 +1115,7 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, getAV, setAvMonth
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-around",background:"#f8fafc",borderRadius:8,padding:"8px 4px",marginTop:8,gap:4,flexWrap:"wrap"}}>
                 <CI l="מגיע לו"  v={c.monthly} />
                 <span style={{color:"#94a3b8"}}>−</span>
-                <CI l="עיגול"    v={c.rounding} />
+                <CI l="מהקופה (סריקוב)" v={c.kupaPortion} />
                 {c.exams>0&&<><span style={{color:"#94a3b8"}}>+</span><CI l="בחינות" v={c.exams}/></>}
                 {c.prevBankGap!==0&&<><span style={{color:"#94a3b8"}}>{c.prevBankGap>0?"+":"−"}</span><CI l="פער קודם" v={Math.abs(c.prevBankGap)}/></>}
                 {c.holiday>0&&<><span style={{color:"#94a3b8"}}>+</span><CI l="🎉 חג" v={c.holiday} color="#b45309"/></>}
@@ -1133,6 +1147,12 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, getAV, setAvMonth
               <div style={{background:"#ecfdf5",border:"1.5px solid #34d399",borderRadius:8,padding:"7px 12px",marginTop:6,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <span style={{fontSize:12,color:"#059669",fontWeight:700}}>💰 סה״כ להפקדה:</span>
                 <span style={{fontSize:16,fontWeight:800,color:"#059669"}}>{fmt(c.totalToBank)} ₪</span>
+              </div>
+            )}
+            {c.totalToBank<0&&(
+              <div style={{background:"#fef2f2",border:"1.5px solid #f87171",borderRadius:8,padding:"7px 12px",marginTop:6,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{fontSize:12,color:"#dc2626",fontWeight:700}}>⚠️ האברך צריך להחזיר:</span>
+                <span style={{fontSize:16,fontWeight:800,color:"#dc2626"}}>{fmt(Math.abs(c.totalToBank))} ₪</span>
               </div>
             )}
 
