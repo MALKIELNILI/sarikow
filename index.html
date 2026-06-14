@@ -1373,7 +1373,7 @@ function BankTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, selMonth
     .map(av=>({ av, c:calcAvrechMonth(av,selKey,prevKey) }))
     .filter(({c})=>c.monthly>0||c.holiday>0||c.totalToBank>0);
 
-  const cashList = deposits.filter(({c})=>c.cashAmount>0);
+  const cashList = deposits.filter(({c})=>c.cashAmount>0 && c.taanitAmount===0);
 
   // תענית דיבור
   const taanitList       = avrechim.filter(a=>a.active).map(av=>({ av, c:calcAvrechMonth(av,selKey,prevKey) })).filter(({c})=>c.taanitAmount>0);
@@ -1487,6 +1487,7 @@ function BankTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, selMonth
           </div>
           {taanitList.map(({av,c})=>{
             const paid = getAV(selKey,av.id,"taanitPaid")==="1";
+            const combined = c.taanitAmount + c.cashAmount;
             return (
               <div key={av.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
                 padding:"7px 8px",borderRadius:8,marginBottom:4,
@@ -1495,17 +1496,19 @@ function BankTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, selMonth
                 <div>
                   <span style={{fontWeight:700,fontSize:14}}>{av.name}</span>
                   {paid&&<span style={{fontSize:11,color:"#0369a1",marginRight:6,fontWeight:600}}> ✓ קיבל</span>}
-                  <div style={{fontSize:11,color:"#64748b"}}>{c.taanitDays} ימים × 15 ₪</div>
+                  <div style={{fontSize:11,color:"#64748b"}}>
+                    {c.taanitDays} ימים × 15 ₪{c.cashAmount>0&&` + ${fmt(c.cashAmount)} ₪ מזומן`}
+                  </div>
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <span style={{fontWeight:800,fontSize:16,color:"#0369a1"}}>{fmt(c.taanitAmount)} ₪</span>
+                  <span style={{fontWeight:800,fontSize:16,color:"#0369a1"}}>{fmt(combined)} ₪</span>
                   <label style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer",
                     background:paid?"#0369a1":"#f1f5f9",border:`2px solid ${paid?"#0369a1":"#cbd5e1"}`,
                     borderRadius:7,padding:"4px 10px",fontSize:12,fontWeight:600,
                     color:paid?"#fff":"#64748b",transition:"all .2s",userSelect:"none"}}>
                     <input type="checkbox"
                       checked={paid}
-                      onChange={e=>setAvMonthField(selKey,av.id,"taanitPaid",e.target.checked?"1":"")}
+                      onChange={e=>{const v=e.target.checked?"1":""; setAvMonthField(selKey,av.id,"taanitPaid",v); if(c.cashAmount>0) setAvMonthField(selKey,av.id,"cashPaid",v);}}
                       style={{width:15,height:15,cursor:"pointer",accentColor:"#0369a1"}}/>
                     {paid?"שולם":"סמן"}
                   </label>
@@ -1591,13 +1594,13 @@ function BankTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, selMonth
               )}
               {c.totalToBank>0 && (
                 c.cashAmount>=c.totalToBank ? (
-                  <button onClick={()=>setAvMonthField(selKey,av.id,"bankDeposit","")}
+                  <button onClick={()=>{setAvMonthField(selKey,av.id,"bankDeposit","");setAvMonthField(selKey,av.id,"bankRequested","");}}
                     style={{background:"#fefce8",border:"1.5px solid #fbbf24",borderRadius:8,padding:"4px 10px",
                       fontSize:12,fontWeight:600,cursor:"pointer",color:"#92400e"}}>
                     ↩ העבר לבנק
                   </button>
                 ) : (
-                  <button onClick={()=>setAvMonthField(selKey,av.id,"bankDeposit","0")}
+                  <button onClick={()=>{setAvMonthField(selKey,av.id,"bankDeposit","0");setAvMonthField(selKey,av.id,"bankRequested","1");}}
                     style={{background:"#eff6ff",border:"1.5px solid #93c5fd",borderRadius:8,padding:"4px 10px",
                       fontSize:12,fontWeight:600,cursor:"pointer",color:"#1d4ed8"}}>
                     💵 העבר למזומן
