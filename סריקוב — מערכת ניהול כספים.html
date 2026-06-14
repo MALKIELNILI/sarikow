@@ -1589,6 +1589,21 @@ function BankTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, selMonth
                   {c.bankGap===0?"✓ שולם":c.bankGap>0?`חסר ${fmt(c.bankGap)} ₪`:`עודף ${fmt(Math.abs(c.bankGap))} ₪`}
                 </div>
               )}
+              {c.totalToBank>0 && (
+                c.cashAmount>=c.totalToBank ? (
+                  <button onClick={()=>setAvMonthField(selKey,av.id,"bankDeposit","")}
+                    style={{background:"#fefce8",border:"1.5px solid #fbbf24",borderRadius:8,padding:"4px 10px",
+                      fontSize:12,fontWeight:600,cursor:"pointer",color:"#92400e"}}>
+                    ↩ העבר לבנק
+                  </button>
+                ) : (
+                  <button onClick={()=>setAvMonthField(selKey,av.id,"bankDeposit","0")}
+                    style={{background:"#eff6ff",border:"1.5px solid #93c5fd",borderRadius:8,padding:"4px 10px",
+                      fontSize:12,fontWeight:600,cursor:"pointer",color:"#1d4ed8"}}>
+                    💵 העבר למזומן
+                  </button>
+                )
+              )}
               <label style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer",userSelect:"none",
                 background:getAV(selKey,av.id,"bankRequested")==="1"?"#dcfce7":"#f1f5f9",
                 border:`2px solid ${getAV(selKey,av.id,"bankRequested")==="1"?"#16a34a":"#cbd5e1"}`,
