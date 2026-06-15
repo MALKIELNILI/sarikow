@@ -155,22 +155,66 @@ const toHebrewDay   = dateStr => { const n=_hDayNum(dateStr); return HEB_LETTERS
 const toHebrewMonth = dateStr => { try { return _hMonthFmt.format(new Date(dateStr+"T12:00:00")); } catch(e){ return ""; } };
 const toFullHebDate = dateStr => { try { const d=new Date(dateStr+"T12:00:00"); return `${HEB_LETTERS[_hDayNum(dateStr)]||""} ${_hMonthOnly.format(d)}`; } catch(e){ return dateStr; } };
 
-// לוח חודשים עברי → גרגוריאני
-const HEB_YEAR_MONTHS = {
-  5786: { "תשרי":"2025-09-23","חשון":"2025-10-23","כסלו":"2025-11-21","טבת":"2025-12-21","שבט":"2026-01-19","אדר":"2026-02-18","ניסן":"2026-03-19","אייר":"2026-04-18","סיון":"2026-05-17","תמוז":"2026-06-16","אב":"2026-07-15","אלול":"2026-08-14" },
-  // תשפ״ז היא שנה מעוברת - "אדר" כאן מתייחס לאדר ב׳ (אדר א׳ קודם לו, ב-2027-02-08)
-  5787: { "תשרי":"2026-09-12","חשון":"2026-10-12","כסלו":"2026-11-11","טבת":"2026-12-11","שבט":"2027-01-09","אדר":"2027-03-10","ניסן":"2027-04-08","אייר":"2027-05-08","סיון":"2027-06-06","תמוז":"2027-07-06","אב":"2027-08-04","אלול":"2027-09-03" },
-};
-const HEB_MONTH_DAYS = { "תשרי":30,"חשון":29,"כסלו":30,"טבת":29,"שבט":30,"אדר":29,"ניסן":30,"אייר":29,"סיון":30,"תמוז":29,"אב":30,"אלול":29 };
-
+// המרת תאריך עברי → גרגוריאני (מחושב דינמית מהלוח העברי של הדפדפן - תקין לכל שנה)
+const HEB_MONTHS = ["תשרי","חשון","כסלו","טבת","שבט","אדר","ניסן","אייר","סיון","תמוז","אב","אלול"];
+const HEB_MONTH_EN = { "תשרי":"Tishri","חשון":"Heshvan","כסלו":"Kislev","טבת":"Tevet","שבט":"Shevat","אדר":"Adar","ניסן":"Nisan","אייר":"Iyar","סיון":"Sivan","תמוז":"Tamuz","אב":"Av","אלול":"Elul" };
+const _hebFmt = new Intl.DateTimeFormat("en-US-u-ca-hebrew", { year:"numeric", month:"short", day:"numeric" });
+const _hebMonthStartCache = {};
+function _scanHebYear(hebYear){
+  const gy = hebYear - 3761; // שנה עברית X מתחילה בערך בספטמבר-אוקטובר של (X-3760)
+  let d = new Date(Date.UTC(gy, 7, 1));
+  const end = new Date(Date.UTC(gy+1, 10, 15));
+  while(d<=end){
+    const parts=_hebFmt.formatToParts(d);
+    const mEn=parts.find(p=>p.type==="month").value;
+    const day=Number(parts.find(p=>p.type==="day").value);
+    const yr=Number(parts.find(p=>p.type==="year").value);
+    if(yr===hebYear && day===1){
+      const ds=`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`;
+      _hebMonthStartCache[hebYear+"|"+mEn]=ds;
+    }
+    d.setUTCDate(d.getUTCDate()+1);
+  }
+}
+function _hebMonthStart(hebYear, monthHeb){
+  if(!_hebMonthStartCache[hebYear+"|Tishri"]) _scanHebYear(hebYear);
+  let monthEn = HEB_MONTH_EN[monthHeb];
+  // שנה מעוברת: "אדר" מתייחס לאדר ב׳ (האדר הסמוך לניסן)
+  if(monthEn==="Adar" && _hebMonthStartCache[hebYear+"|Adar II"]) monthEn="Adar II";
+  return _hebMonthStartCache[hebYear+"|"+monthEn]||null;
+}
 const hebToGreg = (year, month, day) => {
-  const start = HEB_YEAR_MONTHS[year]?.[month];
+  const start = _hebMonthStart(year, month);
   if(!start) return null;
   const d = new Date(start+"T12:00:00");
   d.setDate(d.getDate()+day-1);
   const y=d.getFullYear(), m=d.getMonth()+1, da=d.getDate();
   return `${y}-${String(m).padStart(2,"0")}-${String(da).padStart(2,"0")}`;
 };
+// אורך חודש עברי בפועל (יכול להשתנות משנה לשנה)
+const hebMonthDays = (year, month) => {
+  const idx = HEB_MONTHS.indexOf(month);
+  const cur = hebToGreg(year, month, 1);
+  const next = idx<HEB_MONTHS.length-1 ? hebToGreg(year, HEB_MONTHS[idx+1], 1) : hebToGreg(year+1, HEB_MONTHS[0], 1);
+  if(!cur||!next) return 29;
+  const diff = Math.round((new Date(next+"T12:00:00") - new Date(cur+"T12:00:00"))/86400000);
+  return diff>0?diff:29;
+};
+// המרת שנה עברית למספר בגימטריה, לדוגמה 5786 → תשפ״ו
+const _GEMATRIA=[[400,"ת"],[300,"ש"],[200,"ר"],[100,"ק"],[90,"צ"],[80,"פ"],[70,"ע"],[60,"ס"],[50,"נ"],[40,"מ"],[30,"ל"],[20,"כ"],[10,"י"],[9,"ט"],[8,"ח"],[7,"ז"],[6,"ו"],[5,"ה"],[4,"ד"],[3,"ג"],[2,"ב"],[1,"א"]];
+function hebYearLabel(y){
+  const n=y%1000, letters=[];
+  let h=Math.floor(n/100)*100, rest=n%100;
+  for(const [v,l] of _GEMATRIA){ if(v>=100){ while(h>=v){letters.push(l);h-=v;} } }
+  if(rest===15) letters.push("ט","ו");
+  else if(rest===16) letters.push("ט","ז");
+  else { let r=rest; for(const [v,l] of _GEMATRIA){ if(v<100){ while(r>=v){letters.push(l);r-=v;} } } }
+  if(letters.length<=1) return (letters[0]||"")+"׳";
+  return letters.slice(0,-1).join("")+"״"+letters[letters.length-1];
+}
+// טווח שנים עבריות פעיל (מתעדכן אוטומטית מדי שנה לפי התאריך הנוכחי)
+const _curHebYear = Number((new Intl.DateTimeFormat("en-US-u-ca-hebrew",{year:"numeric"}).format(new Date()).match(/\d+/)||[])[0]) || 5786;
+const HEB_YEARS = Array.from({length:5},(_,i)=>_curHebYear-1+i);
 
 // ── FIREBASE HELPERS ─────────────────────────────────────────
 function fbSet(path,val){ db.ref(path).set(val); }
@@ -1678,13 +1722,13 @@ function AttendanceTab({ avrechim, selKey, selYear, selMonth, attendance, setAtt
   const [settingsModal,setSettingsModal]= useState(false);
   const [shareModal,  setShareModal]   = useState(false);
   const [viewMode,    setViewMode]     = useState("grid");
-  const [hebYear,     setHebYear]      = useState(5786);
+  const [hebYear,     setHebYear]      = useState(_curHebYear);
   const [hebMonth,    setHebMonth]     = useState("ניסן");
   const [hebDay,      setHebDay]       = useState(1);
   const [newVacLabel, setNewVacLabel]  = useState("");
   const [vacEveryYear,setVacEveryYear] = useState(false);
   const [bhEveryYear, setBhEveryYear]  = useState(false);
-  const [newBh,       setNewBh]        = useState({yearFrom:5786,monthFrom:"תשרי",dayFrom:1,yearTo:5786,monthTo:"תשרי",dayTo:29,label:""});
+  const [newBh,       setNewBh]        = useState({yearFrom:_curHebYear,monthFrom:"תשרי",dayFrom:1,yearTo:_curHebYear,monthTo:"תשרי",dayTo:29,label:""});
   const [editBhIdx,   setEditBhIdx]    = useState(null);
   const [editBhData,  setEditBhData]   = useState({from:"",to:"",label:""});
   const [tooltip,     setTooltip]      = useState(null);
@@ -1905,7 +1949,7 @@ function AttendanceTab({ avrechim, selKey, selYear, selMonth, attendance, setAtt
       {/* Settings modal */}
       {settingsModal&&(()=>{
         const gregDate = hebToGreg(hebYear, hebMonth, hebDay);
-        const maxDay   = HEB_MONTH_DAYS[hebMonth]||29;
+        const maxDay   = hebMonthDays(hebYear, hebMonth);
         const allVacs  = Object.entries(customVacations||{}).sort(([a],[b])=>a.localeCompare(b));
         return (
           <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:12}} onClick={()=>setSettingsModal(false)}>
@@ -1924,10 +1968,10 @@ function AttendanceTab({ avrechim, selKey, selYear, selMonth, attendance, setAtt
                   <div style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}>
                     <label style={{fontSize:12,color:"#475569",fontWeight:600,minWidth:50}}>שנה:</label>
                     <div style={{display:"flex",gap:6}}>
-                      {[5786,5787].map(y=>(
+                      {HEB_YEARS.map(y=>(
                         <button key={y} onClick={()=>setHebYear(y)}
                           style={{padding:"4px 12px",borderRadius:7,border:`2px solid ${hebYear===y?"#16a34a":"#e2e8f0"}`,background:hebYear===y?"#16a34a":"#fff",color:hebYear===y?"#fff":"#475569",fontWeight:700,cursor:"pointer",fontSize:12}}>
-                          {y===5786?"תשפ״ו":"תשפ״ז"}
+                          {hebYearLabel(y)}
                         </button>
                       ))}
                     </div>
@@ -1937,7 +1981,7 @@ function AttendanceTab({ avrechim, selKey, selYear, selMonth, attendance, setAtt
                   <div style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}>
                     <label style={{fontSize:12,color:"#475569",fontWeight:600,minWidth:50}}>חודש:</label>
                     <select style={{...inp,flex:1}} value={hebMonth} onChange={e=>{setHebMonth(e.target.value);setHebDay(1);}}>
-                      {Object.keys(HEB_YEAR_MONTHS[5786]).map(m=>(
+                      {HEB_MONTHS.map(m=>(
                         <option key={m} value={m}>{m}</option>
                       ))}
                     </select>
@@ -1979,8 +2023,8 @@ function AttendanceTab({ avrechim, selKey, selYear, selMonth, attendance, setAtt
                   <button style={primaryBtn} onClick={()=>{
                     if(!newVacLabel) return;
                     if(vacEveryYear){
-                      Object.keys(HEB_YEAR_MONTHS).forEach(y=>{
-                        const g=hebToGreg(Number(y),hebMonth,hebDay);
+                      HEB_YEARS.forEach(y=>{
+                        const g=hebToGreg(y,hebMonth,hebDay);
                         if(g) setCustomVacation(g,newVacLabel);
                       });
                     } else {
@@ -2070,19 +2114,19 @@ function AttendanceTab({ avrechim, selKey, selYear, selMonth, attendance, setAtt
                     {/* FROM */}
                     <div style={{fontWeight:600,fontSize:11,color:"#64748b",marginBottom:4}}>מתאריך:</div>
                     <div style={{display:"flex",gap:5,marginBottom:5,alignItems:"center"}}>
-                      {[5786,5787].map(y=>(
+                      {HEB_YEARS.map(y=>(
                         <button key={y} onClick={()=>setNewBh(b=>({...b,yearFrom:y}))}
                           style={{padding:"3px 9px",borderRadius:6,border:`1.5px solid ${newBh.yearFrom===y?"#6366f1":"#e2e8f0"}`,background:newBh.yearFrom===y?"#6366f1":"#fff",color:newBh.yearFrom===y?"#fff":"#475569",fontWeight:600,cursor:"pointer",fontSize:11}}>
-                          {y===5786?"תשפ״ו":"תשפ״ז"}
+                          {hebYearLabel(y)}
                         </button>
                       ))}
                       <select style={{...inp,flex:1,fontSize:11,padding:"4px 6px"}} value={newBh.monthFrom}
                         onChange={e=>setNewBh(b=>({...b,monthFrom:e.target.value,dayFrom:1}))}>
-                        {Object.keys(HEB_YEAR_MONTHS[5786]).map(m=><option key={m} value={m}>{m}</option>)}
+                        {HEB_MONTHS.map(m=><option key={m} value={m}>{m}</option>)}
                       </select>
                     </div>
                     <div style={{display:"flex",flexWrap:"wrap",gap:2,marginBottom:8}}>
-                      {Array.from({length:HEB_MONTH_DAYS[newBh.monthFrom]||29},(_,i)=>i+1).map(d=>(
+                      {Array.from({length:hebMonthDays(newBh.yearFrom, newBh.monthFrom)},(_,i)=>i+1).map(d=>(
                         <button key={d} onClick={()=>setNewBh(b=>({...b,dayFrom:d}))}
                           style={{width:24,height:24,borderRadius:5,border:`1.5px solid ${newBh.dayFrom===d?"#6366f1":"#e2e8f0"}`,background:newBh.dayFrom===d?"#6366f1":"#fff",color:newBh.dayFrom===d?"#fff":"#374151",cursor:"pointer",fontSize:10,fontWeight:newBh.dayFrom===d?700:400}}>
                           {HEB_LETTERS[d]}
@@ -2093,19 +2137,19 @@ function AttendanceTab({ avrechim, selKey, selYear, selMonth, attendance, setAtt
                     {/* TO */}
                     <div style={{fontWeight:600,fontSize:11,color:"#64748b",marginBottom:4}}>עד תאריך:</div>
                     <div style={{display:"flex",gap:5,marginBottom:5,alignItems:"center"}}>
-                      {[5786,5787].map(y=>(
+                      {HEB_YEARS.map(y=>(
                         <button key={y} onClick={()=>setNewBh(b=>({...b,yearTo:y}))}
                           style={{padding:"3px 9px",borderRadius:6,border:`1.5px solid ${newBh.yearTo===y?"#6366f1":"#e2e8f0"}`,background:newBh.yearTo===y?"#6366f1":"#fff",color:newBh.yearTo===y?"#fff":"#475569",fontWeight:600,cursor:"pointer",fontSize:11}}>
-                          {y===5786?"תשפ״ו":"תשפ״ז"}
+                          {hebYearLabel(y)}
                         </button>
                       ))}
                       <select style={{...inp,flex:1,fontSize:11,padding:"4px 6px"}} value={newBh.monthTo}
                         onChange={e=>setNewBh(b=>({...b,monthTo:e.target.value,dayTo:1}))}>
-                        {Object.keys(HEB_YEAR_MONTHS[5786]).map(m=><option key={m} value={m}>{m}</option>)}
+                        {HEB_MONTHS.map(m=><option key={m} value={m}>{m}</option>)}
                       </select>
                     </div>
                     <div style={{display:"flex",flexWrap:"wrap",gap:2,marginBottom:8}}>
-                      {Array.from({length:HEB_MONTH_DAYS[newBh.monthTo]||29},(_,i)=>i+1).map(d=>(
+                      {Array.from({length:hebMonthDays(newBh.yearTo, newBh.monthTo)},(_,i)=>i+1).map(d=>(
                         <button key={d} onClick={()=>setNewBh(b=>({...b,dayTo:d}))}
                           style={{width:24,height:24,borderRadius:5,border:`1.5px solid ${newBh.dayTo===d?"#6366f1":"#e2e8f0"}`,background:newBh.dayTo===d?"#6366f1":"#fff",color:newBh.dayTo===d?"#fff":"#374151",cursor:"pointer",fontSize:10,fontWeight:newBh.dayTo===d?700:400}}>
                           {HEB_LETTERS[d]}
@@ -2129,9 +2173,9 @@ function AttendanceTab({ avrechim, selKey, selYear, selMonth, attendance, setAtt
                     <button style={{...primaryBtn,background:"#6366f1",fontSize:12,padding:"8px"}} onClick={()=>{
                       if(!newBh.label.trim()) return;
                       if(bhEveryYear){
-                        Object.keys(HEB_YEAR_MONTHS).forEach(y=>{
-                          const gf=hebToGreg(Number(y),newBh.monthFrom,newBh.dayFrom);
-                          const gt=hebToGreg(Number(y),newBh.monthTo,newBh.dayTo);
+                        HEB_YEARS.forEach(y=>{
+                          const gf=hebToGreg(y,newBh.monthFrom,newBh.dayFrom);
+                          const gt=hebToGreg(y,newBh.monthTo,newBh.dayTo);
                           if(gf&&gt&&gf<=gt) addBeinHazmanim({from:gf,to:gt,label:newBh.label.trim()});
                         });
                       } else {
@@ -2140,7 +2184,7 @@ function AttendanceTab({ avrechim, selKey, selYear, selMonth, attendance, setAtt
                         if(!gf||!gt||gf>gt) return;
                         addBeinHazmanim({from:gf,to:gt,label:newBh.label.trim()});
                       }
-                      setNewBh({yearFrom:5786,monthFrom:"תשרי",dayFrom:1,yearTo:5786,monthTo:"תשרי",dayTo:29,label:""});
+                      setNewBh({yearFrom:_curHebYear,monthFrom:"תשרי",dayFrom:1,yearTo:_curHebYear,monthTo:"תשרי",dayTo:29,label:""});
                     }}>הוסף בין הזמנים</button>
                   </div>
                 </div>
