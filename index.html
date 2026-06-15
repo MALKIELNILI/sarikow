@@ -1375,6 +1375,12 @@ function BankTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, selMonth
 
   const cashList = deposits.filter(({c})=>c.cashAmount>0 && c.taanitAmount===0);
 
+  // אברכים שצריכים להחזיר
+  const owingList = avrechim.filter(a=>a.active).map(av=>({ av, c:calcAvrechMonth(av,selKey,prevKey) })).filter(({c})=>c.totalToBank<0);
+  const totalOwing = owingList.reduce((s,{c})=>s+Math.abs(c.totalToBank),0);
+  const owingPaidCount = owingList.filter(({av})=>getAV(selKey,av.id,"refundReceived")==="1").length;
+  const allOwingPaid   = owingPaidCount===owingList.length && owingList.length>0;
+
   // תענית דיבור
   const taanitList       = avrechim.filter(a=>a.active).map(av=>({ av, c:calcAvrechMonth(av,selKey,prevKey) })).filter(({c})=>c.taanitAmount>0);
   const totalTaanit      = taanitList.reduce((s,{c})=>s+c.taanitAmount,0);
@@ -1436,6 +1442,45 @@ function BankTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, selMonth
           )}
         </div>
       </div>
+
+      {/* ── כרטיס אברכים שצריכים להחזיר ── */}
+      {owingList.length>0&&(
+        <div style={{...card,background:allOwingPaid?"#f0fdf4":"#fef2f2",border:`2px solid ${allOwingPaid?"#16a34a":"#f87171"}`}}>
+          <div style={{fontWeight:700,fontSize:14,color:allOwingPaid?"#166534":"#dc2626",marginBottom:8}}>
+            {allOwingPaid?"✅ כל ההחזרים התקבלו":"⚠️ אברכים שצריכים להחזיר"}
+            <span style={{fontSize:11,fontWeight:400,marginRight:6,color:"#64748b"}}>
+              ({owingPaidCount}/{owingList.length} התקבלו — {fmt(totalOwing)} ₪ סה״כ)
+            </span>
+          </div>
+          {owingList.map(({av,c})=>{
+            const received = getAV(selKey,av.id,"refundReceived")==="1";
+            return (
+              <div key={av.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                padding:"7px 8px",borderRadius:8,marginBottom:4,
+                background:received?"#dcfce7":"#fff",border:`1px solid ${received?"#86efac":"#fecaca"}`,
+                opacity:received?.65:1,transition:"all .2s"}}>
+                <div>
+                  <span style={{fontWeight:700,fontSize:14}}>{av.name}</span>
+                  {received&&<span style={{fontSize:11,color:"#16a34a",marginRight:6,fontWeight:600}}> ✓ התקבל</span>}
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontWeight:800,fontSize:16,color:"#dc2626"}}>{fmt(Math.abs(c.totalToBank))} ₪</span>
+                  <label style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer",
+                    background:received?"#16a34a":"#f1f5f9",border:`2px solid ${received?"#16a34a":"#cbd5e1"}`,
+                    borderRadius:7,padding:"4px 10px",fontSize:12,fontWeight:600,
+                    color:received?"#fff":"#64748b",transition:"all .2s",userSelect:"none"}}>
+                    <input type="checkbox"
+                      checked={received}
+                      onChange={e=>setAvMonthField(selKey,av.id,"refundReceived",e.target.checked?"1":"")}
+                      style={{width:15,height:15,cursor:"pointer",accentColor:"#16a34a"}}/>
+                    התקבל
+                  </label>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* ── כרטיס מזומן ── */}
       {cashList.length>0&&(
