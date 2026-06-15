@@ -1681,6 +1681,7 @@ function AttendanceTab({ avrechim, selKey, selYear, selMonth, attendance, setAtt
   const [hebMonth,    setHebMonth]     = useState("ניסן");
   const [hebDay,      setHebDay]       = useState(1);
   const [newVacLabel, setNewVacLabel]  = useState("");
+  const [vacEveryYear,setVacEveryYear] = useState(false);
   const [newBh,       setNewBh]        = useState({yearFrom:5786,monthFrom:"תשרי",dayFrom:1,yearTo:5786,monthTo:"תשרי",dayTo:29,label:""});
   const [editBhIdx,   setEditBhIdx]    = useState(null);
   const [editBhData,  setEditBhData]   = useState({from:"",to:"",label:""});
@@ -1968,9 +1969,22 @@ function AttendanceTab({ avrechim, selKey, selYear, selMonth, attendance, setAtt
                       <button key={s} style={{...smallBtn,fontSize:11}} onClick={()=>setNewVacLabel(s)}>{s}</button>
                     ))}
                   </div>
+                  <label style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,cursor:"pointer",userSelect:"none",fontSize:12,color:"#166534",fontWeight:600}}>
+                    <input type="checkbox" checked={vacEveryYear} onChange={e=>setVacEveryYear(e.target.checked)}
+                      style={{width:15,height:15,cursor:"pointer",accentColor:"#16a34a"}}/>
+                    📅 כל שנה (לפי התאריך העברי - לכל השנים המוגדרות)
+                  </label>
                   <button style={primaryBtn} onClick={()=>{
-                    if(!gregDate||!newVacLabel) return;
-                    setCustomVacation(gregDate,newVacLabel);
+                    if(!newVacLabel) return;
+                    if(vacEveryYear){
+                      Object.keys(HEB_YEAR_MONTHS).forEach(y=>{
+                        const g=hebToGreg(Number(y),hebMonth,hebDay);
+                        if(g) setCustomVacation(g,newVacLabel);
+                      });
+                    } else {
+                      if(!gregDate) return;
+                      setCustomVacation(gregDate,newVacLabel);
+                    }
                     setNewVacLabel("");
                   }}>הוסף חופשה</button>
                 </div>
