@@ -416,11 +416,20 @@ tr:hover td{background:rgba(255,255,255,0.02);}
 
     <!-- YEARLY -->
     <div id="page-yearly" class="page">
-      <div class="month-bar">
-        <span class="month-label">📆 סיכום שנתי</span>
-        <select id="yearly-year" onchange="renderYearly()"></select>
-        <button class="btn btn-ghost btn-sm" onclick="exportYearlyPDF()">📄 PDF</button>
+      <div style="padding:10px 0 0;">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
+          <button class="btn btn-ghost btn-sm" onclick="setCurrentSchoolYear()">🏫 שנת לימודים</button>
+          <button class="btn btn-ghost btn-sm" onclick="setCalendarYear()">📅 שנה קלנדרית</button>
+          <button class="btn btn-ghost btn-sm" onclick="exportYearlyPDF()" style="margin-right:auto;">📄 PDF</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <span style="font-size:11px;color:var(--muted);">מ-</span>
+          <input type="date" id="yearly-from-date" onchange="yearlyRangeTitle='';renderYearly()" style="width:145px;font-size:12px;padding:5px 8px;">
+          <span style="font-size:11px;color:var(--muted);">עד</span>
+          <input type="date" id="yearly-to-date" onchange="yearlyRangeTitle='';renderYearly()" style="width:145px;font-size:12px;padding:5px 8px;">
+        </div>
       </div>
+      <div id="yearly-period-label"></div>
       <div id="yearly-cards" class="cards"></div>
       <div id="yearly-table"></div>
     </div>
@@ -838,8 +847,10 @@ function populateSelects(){
   const yH=years.map(y=>`<option value="${y}"${y===curY?' selected':''}>${y}</option>`).join('');
   ['dash-month','inc-month','inc-filter-month','exp-month','exp-filter-month','qa-month','upd-nistanim-month'].forEach(id=>{const el=$(id);if(el)el.innerHTML=mH;});
   ['dash-year','inc-year','inc-filter-year','exp-year','exp-filter-year','qa-year','upd-nistanim-year'].forEach(id=>{const el=$(id);if(el)el.innerHTML=yH;});
-  const yOnlyH=years.map(y=>`<option value="${y}"${y===curY?' selected':''}>${y}</option>`).join('');
-  const yEl=$('yearly-year');if(yEl)yEl.innerHTML=yOnlyH;
+  // yearly date range defaults: from = Sep of current school year, to = today
+  const schoolYear=curM>=9?curY:curY-1;
+  const fromEl=$('yearly-from-date');if(fromEl)fromEl.value=`${schoolYear}-09-01`;
+  const toEl=$('yearly-to-date');if(toEl)toEl.value=now.toISOString().split('T')[0];
   const payDateEl=$('pay-date');if(payDateEl)payDateEl.value=now.toISOString().split('T')[0];
 }
 
@@ -1772,13 +1783,50 @@ function renderKupa(){
 }
 
 // ── YEARLY ────────────────────────────────────────────────
+let yearlyRangeTitle='';
+function hebrewYearLabel(schoolStartYear){
+  const n=(schoolStartYear+3761)%1000;
+  const letters=[[400,'ת'],[300,'ש'],[200,'ר'],[100,'ק'],[90,'צ'],[80,'פ'],[70,'ע'],[60,'ס'],[50,'נ'],[40,'מ'],[30,'ל'],[20,'כ'],[10,'י'],[9,'ט'],[8,'ח'],[7,'ז'],[6,'ו'],[5,'ה'],[4,'ד'],[3,'ג'],[2,'ב'],[1,'א']];
+  let r='',rem=n;
+  for(const[v,l]of letters){while(rem>=v){r+=l;rem-=v;}}
+  r=r.replace('יה','טו').replace('יו','טז');
+  return r.length===1?r+"'":(r.slice(0,-1)+'"'+r.slice(-1));
+}
+window.setCalendarYear=function(){
+  const curY=new Date().getFullYear();
+  $('yearly-from-date').value=`${curY}-01-01`;
+  $('yearly-to-date').value=`${curY}-12-31`;
+  yearlyRangeTitle='שנה קלנדרית '+curY;
+  renderYearly();
+};
+window.setCurrentSchoolYear=function(){
+  const now=new Date(),curM=now.getMonth()+1,curY=now.getFullYear();
+  const schoolYear=curM>=9?curY:curY-1;
+  $('yearly-from-date').value=`${schoolYear}-09-01`;
+  $('yearly-to-date').value=now.toISOString().split('T')[0];
+  yearlyRangeTitle='שנת לימודים תש'+hebrewYearLabel(schoolYear);
+  renderYearly();
+};
+function buildYearlyRange(){
+  const fromVal=$('yearly-from-date').value,toVal=$('yearly-to-date').value;
+  if(!fromVal||!toVal)return{range:[],fromM:1,fromY:2025,toM:1,toY:2025};
+  const [fromY,fromM]=fromVal.split('-').map(Number);
+  const [toY,toM]=toVal.split('-').map(Number);
+  const range=[];let cm=fromM,cy=fromY;
+  while((cy<toY||(cy===toY&&cm<=toM))&&range.length<60){
+    range.push({m:cm,y:cy,mName:HEB[cm-1]+' '+cy});
+    cm++;if(cm>12){cm=1;cy++;}
+  }
+  return{range,fromM,fromY,toM,toY};
+}
 function renderYearly(){
-  const y=parseInt($('yearly-year').value);
-  const n1=D.settings.name1||'מלכיאל',n2=D.settings.name2||'השותף';
+  const {range,fromM,fromY,toM,toY}=buildYearlyRange();
+  const n1=D.settings.name1||'מלכיאל';
   const target=D.settings.target||22000;
+  const fromDateVal=$('yearly-from-date').value,toDateVal=$('yearly-to-date').value;
+  const fmtD=v=>v?new Date(v).toLocaleDateString('he-IL'):'';
   let totalInc=0,totalExp=0,totalProfit=0,totalTuitionInc=0;
-  const rows=HEB.map((mName,idx)=>{
-    const m=idx+1;
+  const rows=range.map(({m,y,mName})=>{
     const inc=D.incomes.filter(i=>i.month===m&&i.year===y&&i.type!=='nistanim').reduce((s,i)=>s+i.amount,0);
     const tuitionInc=D.incomes.filter(i=>i.month===m&&i.year===y&&i.type==='tuition').reduce((s,i)=>s+i.amount,0);
     const kupaExp=D.expenses.filter(e=>e.month===m&&e.year===y&&(e.payer==='partner'||e.payer==='tuition')).reduce((s,e)=>s+e.amount,0);
@@ -1786,24 +1834,60 @@ function renderYearly(){
     totalInc+=inc;totalExp+=kupaExp;totalProfit+=profit;totalTuitionInc+=tuitionInc;
     return{mName,inc,tuitionInc,exp:kupaExp,profit};
   });
+  const mc=range.length;
+  const totalTargetDiff=totalTuitionInc-(target*mc);
+  const rangeLabel=`${HEB[fromM-1]} ${fromY} – ${HEB[toM-1]} ${toY}`;
+  const dateRangeLabel=`${fmtD(fromDateVal)} – ${fmtD(toDateVal)}`;
+  const profitColor=totalProfit>=0?'var(--green)':'var(--red)';
+  const title=yearlyRangeTitle||'דוח תקופתי';
 
-  const totalTargetDiff=totalTuitionInc-(target*12);
+  // בלוק כותרת תקופה
+  $('yearly-period-label').innerHTML=`
+    <div style="background:linear-gradient(135deg,var(--surface),var(--surface2));border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+      <div style="font-size:28px;flex-shrink:0;">📆</div>
+      <div style="flex:1;min-width:150px;">
+        <div style="font-size:16px;font-weight:800;margin-bottom:3px;">${title}</div>
+        <div style="font-size:12px;color:var(--muted);">${dateRangeLabel}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:1px;">${mc} חודשים</div>
+      </div>
+      <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center;">
+        <div style="text-align:center;">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:3px;">הכנסות</div>
+          <div style="font-size:15px;font-weight:800;color:var(--green);">₪${fmt(totalInc)}</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:3px;">הוצאות</div>
+          <div style="font-size:15px;font-weight:800;color:var(--red);">₪${fmt(totalExp)}</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:3px;">רווח קופה</div>
+          <div style="font-size:15px;font-weight:800;color:${profitColor};">₪${fmt(totalProfit)}</div>
+        </div>
+        <div style="text-align:center;border-right:1px solid var(--border);padding-right:18px;">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:3px;">חלקך (50%)</div>
+          <div style="font-size:20px;font-weight:800;color:var(--accent);">₪${fmt(totalProfit/2)}</div>
+        </div>
+      </div>
+    </div>`;
 
   $('yearly-cards').innerHTML=`
-    <div class="card green"><div class="label">סה"כ הכנסות ${y}</div><div class="val">₪${fmt(totalInc)}</div></div>
-    <div class="card red"><div class="label">סה"כ הוצאות ${y}</div><div class="val">₪${fmt(totalExp)}</div></div>
-    <div class="card ${totalProfit>=0?'blue':'red'}"><div class="label">רווח שנתי</div><div class="val">₪${fmt(totalProfit)}</div></div>
-    <div class="card yellow"><div class="label">חלקך השנתי</div><div class="val">₪${fmt(totalProfit/2)}</div></div>
-    <div class="card ${totalTargetDiff>=0?'green':'red'}"><div class="label">${totalTargetDiff>=0?'עודף':'חוסר'} שכ"ל שנתי</div><div class="val">${totalTargetDiff>=0?'+':''}₪${fmt(totalTargetDiff)}</div><div class="sub-val">יעד: ₪${fmt(target*12)}</div></div>`;
+    <div class="card green"><div class="label">סה"כ הכנסות</div><div class="val">₪${fmt(totalInc)}</div></div>
+    <div class="card red"><div class="label">סה"כ הוצאות</div><div class="val">₪${fmt(totalExp)}</div></div>
+    <div class="card ${totalProfit>=0?'blue':'red'}"><div class="label">רווח סה"כ</div><div class="val">₪${fmt(totalProfit)}</div></div>
+    <div class="card yellow"><div class="label">חלקך (50%)</div><div class="val">₪${fmt(totalProfit/2)}</div></div>
+    <div class="card ${totalTargetDiff>=0?'green':'red'}"><div class="label">${totalTargetDiff>=0?'עודף':'חוסר'} שכ"ל</div><div class="val">${totalTargetDiff>=0?'+':''}₪${fmt(totalTargetDiff)}</div><div class="sub-val">יעד: ₪${fmt(target*mc)}</div></div>`;
 
   $('yearly-table').innerHTML=`<div class="section">
-    <div class="section-header"><h2>📆 פירוט חודשי — ${y}</h2></div>
+    <div class="section-header" style="flex-direction:column;align-items:flex-start;gap:2px;">
+      <h2>📆 פירוט חודשי — ${title}</h2>
+      <span style="font-size:11px;color:var(--muted);">${dateRangeLabel} | ${mc} חודשים</span>
+    </div>
     <div style="padding:0;">
-      <table><thead><tr><th>חודש</th><th>הכנסות</th><th>בפועל (ללא השלמה)</th><th>יעד</th><th>פער</th><th>הוצאות</th><th>רווח</th><th>חלקך</th></tr></thead><tbody>
+      <table><thead><tr><th>חודש</th><th>הכנסות</th><th>שכ"ל בפועל</th><th>יעד</th><th>פער</th><th>הוצאות</th><th>רווח</th><th>חלקך</th></tr></thead><tbody>
       ${rows.map(r=>{
         const diff=r.tuitionInc-target;
         return `<tr>
-          <td style="font-weight:600">${r.mName}</td>
+          <td style="font-weight:600;white-space:nowrap">${r.mName}</td>
           <td class="text-green">₪${fmt(r.inc)}</td>
           <td>₪${fmt(r.tuitionInc)}</td>
           <td class="text-muted">₪${fmt(target)}</td>
@@ -1818,7 +1902,7 @@ function renderYearly(){
           <td>סה"כ</td>
           <td class="text-green" style="font-size:13px;">₪${fmt(totalInc)}</td>
           <td style="font-size:13px;">₪${fmt(totalTuitionInc)}</td>
-          <td class="text-muted" style="font-size:13px;">₪${fmt(target*12)}</td>
+          <td class="text-muted" style="font-size:13px;">₪${fmt(target*mc)}</td>
           <td style="font-weight:800;color:${totalTargetDiff>=0?'var(--green)':'var(--red)'};">${totalTargetDiff>=0?'+':''}₪${fmt(totalTargetDiff)}</td>
           <td class="text-red" style="font-size:13px;">₪${fmt(totalExp)}</td>
           <td class="${totalProfit>=0?'text-green':'text-red'}" style="font-size:13px;">₪${fmt(totalProfit)}</td>
@@ -1955,30 +2039,104 @@ window.exportMonthPDF=function(){
 };
 
 window.exportYearlyPDF=function(){
-  const y=parseInt($('yearly-year').value);
+  const {range,fromM,fromY,toM,toY}=buildYearlyRange();
+  const fromDateVal=$('yearly-from-date').value,toDateVal=$('yearly-to-date').value;
+  const fmtDate=v=>v?new Date(v).toLocaleDateString('he-IL'):'';
   const n1=D.settings.name1||'מלכיאל';
-  let totalInc=0,totalExp=0;
-  const rows=HEB.map((mName,idx)=>{
-    const m=idx+1;
+  const target=D.settings.target||22000;
+  let totalInc=0,totalExp=0,totalProfit=0,totalTuitionInc=0;
+  const rows=range.map(({m,y,mName})=>{
     const inc=D.incomes.filter(i=>i.month===m&&i.year===y&&i.type!=='nistanim').reduce((s,i)=>s+i.amount,0);
+    const tuitionInc=D.incomes.filter(i=>i.month===m&&i.year===y&&i.type==='tuition').reduce((s,i)=>s+i.amount,0);
     const kupaExp=D.expenses.filter(e=>e.month===m&&e.year===y&&(e.payer==='partner'||e.payer==='tuition')).reduce((s,e)=>s+e.amount,0);
     const profit=Math.max(0,inc-kupaExp);
-    totalInc+=inc;totalExp+=kupaExp;
-    return{mName,inc,exp:kupaExp,profit};
+    totalInc+=inc;totalExp+=kupaExp;totalProfit+=profit;totalTuitionInc+=tuitionInc;
+    return{mName,inc,tuitionInc,exp:kupaExp,profit};
   });
-  const html=`<html dir="rtl"><head><meta charset="UTF-8">
-  <style>body{font-family:Arial,sans-serif;padding:30px;direction:rtl;}
-  h1{font-size:20px;}table{width:100%;border-collapse:collapse;font-size:13px;}
-  th,td{border:1px solid #ddd;padding:7px 10px;text-align:right;}th{background:#f5f5f5;}
-  .tot{font-weight:bold;background:#f0f0f0;}
+  const mc=range.length;
+  const totalTargetDiff=totalTuitionInc-(target*mc);
+  const rangeLabel=`${fmtDate(fromDateVal)} – ${fmtDate(toDateVal)}`;
+  const profitCol=totalProfit>=0?'#15803d':'#dc2626';
+  const targetCol=totalTargetDiff>=0?'#15803d':'#dc2626';
+  const html=`<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:Arial,sans-serif;background:#fff;color:#1e293b;direction:rtl;font-size:13px;}
+    .hdr{background:linear-gradient(135deg,#1e3a5f 0%,#2563eb 100%);color:#fff;padding:24px 30px 20px;margin-bottom:20px;}
+    .hdr h1{font-size:22px;font-weight:800;margin-bottom:5px;letter-spacing:-0.3px;}
+    .hdr .sub{font-size:13px;opacity:0.85;margin-bottom:3px;}
+    .hdr .dt{font-size:11px;opacity:0.6;}
+    .cards{display:flex;gap:10px;padding:0 30px;margin-bottom:20px;flex-wrap:wrap;}
+    .c{flex:1;min-width:100px;border-radius:10px;padding:12px 14px;text-align:center;border:1.5px solid #e2e8f0;}
+    .c .lb{font-size:9px;color:#64748b;margin-bottom:5px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;}
+    .c .vl{font-size:17px;font-weight:800;}
+    .cg{background:#f0fdf4;border-color:#86efac;}.cg .vl{color:#15803d;}
+    .cr{background:#fef2f2;border-color:#fca5a5;}.cr .vl{color:#dc2626;}
+    .cb{background:#eff6ff;border-color:#93c5fd;}.cb .vl{color:#1d4ed8;}
+    .cy{background:#fefce8;border-color:#fde047;}.cy .vl{color:#92400e;}
+    .sec-title{font-size:11px;font-weight:700;color:#475569;padding:7px 30px;letter-spacing:0.5px;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;background:#f8fafc;text-transform:uppercase;margin-bottom:0;}
+    table{width:calc(100% - 60px);margin:12px 30px 20px;border-collapse:collapse;font-size:12px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;}
+    thead tr{background:#1e3a5f;color:#fff;}
+    th{padding:9px 10px;text-align:right;font-size:11px;font-weight:600;letter-spacing:0.3px;}
+    td{padding:7px 10px;border-bottom:1px solid #f1f5f9;text-align:right;vertical-align:middle;}
+    tr:nth-child(even) td{background:#f8fafc;}
+    .ft td{background:#0f2847 !important;color:#fff !important;font-weight:800;font-size:12px;padding:9px 10px;border-bottom:none;}
+    .g{color:#15803d;font-weight:700;}
+    .r{color:#dc2626;font-weight:700;}
+    .bl{color:#1d4ed8;font-weight:700;}
+    .m{color:#94a3b8;}
+    .footer{text-align:center;font-size:10px;color:#94a3b8;padding:14px 30px;border-top:1px solid #e2e8f0;margin-top:4px;}
+    @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
   </style></head><body>
-  <h1>📆 דוח שנתי — ${y}</h1>
-  <p style="color:#888;font-size:12px;">הופק: ${new Date().toLocaleDateString('he-IL')}</p>
-  <table><tr><th>חודש</th><th>הכנסות</th><th>הוצאות</th><th>רווח</th><th>חלק ${n1}</th></tr>
-  ${rows.map(r=>`<tr><td>${r.mName}</td><td>₪${fmt(r.inc)}</td><td>₪${fmt(r.exp)}</td><td>₪${fmt(r.profit)}</td><td>₪${fmt(r.profit/2)}</td></tr>`).join('')}
-  <tr class="tot"><td>סה"כ</td><td>₪${fmt(totalInc)}</td><td>₪${fmt(totalExp)}</td><td>₪${fmt(totalInc-totalExp)}</td><td>₪${fmt((totalInc-totalExp)/2)}</td></tr>
-  </table></body></html>`;
-  const w=window.open('','_blank');w.document.write(html);w.document.close();setTimeout(()=>w.print(),400);
+  <div class="hdr">
+    <h1>📚 תלמוד תורה — ${yearlyRangeTitle||'דוח תקופתי'}</h1>
+    <div class="sub">תקופה: ${rangeLabel} &nbsp;|&nbsp; ${mc} חודשים</div>
+    <div class="dt">הופק: ${new Date().toLocaleDateString('he-IL',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</div>
+  </div>
+  <div class="cards">
+    <div class="c cg"><div class="lb">סה"כ הכנסות</div><div class="vl">₪${fmt(totalInc)}</div></div>
+    <div class="c cr"><div class="lb">סה"כ הוצאות</div><div class="vl">₪${fmt(totalExp)}</div></div>
+    <div class="c cb"><div class="lb">רווח קופה</div><div class="vl" style="color:${profitCol}">₪${fmt(totalProfit)}</div></div>
+    <div class="c cy"><div class="lb">חלק ${n1}</div><div class="vl">₪${fmt(totalProfit/2)}</div></div>
+    <div class="c" style="background:${totalTargetDiff>=0?'#f0fdf4':'#fef2f2'};border-color:${totalTargetDiff>=0?'#86efac':'#fca5a5'};">
+      <div class="lb">פער שכ"ל</div>
+      <div class="vl" style="color:${targetCol}">${totalTargetDiff>=0?'+':''}₪${fmt(totalTargetDiff)}</div>
+    </div>
+  </div>
+  <div class="sec-title">📊 פירוט חודשי</div>
+  <table>
+    <thead><tr>
+      <th>חודש</th><th>הכנסות</th><th>שכ"ל בפועל</th><th>יעד ₪${fmt(target)}</th><th>פער</th><th>הוצאות</th><th>רווח</th><th>חלק ${n1}</th>
+    </tr></thead>
+    <tbody>
+    ${rows.map(r=>{
+      const diff=r.tuitionInc-target;
+      return `<tr>
+        <td style="font-weight:700;white-space:nowrap">${r.mName}</td>
+        <td class="g">₪${fmt(r.inc)}</td>
+        <td>₪${fmt(r.tuitionInc)}</td>
+        <td class="m">₪${fmt(target)}</td>
+        <td style="font-weight:700;color:${diff>=0?'#15803d':'#dc2626'}">${diff>=0?'+':''}₪${fmt(diff)}</td>
+        <td class="r">₪${fmt(r.exp)}</td>
+        <td style="font-weight:700;color:${r.profit>0?'#15803d':'#dc2626'}">₪${fmt(r.profit)}</td>
+        <td class="bl">₪${fmt(r.profit/2)}</td>
+      </tr>`;
+    }).join('')}
+    </tbody>
+    <tfoot><tr class="ft">
+      <td>סה"כ</td>
+      <td>₪${fmt(totalInc)}</td>
+      <td>₪${fmt(totalTuitionInc)}</td>
+      <td>₪${fmt(target*mc)}</td>
+      <td>${totalTargetDiff>=0?'+':''}₪${fmt(totalTargetDiff)}</td>
+      <td>₪${fmt(totalExp)}</td>
+      <td>₪${fmt(totalProfit)}</td>
+      <td>₪${fmt(totalProfit/2)}</td>
+    </tr></tfoot>
+  </table>
+  <div class="footer">📚 תלמוד תורה &nbsp;•&nbsp; הופק ב-${new Date().toLocaleDateString('he-IL')}</div>
+  </body></html>`;
+  const w=window.open('','_blank');w.document.write(html);w.document.close();setTimeout(()=>w.print(),500);
 };
 
 // ── LOANS ─────────────────────────────────────────────────
