@@ -1825,15 +1825,16 @@ function renderYearly(){
   const target=D.settings.target||22000;
   const fromDateVal=$('yearly-from-date').value,toDateVal=$('yearly-to-date').value;
   const fmtD=v=>v?new Date(v).toLocaleDateString('he-IL'):'';
-  let totalInc=0,totalExp=0,totalProfit=0,totalTuitionInc=0;
+  let totalInc=0,totalExp=0,totalTuitionInc=0;
   const rows=range.map(({m,y,mName})=>{
     const inc=D.incomes.filter(i=>i.month===m&&i.year===y&&i.type!=='nistanim').reduce((s,i)=>s+i.amount,0);
     const tuitionInc=D.incomes.filter(i=>i.month===m&&i.year===y&&i.type==='tuition').reduce((s,i)=>s+i.amount,0);
     const kupaExp=D.expenses.filter(e=>e.month===m&&e.year===y&&(e.payer==='partner'||e.payer==='tuition')).reduce((s,e)=>s+e.amount,0);
-    const profit=Math.max(0,inc-kupaExp);
-    totalInc+=inc;totalExp+=kupaExp;totalProfit+=profit;totalTuitionInc+=tuitionInc;
+    const profit=inc-kupaExp;
+    totalInc+=inc;totalExp+=kupaExp;totalTuitionInc+=tuitionInc;
     return{mName,inc,tuitionInc,exp:kupaExp,profit};
   });
+  const totalProfit=totalInc-totalExp;
   const mc=range.length;
   const totalTargetDiff=totalTuitionInc-(target*mc);
   const rangeLabel=`${HEB[fromM-1]} ${fromY} – ${HEB[toM-1]} ${toY}`;
@@ -1860,12 +1861,12 @@ function renderYearly(){
           <div style="font-size:15px;font-weight:800;color:var(--red);">₪${fmt(totalExp)}</div>
         </div>
         <div style="text-align:center;">
-          <div style="font-size:10px;color:var(--muted);margin-bottom:3px;">רווח קופה</div>
-          <div style="font-size:15px;font-weight:800;color:${profitColor};">₪${fmt(totalProfit)}</div>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:3px;">${totalProfit>=0?'רווח קופה':'הפסד קופה'}</div>
+          <div style="font-size:15px;font-weight:800;color:${profitColor};">${totalProfit<0?'−':''}₪${fmt(Math.abs(totalProfit))}</div>
         </div>
         <div style="text-align:center;border-right:1px solid var(--border);padding-right:18px;">
           <div style="font-size:10px;color:var(--muted);margin-bottom:3px;">חלקך (50%)</div>
-          <div style="font-size:20px;font-weight:800;color:var(--accent);">₪${fmt(totalProfit/2)}</div>
+          <div style="font-size:20px;font-weight:800;color:${totalProfit>=0?'var(--accent)':'var(--red)'};">${totalProfit<0?'−':''}₪${fmt(Math.abs(totalProfit/2))}</div>
         </div>
       </div>
     </div>`;
@@ -1873,8 +1874,8 @@ function renderYearly(){
   $('yearly-cards').innerHTML=`
     <div class="card green"><div class="label">סה"כ הכנסות</div><div class="val">₪${fmt(totalInc)}</div></div>
     <div class="card red"><div class="label">סה"כ הוצאות</div><div class="val">₪${fmt(totalExp)}</div></div>
-    <div class="card ${totalProfit>=0?'blue':'red'}"><div class="label">רווח סה"כ</div><div class="val">₪${fmt(totalProfit)}</div></div>
-    <div class="card yellow"><div class="label">חלקך (50%)</div><div class="val">₪${fmt(totalProfit/2)}</div></div>
+    <div class="card ${totalProfit>=0?'green':'red'}"><div class="label">${totalProfit>=0?'רווח סה"כ':'הפסד סה"כ'}</div><div class="val">${totalProfit<0?'−':''}₪${fmt(Math.abs(totalProfit))}</div></div>
+    <div class="card ${totalProfit>=0?'yellow':'red'}"><div class="label">חלקך (50%)</div><div class="val">${totalProfit<0?'−':''}₪${fmt(Math.abs(totalProfit/2))}</div></div>
     <div class="card ${totalTargetDiff>=0?'green':'red'}"><div class="label">${totalTargetDiff>=0?'עודף':'חוסר'} שכ"ל</div><div class="val">${totalTargetDiff>=0?'+':''}₪${fmt(totalTargetDiff)}</div><div class="sub-val">יעד: ₪${fmt(target*mc)}</div></div>`;
 
   $('yearly-table').innerHTML=`<div class="section">
@@ -1883,7 +1884,7 @@ function renderYearly(){
       <span style="font-size:11px;color:var(--muted);">${dateRangeLabel} | ${mc} חודשים</span>
     </div>
     <div style="padding:0;">
-      <table><thead><tr><th>חודש</th><th>הכנסות</th><th>שכ"ל בפועל</th><th>יעד</th><th>פער</th><th>הוצאות</th><th>רווח</th><th>חלקך</th></tr></thead><tbody>
+      <table><thead><tr><th>חודש</th><th>הכנסות</th><th>שכ"ל בפועל</th><th>יעד</th><th>פער</th><th>הוצאות</th><th>רווח/הפסד</th><th>חלקך</th></tr></thead><tbody>
       ${rows.map(r=>{
         const diff=r.tuitionInc-target;
         return `<tr>
@@ -1893,8 +1894,8 @@ function renderYearly(){
           <td class="text-muted">₪${fmt(target)}</td>
           <td style="font-weight:700;color:${diff>=0?'var(--green)':'var(--red)'};">${diff>=0?'+':''}₪${fmt(diff)}</td>
           <td class="text-red">₪${fmt(r.exp)}</td>
-          <td class="${r.profit>=0?'text-green':'text-red'}" style="font-weight:700">₪${fmt(r.profit)}</td>
-          <td style="color:var(--accent);font-weight:700">₪${fmt(r.profit/2)}</td>
+          <td class="${r.profit>=0?'text-green':'text-red'}" style="font-weight:700">${r.profit<0?'−':''}₪${fmt(Math.abs(r.profit))}</td>
+          <td style="color:${r.profit>=0?'var(--accent)':'var(--red)'};font-weight:700">${r.profit<0?'−':''}₪${fmt(Math.abs(r.profit/2))}</td>
         </tr>`;
       }).join('')}
       </tbody><tfoot>
@@ -1905,8 +1906,8 @@ function renderYearly(){
           <td class="text-muted" style="font-size:13px;">₪${fmt(target*mc)}</td>
           <td style="font-weight:800;color:${totalTargetDiff>=0?'var(--green)':'var(--red)'};">${totalTargetDiff>=0?'+':''}₪${fmt(totalTargetDiff)}</td>
           <td class="text-red" style="font-size:13px;">₪${fmt(totalExp)}</td>
-          <td class="${totalProfit>=0?'text-green':'text-red'}" style="font-size:13px;">₪${fmt(totalProfit)}</td>
-          <td style="color:var(--accent);font-size:13px;">₪${fmt(totalProfit/2)}</td>
+          <td class="${totalProfit>=0?'text-green':'text-red'}" style="font-size:13px;">${totalProfit<0?'−':''}₪${fmt(Math.abs(totalProfit))}</td>
+          <td style="color:${totalProfit>=0?'var(--accent)':'var(--red)'};font-size:13px;">${totalProfit<0?'−':''}₪${fmt(Math.abs(totalProfit/2))}</td>
         </tr>
       </tfoot></table>
     </div>
