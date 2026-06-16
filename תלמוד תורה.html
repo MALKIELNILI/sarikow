@@ -1743,11 +1743,11 @@ function renderKupa(){
       <div class="val">₪${fmt(totExp)}</div>
       <div class="sub-val">מהקופה בלבד</div>
     </div>
-    <div class="card ${totProfit>0?'green':'blue'}">
-      <div class="label">סה"כ רווח</div>
-      <div class="val">₪${fmt(totProfit)}</div>
-      <div class="sub-val">${totDeficit>0?'גירעון מצטבר: ₪'+fmt(totDeficit):''}</div>
-    </div>`;
+    ${(()=>{const net=totInc-totExp;return`<div class="card ${net>=0?'green':'red'}">
+      <div class="label">${net>=0?'סה"כ רווח':'סה"כ הפסד'}</div>
+      <div class="val">${net>=0?'':'−'}₪${fmt(Math.abs(net))}</div>
+      <div class="sub-val">${net>=0?'הכנסות עולות על הוצאות':'הוצאות עולות על הכנסות'}</div>
+    </div>`;})()}`;
 
   // טבלה
   $('kupa-table').innerHTML=`<table><thead><tr>
