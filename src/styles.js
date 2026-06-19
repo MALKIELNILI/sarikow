@@ -1,0 +1,15 @@
+export const col       = {display:"flex",flexDirection:"column",gap:12};
+export const card      = {background:"#fff",borderRadius:12,padding:"13px 15px",boxShadow:"0 1px 4px rgba(0,0,0,0.07)"};
+export const inp       = {border:"1px solid #e2e8f0",borderRadius:8,padding:"8px 10px",fontSize:13,width:"100%",boxSizing:"border-box"};
+export const iinp      = {border:"1px solid #e2e8f0",borderRadius:6,padding:"4px 7px",width:"100%",fontSize:13};
+export const tbl       = {width:"100%",borderCollapse:"collapse"};
+export const th        = {padding:"5px 6px",background:"#f8fafc",textAlign:"right",fontSize:11,color:"#64748b",borderBottom:"1px solid #e2e8f0"};
+export const td        = {padding:"5px 6px",fontSize:12};
+export const empty     = {color:"#94a3b8",textAlign:"center",padding:10,fontSize:13};
+export const divider   = {height:1,background:"#e2e8f0",margin:"5px 0"};
+export const addBtn    = {padding:"5px 11px",borderRadius:8,background:"#eff6ff",color:"#2563eb",border:"1px solid #bfdbfe",cursor:"pointer",fontWeight:600,fontSize:12};
+export const primaryBtn= {width:"100%",padding:"11px",background:"#2563eb",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:700,cursor:"pointer"};
+export const greenBtn  = {padding:"8px 14px",background:"#22c55e",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontWeight:600};
+export const grayBtn   = {padding:"8px 12px",background:"#f1f5f9",color:"#475569",border:"1px solid #e2e8f0",borderRadius:8,cursor:"pointer"};
+export const smallBtn  = {padding:"4px 9px",borderRadius:6,background:"#f1f5f9",border:"1px solid #e2e8f0",cursor:"pointer",fontSize:12};
+export const delBtn    = {background:"#fee2e2",color:"#dc2626",border:"none",borderRadius:6,padding:"3px 8px",cursor:"pointer"};
