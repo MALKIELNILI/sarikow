@@ -383,7 +383,8 @@ function App(){
     // מה מתוך מה שסריקוב הכניס מקורו בקופה (אחרי קיזוז דתות/קרן)
     const kupaPortion = sarikowGiven - datot - keren;
     // בנק בסיסי: מגיע לו − מה שמקורו בקופה + בחינות
-    const bank = monthly - kupaPortion + exams;
+    const prevRefundCarryover = prevMonthKey ? Number(getAV(prevMonthKey,av.id,"refundCarryover")||0) : 0;
+    const bank = monthly - kupaPortion + exams + prevRefundCarryover;
     // אין העברת פערים לחודש הבא — כל חודש עומד בפני עצמו
     const prevBankGap = 0;
     const effectiveBank = bank;
@@ -418,7 +419,7 @@ function App(){
     const taanitDays   = Number(getAV(monthKey,av.id,"taanitDays"))||0;
     const taanitAmount = taanitDays * 15;
 
-    return { monthly, datot, keren, autoDatot, autoKeren, datotRaw, kerenRaw, rounding, sarikowGivenRaw, sarikowGiven, kupaPortion, exams, bank, prevBankGap, effectiveBank, actualBank, holiday, depositRounding, totalToBank, bankDeposit, cashAmount, bankGapAuto, bankGap, trackNum, datotCount, kerenCount, incomeGroup, totalDatot, totalKeren, taanitDays, taanitAmount, suppAmt, externalPerAvrech, totalReceived, settlementBalance, prevSettlementCarryover };
+    return { monthly, datot, keren, autoDatot, autoKeren, datotRaw, kerenRaw, rounding, sarikowGivenRaw, sarikowGiven, kupaPortion, exams, bank, prevBankGap, effectiveBank, actualBank, holiday, depositRounding, totalToBank, bankDeposit, cashAmount, bankGapAuto, bankGap, trackNum, datotCount, kerenCount, incomeGroup, totalDatot, totalKeren, taanitDays, taanitAmount, suppAmt, externalPerAvrech, totalReceived, settlementBalance, prevSettlementCarryover, prevRefundCarryover };
   };
 
   // Get sorted month keys
@@ -1500,28 +1501,90 @@ function BankTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, selMonth
           </div>
           {owingList.map(({av,c})=>{
             const received = getAV(selKey,av.id,"refundReceived")==="1";
+            const refundRaw = getAV(selKey,av.id,"refundActual");
+            const refundActual = refundRaw!==""?Number(refundRaw):null;
+            const owed = Math.abs(c.totalToBank);
+            const carryover = refundActual!==null ? refundActual - owed : null;
+
+            const onRefundChange = v => {
+              setAvMonthField(selKey,av.id,"refundActual",v);
+              if(v!=="") setAvMonthField(selKey,av.id,"refundCarryover", Number(v)-owed);
+              else        setAvMonthField(selKey,av.id,"refundCarryover","");
+            };
+
             return (
-              <div key={av.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-                padding:"7px 8px",borderRadius:8,marginBottom:4,
-                background:received?"#dcfce7":"#fff",border:`1px solid ${received?"#86efac":"#fecaca"}`,
-                opacity:received?.65:1,transition:"all .2s"}}>
-                <div>
-                  <span style={{fontWeight:700,fontSize:14}}>{av.name}</span>
-                  {received&&<span style={{fontSize:11,color:"#16a34a",marginRight:6,fontWeight:600}}> ✓ התקבל</span>}
+              <div key={av.id} style={{borderRadius:8,marginBottom:4,overflow:"hidden",
+                border:`1px solid ${received?"#86efac":"#fecaca"}`,
+                background:received?"#dcfce7":"#fff",transition:"all .2s"}}>
+
+                {/* שורה ראשית */}
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                  padding:"7px 10px",opacity:received?0.65:1,gap:8}}>
+                  <div>
+                    <span style={{fontWeight:700,fontSize:14}}>{av.name}</span>
+                    {received&&<span style={{fontSize:11,color:"#16a34a",marginRight:6,fontWeight:600}}> ✓ התקבל</span>}
+                    {c.prevRefundCarryover!==0&&<div style={{fontSize:10,fontWeight:700,
+                      color:c.prevRefundCarryover>0?"#16a34a":"#dc2626"}}>
+                      פ׳קודם: {c.prevRefundCarryover>0?"+":""}{fmt(c.prevRefundCarryover)} ₪
+                    </div>}
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontWeight:800,fontSize:16,color:"#dc2626"}}>{fmt(owed)} ₪</span>
+                    <label style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer",
+                      background:received?"#16a34a":"#f1f5f9",border:`2px solid ${received?"#16a34a":"#cbd5e1"}`,
+                      borderRadius:7,padding:"4px 10px",fontSize:12,fontWeight:600,
+                      color:received?"#fff":"#64748b",transition:"all .2s",userSelect:"none"}}>
+                      <input type="checkbox"
+                        checked={received}
+                        onChange={e=>setAvMonthField(selKey,av.id,"refundReceived",e.target.checked?"1":"")}
+                        style={{width:15,height:15,cursor:"pointer",accentColor:"#16a34a"}}/>
+                      התקבל
+                    </label>
+                  </div>
                 </div>
-                <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <span style={{fontWeight:800,fontSize:16,color:"#dc2626"}}>{fmt(Math.abs(c.totalToBank))} ₪</span>
-                  <label style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer",
-                    background:received?"#16a34a":"#f1f5f9",border:`2px solid ${received?"#16a34a":"#cbd5e1"}`,
-                    borderRadius:7,padding:"4px 10px",fontSize:12,fontWeight:600,
-                    color:received?"#fff":"#64748b",transition:"all .2s",userSelect:"none"}}>
-                    <input type="checkbox"
-                      checked={received}
-                      onChange={e=>setAvMonthField(selKey,av.id,"refundReceived",e.target.checked?"1":"")}
-                      style={{width:15,height:15,cursor:"pointer",accentColor:"#16a34a"}}/>
-                    התקבל
-                  </label>
-                </div>
+
+                {/* שדה סכום שהתקבל */}
+                {!received&&(
+                  <div style={{borderTop:"1px solid #fecaca",padding:"7px 10px",
+                    background:"rgba(254,202,202,.1)",display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+                    <div style={{flex:1,minWidth:110}}>
+                      <div style={{fontSize:11,color:"#475569",fontWeight:600,marginBottom:3}}>💰 התקבל בפועל (₪)</div>
+                      <input type="number"
+                        style={{border:`2px solid ${refundActual!==null?"#f59e0b":"#cbd5e1"}`,
+                          borderRadius:7,padding:"5px 8px",fontSize:14,width:"100%",
+                          boxSizing:"border-box",textAlign:"left",background:"#fff"}}
+                        value={refundRaw}
+                        placeholder={String(owed)}
+                        onChange={e=>onRefundChange(e.target.value)}
+                      />
+                    </div>
+                    {carryover!==null&&(
+                      carryover===0
+                        ? <div style={{fontSize:13,color:"#16a34a",fontWeight:800}}>✅ מאוזן</div>
+                        : <div style={{textAlign:"center",borderRadius:8,padding:"4px 10px",
+                            background:carryover>0?"#f0fdf4":"#fef2f2",
+                            border:`1.5px solid ${carryover>0?"#86efac":"#f87171"}`}}>
+                            <div style={{fontSize:10,color:"#64748b"}}>עובר לחודש הבא</div>
+                            <div style={{fontSize:14,fontWeight:800,color:carryover>0?"#16a34a":"#dc2626"}}>
+                              {carryover>0?"זכות +":"חוב "}{fmt(Math.abs(carryover))} ₪
+                            </div>
+                          </div>
+                    )}
+                  </div>
+                )}
+
+                {/* כשסגור — תקציר */}
+                {received&&refundActual!==null&&(
+                  <div style={{borderTop:"1px solid #86efac",padding:"4px 10px",
+                    background:"rgba(134,239,172,.12)",fontSize:11,color:"#166534",display:"flex",gap:8}}>
+                    <span>התקבל: <b>{fmt(refundActual)} ₪</b></span>
+                    {carryover!==null&&carryover!==0&&<span style={{fontWeight:700,
+                      color:carryover>0?"#16a34a":"#dc2626"}}>
+                      | {carryover>0?"זכות +":"חוב "}{fmt(Math.abs(carryover))} ₪ לחודש הבא
+                    </span>}
+                    {carryover===0&&<span>| ✓ מאוזן</span>}
+                  </div>
+                )}
               </div>
             );
           })}
