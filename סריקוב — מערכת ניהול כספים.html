@@ -232,6 +232,9 @@ function App(){
   const [baseBalance,setBaseBS]  = useState({amount:191321,date:"29.1.26"});
   const [avrechim,setAvrechimS]  = useState(defaultAvrechim);
   const [supplementSettings,setSupplementS] = useState({datot:1000,keren:1000});
+  const [rpAvrechim, setRpAvrechimS]   = useState([]);
+  const [rpMonths,   setRpMonthsS]     = useState({});
+  const [rpBaseBalance, setRpBaseBS]   = useState({amount:0,date:""});
   // allMonths: { "2026-01": { donors, datot, keren, sent2000, sent1000, sentKeren }, ... }
   const [allMonths,setAllMonthsS]= useState({});
   // avAllMonths: { "2026-01": { avId: { monthlyStipend, datot, keren, roundingByFriend, exams } } }
@@ -246,11 +249,11 @@ function App(){
 
   const selKey = mkMonthKey(selYear,selMonth);
 
-  const local = useRef({baseBalance,avrechim,allMonths,avAllMonths,attendance:{},customVacations:{},beinHazmanims:BEIN_HAZMANIM,hiddenHols:[]});
+  const local = useRef({baseBalance,avrechim,allMonths,avAllMonths,attendance:{},customVacations:{},beinHazmanims:BEIN_HAZMANIM,hiddenHols:[],rpAvrechim:[],rpMonths:{},rpBaseBalance:{amount:0,date:""}});
 
   useEffect(()=>{
-    let loaded={base:false,av:false,months:false,avmonths:false,att:false,cv:false,bh:false,hh:false,supp:false};
-    const check=()=>{ if(loaded.base&&loaded.av&&loaded.months&&loaded.avmonths&&loaded.att&&loaded.cv&&loaded.bh&&loaded.hh&&loaded.supp) setReady(true); };
+    let loaded={base:false,av:false,months:false,avmonths:false,att:false,cv:false,bh:false,hh:false,supp:false,rpav:false,rpmonths:false,rpbase:false};
+    const check=()=>{ if(Object.values(loaded).every(Boolean)) setReady(true); };
     const u1=fbListen("baseBalance",v=>{ if(v){setBaseBS(v);local.current.baseBalance=v;} loaded.base=true;check(); });
     const u2=fbListen("avrechim",v=>{
       if(v&&Array.isArray(v)){
@@ -277,7 +280,10 @@ function App(){
     });
     const u8=fbListen("hiddenHols",v=>{ const d=v||[]; setHiddenHols(d);local.current.hiddenHols=d; loaded.hh=true;check(); });
     const u9=fbListen("supplementSettings",v=>{ if(v&&typeof v==="object"){setSupplementS(v);local.current.supplementSettings=v;} loaded.supp=true;check(); });
-    return()=>{ u1();u2();u3();u4();u5();u6();u7();u8();u9(); };
+    const urp1=fbListen("ravPinchas/avrechim",v=>{ const d=v&&Array.isArray(v)?v:[]; setRpAvrechimS(d);local.current.rpAvrechim=d; loaded.rpav=true;check(); });
+    const urp2=fbListen("ravPinchas/months",v=>{ const d=v||{}; setRpMonthsS(d);local.current.rpMonths=d; loaded.rpmonths=true;check(); });
+    const urp3=fbListen("ravPinchas/baseBalance",v=>{ if(v){setRpBaseBS(v);local.current.rpBaseBalance=v;} loaded.rpbase=true;check(); });
+    return()=>{ u1();u2();u3();u4();u5();u6();u7();u8();u9();urp1();urp2();urp3(); };
   },[]);
 
   const sync = fn => { setSyncing(true); fn(); setTimeout(()=>setSyncing(false),1200); };
@@ -341,6 +347,18 @@ function App(){
     const cur=local.current.hiddenHols||[];
     const upd=cur.includes(label)?cur.filter(l=>l!==label):[...cur,label];
     local.current.hiddenHols=upd; setHiddenHols(upd); sync(()=>fbSet("hiddenHols",upd));
+  };
+  const setRpAvrechim = fn => {
+    const n=typeof fn==="function"?fn(local.current.rpAvrechim||[]):fn;
+    local.current.rpAvrechim=n; setRpAvrechimS(n); sync(()=>fbSet("ravPinchas/avrechim",n));
+  };
+  const setRpBaseBalance = v => {
+    local.current.rpBaseBalance=v; setRpBaseBS(v); sync(()=>fbSet("ravPinchas/baseBalance",v));
+  };
+  const setRpMonthField = (monthKey,field,val) => {
+    const cur=local.current.rpMonths||{};
+    const upd={...cur,[monthKey]:{...(cur[monthKey]||{}),[field]:val}};
+    local.current.rpMonths=upd; setRpMonthsS(upd); sync(()=>fbSet("ravPinchas/months",upd));
   };
   const updateBeinHazmanim = (idx, entry) => {
     const cur=[...(local.current.beinHazmanims||BEIN_HAZMANIM)];
@@ -529,6 +547,7 @@ function App(){
             <button onClick={()=>setTab("summary")}    style={tabS("summary")}>📂 סיכומים</button>
             <button onClick={()=>setTab("bank")}       style={tabS("bank")}>🏦 בנק</button>
             <button onClick={()=>setTab("settlement")} style={tabS("settlement")}>💰 חשבון</button>
+            <button onClick={()=>setTab("ravpinchas")} style={{...tabS("ravpinchas"),background:tab==="ravpinchas"?"#064e3b":"#f8fafc",borderColor:tab==="ravpinchas"?"#064e3b":"#e2e8f0",color:tab==="ravpinchas"?"#fff":"#64748b"}}>📿 הרב פנחס</button>
           </div>
         </div>
       </header>
@@ -556,6 +575,7 @@ function App(){
         {tab==="summary"    && <SummaryTab avrechim={avrechim} allMonthKeys={allMonthKeys()} calcMonthTotals={calcMonthTotals} calcAvrechMonth={calcAvrechMonth} getPrevMonthKey={getPrevMonthKey} baseBalance={baseBalance} liveBalance={liveBalance} selKey={selKey} allMonths={allMonths} />}
         {tab==="bank"       && <BankTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} />}
         {tab==="settlement" && <SettlementTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} supplementSettings={supplementSettings} setSupplementSettings={setSupplementSettings} />}
+        {tab==="ravpinchas" && <RavPinchasTab rpAvrechim={rpAvrechim} setRpAvrechim={setRpAvrechim} rpMonths={rpMonths} setRpMonthField={setRpMonthField} rpBaseBalance={rpBaseBalance} setRpBaseBalance={setRpBaseBalance} selKey={selKey} selYear={selYear} selMonth={selMonth} allDonorNames={allDonorNames} donorHistory={donorHistory} syncing={syncing} />}
       </main>
     </div>
   );
@@ -2609,6 +2629,303 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
           <div style={{fontWeight:600,fontSize:12,color:"#94a3b8",marginBottom:5}}>⬜ ללא נתוני מגיע ({noDataRows.length})</div>
           <div style={{fontSize:12,color:"#94a3b8"}}>{noDataRows.map(({av})=>av.name).join(" | ")}</div>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ── RAV PINCHAS TAB ──────────────────────────────────────────
+function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, rpBaseBalance, setRpBaseBalance, selKey, selYear, selMonth, allDonorNames, donorHistory, syncing }) {
+  const [editBase,   setEditBase]   = useState(false);
+  const [tempBase,   setTempBase]   = useState(rpBaseBalance.amount);
+  const [showDonor,  setShowDonor]  = useState(false);
+  const [newDonor,   setNewDonor]   = useState({name:"",amount:""});
+  const [showAddAv,  setShowAddAv]  = useState(false);
+  const [newAv,      setNewAv]      = useState({name:"",amount:1000});
+  const [editAvId,   setEditAvId]   = useState(null);
+  const [showAdj,    setShowAdj]    = useState(false);
+
+  const getMD = (field,def) => rpMonths[selKey]?.[field] ?? def;
+  const donors    = getMD("donors",[]);
+  const avAmounts = getMD("avAmounts",{});
+  const avPaid    = getMD("avPaid",{});
+  const adjustment= Number(getMD("adjustment",0));
+
+  const activeAvrechim = rpAvrechim.filter(a=>a.active!==false);
+  const getAvAmt = av => avAmounts[av.id]!==undefined ? Number(avAmounts[av.id]) : Number(av.amount||1000);
+
+  const monthDonors = donors.reduce((s,d)=>s+Number(d.amount||0),0);
+  const monthSent   = activeAvrechim.reduce((s,av)=>s+getAvAmt(av),0);
+  const monthNet    = monthDonors - monthSent + adjustment;
+
+  const liveBalance = (() => {
+    let sum = Number(rpBaseBalance.amount||0);
+    Object.entries(rpMonths).forEach(([,md])=>{
+      if((md.donors||[]).length>0 || Number(md.adjustment||0)!==0){
+        const d=(md.donors||[]).reduce((s,x)=>s+Number(x.amount||0),0);
+        const s=activeAvrechim.reduce((t,av)=>{
+          const ovr=md.avAmounts?.[av.id];
+          return t+(ovr!==undefined?Number(ovr):Number(av.amount||1000));
+        },0);
+        sum += d - s + Number(md.adjustment||0);
+      }
+    });
+    return sum;
+  })();
+
+  const setDonors   = val => setRpMonthField(selKey,"donors",val);
+  const setAvAmt    = (avId,val) => setRpMonthField(selKey,"avAmounts",{...avAmounts,[avId]:val});
+  const clearAvAmt  = avId => { const u={...avAmounts}; delete u[avId]; setRpMonthField(selKey,"avAmounts",u); };
+  const setAvPaidF  = (avId,val) => setRpMonthField(selKey,"avPaid",{...avPaid,[avId]:val});
+  const updAv       = (id,k,v) => setRpAvrechim(p=>p.map(a=>a.id===id?{...a,[k]:v}:a));
+
+  const paidCount   = activeAvrechim.filter(av=>avPaid[av.id]==="1").length;
+  const allPaid     = paidCount===activeAvrechim.length && activeAvrechim.length>0;
+
+  return (
+    <div style={col}>
+
+      {/* ── כרטיס יתרה ── */}
+      <div style={{background:"linear-gradient(135deg,#064e3b,#059669)",borderRadius:12,padding:"14px 16px",color:"#fff",boxShadow:"0 2px 8px rgba(0,0,0,0.15)"}}>
+        <div style={{fontSize:13,opacity:.75,marginBottom:4}}>💰 יתרה חיה — הרב פנחס</div>
+        <div style={{fontSize:36,fontWeight:800}}>{fmt(liveBalance)} ₪</div>
+        <div style={{display:"flex",gap:7,marginTop:10,flexWrap:"wrap"}}>
+          <Chip label="בסיס"        val={fmt(rpBaseBalance.amount)+" ₪"} />
+          <Chip label="הכנסות חודש" val={"+"+fmt(monthDonors)+" ₪"} pos />
+          <Chip label="לאברכים"     val={"−"+fmt(monthSent)+" ₪"} neg />
+        </div>
+        <div style={{marginTop:8,fontSize:12,opacity:.7}}>
+          בסיס נכון לתאריך: {rpBaseBalance.date||"—"}
+          <button style={{background:"none",border:"none",color:"rgba(255,255,255,.7)",cursor:"pointer",fontSize:12,marginRight:10,textDecoration:"underline"}}
+            onClick={()=>{setTempBase(rpBaseBalance.amount);setEditBase(true);}}>✏️ עדכן בסיס</button>
+        </div>
+      </div>
+
+      {editBase&&(
+        <div style={card}>
+          <div style={{fontWeight:700,fontSize:14,marginBottom:8}}>עדכון יתרת בסיס</div>
+          <div style={{display:"flex",gap:8}}>
+            <input style={{...inp,flex:1}} type="number" value={tempBase} onChange={e=>setTempBase(e.target.value)} autoFocus/>
+            <button style={greenBtn} onClick={()=>{setRpBaseBalance({amount:Number(tempBase)||0,date:new Date().toLocaleDateString("he-IL")});setEditBase(false);}}>שמור</button>
+            <button style={grayBtn}  onClick={()=>setEditBase(false)}>ביטול</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── תורמים ── */}
+      <datalist id="rp-donor-list">
+        {allDonorNames.map((n,i)=><option key={i} value={n}/>)}
+      </datalist>
+      <div style={card}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:6}}>
+          <div style={{fontWeight:700,fontSize:14}}>💝 תורמים — {mkMonthLabel(selYear,selMonth)}</div>
+          <button style={addBtn} onClick={()=>setShowDonor(true)}>+ הוסף</button>
+        </div>
+        {donors.length===0
+          ? <div style={empty}>לחץ ״+ הוסף״ להוסיף תורם</div>
+          : <table style={tbl}>
+              <thead><tr><th style={th}>שם</th><th style={th}>סכום (₪)</th><th style={th}></th></tr></thead>
+              <tbody>
+                {donors.map((d,i)=>(
+                  <tr key={i} style={{borderBottom:"1px solid #f1f5f9"}}>
+                    <td style={td}><input style={iinp} list="rp-donor-list" value={d.name} onChange={e=>{
+                      const name=e.target.value;
+                      setDonors(donors.map((x,j)=>j!==i?x:{...x,name,amount:donorHistory[name]!==undefined?donorHistory[name]:x.amount}));
+                    }}/></td>
+                    <td style={td}><input style={{...iinp,textAlign:"left"}} type="number" value={d.amount}
+                      onChange={e=>setDonors(donors.map((x,j)=>j===i?{...x,amount:e.target.value}:x))}/></td>
+                    <td style={td}><button style={delBtn} onClick={()=>setDonors(donors.filter((_,j)=>j!==i))}>✕</button></td>
+                  </tr>
+                ))}
+                <tr style={{background:"#f0fdf4"}}><td style={{...td,fontWeight:700}}>סה״כ</td><td style={{...td,fontWeight:700}}>{fmt(monthDonors)} ₪</td><td/></tr>
+              </tbody>
+            </table>
+        }
+      </div>
+
+      {/* ── התאמה ידנית ── */}
+      <div style={{...card,border:"1.5px solid #f59e0b",background:"#fffbeb"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span style={{fontWeight:700,fontSize:14}}>⚖️ התאמה ידנית לקופה</span>
+          <button style={{...smallBtn,background:showAdj?"#f59e0b":"#fef3c7",color:showAdj?"#fff":"#92400e",border:"1px solid #f59e0b"}}
+            onClick={()=>setShowAdj(p=>!p)}>{showAdj?"סגור ✕":"± פתח"}</button>
+        </div>
+        {adjustment!==0&&!showAdj&&(
+          <div style={{marginTop:6,fontSize:13,color:adjustment>0?"#16a34a":"#dc2626",fontWeight:700}}>
+            {adjustment>0?"הוספה":"גריעה"}: {fmtSigned(adjustment)} ₪
+          </div>
+        )}
+        {showAdj&&(
+          <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:8}}>
+            <div style={{display:"flex",gap:8,alignItems:"center"}}>
+              <button style={{...smallBtn,background:adjustment>=0?"#16a34a":"#e2e8f0",color:adjustment>=0?"#fff":"#64748b",minWidth:36}}
+                onClick={()=>{ if(adjustment<0) setRpMonthField(selKey,"adjustment",-adjustment); }}>+</button>
+              <input style={{...inp,flex:1,textAlign:"center"}} type="number"
+                value={Math.abs(adjustment||0)}
+                onChange={e=>{ const sign=adjustment<0?-1:1; setRpMonthField(selKey,"adjustment",sign*(Number(e.target.value)||0)); }}
+                placeholder="סכום..."/>
+              <button style={{...smallBtn,background:adjustment<0?"#dc2626":"#e2e8f0",color:adjustment<0?"#fff":"#64748b",minWidth:36}}
+                onClick={()=>{ if(adjustment>0) setRpMonthField(selKey,"adjustment",-adjustment); }}>−</button>
+            </div>
+            <div style={{fontSize:12,color:"#78716c",textAlign:"center"}}>
+              {adjustment>0?`מוסיף ${fmt(adjustment)} ₪ לקופה`:adjustment<0?`גורע ${fmt(Math.abs(adjustment))} ₪ מהקופה`:"אין התאמה"}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── אברכים ── */}
+      <div style={{...card,background:allPaid?"#f0fdf4":"#fff",border:allPaid?"1.5px solid #22c55e":"1px solid #e2e8f0"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:6}}>
+          <div>
+            <div style={{fontWeight:700,fontSize:14}}>{allPaid?"✅ ":"👨‍🎓 "}אברכים — {mkMonthLabel(selYear,selMonth)}</div>
+            {activeAvrechim.length>0&&(
+              <div style={{fontSize:11,color:"#64748b",marginTop:2}}>
+                {paidCount}/{activeAvrechim.length} שולמו
+              </div>
+            )}
+          </div>
+          <button style={addBtn} onClick={()=>setShowAddAv(true)}>+ הוסף אברך</button>
+        </div>
+
+        {activeAvrechim.length===0
+          ? <div style={empty}>לחץ ״+ הוסף אברך״ להוסיף</div>
+          : activeAvrechim.map(av=>{
+              const isEdit = editAvId===av.id;
+              const amt    = getAvAmt(av);
+              const paid   = avPaid[av.id]==="1";
+              const hasOvr = avAmounts[av.id]!==undefined;
+              return (
+                <div key={av.id} style={{borderRadius:9,marginBottom:6,border:`1.5px solid ${paid?"#86efac":"#e2e8f0"}`,
+                  background:paid?"#f0fdf4":"#fff",overflow:"hidden",transition:"all .2s"}}>
+
+                  {/* שורה ראשית */}
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 12px",opacity:paid?0.75:1,gap:8}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      {isEdit
+                        ? <input style={iinp} value={av.name} onChange={e=>updAv(av.id,"name",e.target.value)} autoFocus/>
+                        : <span style={{fontWeight:700,fontSize:14}}>{av.name}</span>}
+                      {paid&&<span style={{fontSize:11,color:"#16a34a",marginRight:6,fontWeight:600}}> ✓ שולם</span>}
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+                      <span style={{fontWeight:800,fontSize:16,color:paid?"#059669":"#1e3a5f"}}>{fmt(amt)} ₪</span>
+                      <button style={smallBtn} onClick={()=>setEditAvId(isEdit?null:av.id)}>{isEdit?"✓":"✏️"}</button>
+                      <button style={{...smallBtn,background:"#fee2e2",color:"#dc2626"}} onClick={()=>updAv(av.id,"active",false)}>✕</button>
+                    </div>
+                  </div>
+
+                  {/* עריכת ברירת מחדל */}
+                  {isEdit&&(
+                    <div style={{borderTop:"1px solid #e2e8f0",padding:"8px 12px",background:"#f8fafc",display:"flex",gap:8,alignItems:"center"}}>
+                      <label style={{fontSize:11,color:"#475569",whiteSpace:"nowrap"}}>סכום קבוע (₪):</label>
+                      <input style={{...iinp,flex:1,textAlign:"left"}} type="number"
+                        value={av.amount||1000} onChange={e=>updAv(av.id,"amount",Number(e.target.value)||1000)}/>
+                    </div>
+                  )}
+
+                  {/* סכום חודשי + כפתור שולם */}
+                  <div style={{borderTop:"1px solid #f1f5f9",padding:"7px 12px",display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                    <div style={{display:"flex",gap:4,alignItems:"center",flex:1,minWidth:130}}>
+                      <label style={{fontSize:11,color:"#64748b",whiteSpace:"nowrap"}}>החודש (₪):</label>
+                      <input style={{...iinp,flex:1,textAlign:"left",border:hasOvr?"2px solid #f59e0b":"1px solid #e2e8f0"}}
+                        type="number"
+                        value={hasOvr ? avAmounts[av.id] : (av.amount||1000)}
+                        onChange={e=>setAvAmt(av.id,e.target.value)}
+                        placeholder={String(av.amount||1000)}/>
+                      {hasOvr&&(
+                        <button style={{...smallBtn,fontSize:10,padding:"2px 6px"}} onClick={()=>clearAvAmt(av.id)}>↺</button>
+                      )}
+                    </div>
+                    <label style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer",
+                      background:paid?"#16a34a":"#f1f5f9",border:`2px solid ${paid?"#16a34a":"#cbd5e1"}`,
+                      borderRadius:7,padding:"4px 10px",fontSize:12,fontWeight:600,
+                      color:paid?"#fff":"#64748b",transition:"all .2s",userSelect:"none"}}>
+                      <input type="checkbox" checked={paid}
+                        onChange={e=>setAvPaidF(av.id,e.target.checked?"1":"")}
+                        style={{width:14,height:14,cursor:"pointer",accentColor:"#16a34a"}}/>
+                      {paid?"✓ שולם":"סמן שולם"}
+                    </label>
+                  </div>
+                </div>
+              );
+            })
+        }
+
+        {activeAvrechim.length>0&&(
+          <div style={{display:"flex",justifyContent:"space-between",padding:"8px 12px",background:"#f0fdf4",borderRadius:8,marginTop:4}}>
+            <span style={{fontWeight:700,fontSize:13,color:"#14532d"}}>סה״כ לאברכים:</span>
+            <span style={{fontWeight:800,fontSize:15,color:"#059669"}}>{fmt(monthSent)} ₪</span>
+          </div>
+        )}
+
+        {/* לא פעילים */}
+        {rpAvrechim.filter(a=>a.active===false).length>0&&(
+          <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #e2e8f0"}}>
+            <div style={{fontWeight:600,color:"#94a3b8",marginBottom:4,fontSize:12}}>לא פעילים</div>
+            {rpAvrechim.filter(a=>a.active===false).map(av=>(
+              <div key={av.id} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",color:"#94a3b8",fontSize:12}}>
+                <span>{av.name}</span>
+                <button style={smallBtn} onClick={()=>updAv(av.id,"active",true)}>שחזר</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── סיכום חודש ── */}
+      <div style={{...card,background:"#f0fdf4",border:"1.5px solid #22c55e"}}>
+        <div style={{fontWeight:700,fontSize:14,marginBottom:8}}>📊 סיכום {mkMonthLabel(selYear,selMonth)}</div>
+        <MR l="הכנסות תורמים"  v={monthDonors} />
+        <MR l="הוצאות לאברכים" v={-monthSent} neg />
+        {adjustment!==0&&<MR l={adjustment>0?"התאמה ➕":"התאמה ➖"} v={adjustment} color={adjustment>0?"#16a34a":"#dc2626"}/>}
+        <div style={divider}/>
+        <MR l="נטו חודש זה" v={monthNet} bold color={monthNet>=0?"#16a34a":"#dc2626"}/>
+        <div style={{height:1,background:"rgba(34,197,94,0.4)",margin:"8px 0"}}/>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 0"}}>
+          <span style={{fontWeight:800,fontSize:15,color:"#14532d"}}>💰 יתרה כוללת בקופה</span>
+          <span style={{fontWeight:800,fontSize:22,color:"#15803d"}}>{fmt(liveBalance)} ₪</span>
+        </div>
+      </div>
+
+      {/* ── מודל הוספת תורם ── */}
+      {showDonor&&(
+        <Modal title="הוספת תורם" onClose={()=>setShowDonor(false)}>
+          <FG label="שם התורם">
+            <input style={inp} list="rp-donor-list" value={newDonor.name} onChange={e=>{
+              const name=e.target.value;
+              setNewDonor(p=>({...p,name,amount:donorHistory[name]!==undefined?donorHistory[name]:p.amount}));
+            }} placeholder="שם..."/>
+          </FG>
+          <FG label="סכום (₪)">
+            <input style={inp} type="number" value={newDonor.amount}
+              onChange={e=>setNewDonor(p=>({...p,amount:e.target.value}))} placeholder="0"/>
+          </FG>
+          <button style={primaryBtn} onClick={()=>{
+            if(!newDonor.name||!newDonor.amount) return;
+            setDonors([...donors,{name:newDonor.name,amount:Number(newDonor.amount)}]);
+            setNewDonor({name:"",amount:""});
+            setShowDonor(false);
+          }}>הוסף</button>
+        </Modal>
+      )}
+
+      {/* ── מודל הוספת אברך ── */}
+      {showAddAv&&(
+        <Modal title="הוספת אברך" onClose={()=>setShowAddAv(false)}>
+          <FG label="שם האברך">
+            <input style={inp} value={newAv.name} onChange={e=>setNewAv(p=>({...p,name:e.target.value}))} placeholder="שם..."/>
+          </FG>
+          <FG label="סכום חודשי (₪)">
+            <input style={inp} type="number" value={newAv.amount}
+              onChange={e=>setNewAv(p=>({...p,amount:e.target.value}))} placeholder="1000"/>
+          </FG>
+          <button style={{...primaryBtn,background:"#059669"}} onClick={()=>{
+            if(!newAv.name) return;
+            setRpAvrechim(p=>[...p,{id:Date.now(),name:newAv.name,amount:Number(newAv.amount)||1000,active:true}]);
+            setNewAv({name:"",amount:1000});
+            setShowAddAv(false);
+          }}>הוסף אברך</button>
+        </Modal>
       )}
     </div>
   );
