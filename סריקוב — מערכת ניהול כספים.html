@@ -2726,6 +2726,60 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
         <div style={{...card,color:"#94a3b8",textAlign:"center"}}>אין נתונים עדיין</div>
       )}
 
+      {/* ── טבלת סיכום כל החודשים ── */}
+      {sortedMonthKeys.length>0&&(
+        <div style={card}>
+          <div style={{fontWeight:700,fontSize:14,marginBottom:10,color:"#064e3b"}}>📊 סיכום כל החודשים</div>
+          <div style={{overflowX:"auto"}}>
+            <table style={{...tbl,fontSize:12}}>
+              <thead>
+                <tr>
+                  <th style={{...th,textAlign:"right"}}>חודש</th>
+                  <th style={{...th,textAlign:"left"}}>💝 תרומות</th>
+                  <th style={{...th,textAlign:"left"}}>👨‍🎓 לאברכים</th>
+                  <th style={{...th,textAlign:"left"}}>נטו</th>
+                  <th style={{...th,textAlign:"left"}}>💰 יתרה</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedMonthKeys.map(key=>{
+                  const [y,m]=key.split("-");
+                  const label=mkMonthLabel(Number(y),Number(m)-1);
+                  const t=calcMonthTotals(key);
+                  const cum=calcCumBalance(key);
+                  return (
+                    <tr key={key} style={{borderBottom:"1px solid #f1f5f9",cursor:"pointer",background:openHist===key?"#f0fdf4":"#fff"}}
+                      onClick={()=>setOpenHist(openHist===key?null:key)}>
+                      <td style={{...td,fontWeight:600,whiteSpace:"nowrap"}}>{label}</td>
+                      <td style={{...td,textAlign:"left",color:"#16a34a",fontWeight:600}}>{fmt(t.donors)}</td>
+                      <td style={{...td,textAlign:"left",color:"#dc2626"}}>{fmt(t.sent)}</td>
+                      <td style={{...td,textAlign:"left",fontWeight:700,color:t.net>=0?"#16a34a":"#dc2626"}}>
+                        {t.net>=0?"+":""}{fmt(t.net)}
+                      </td>
+                      <td style={{...td,textAlign:"left",fontWeight:700,color:"#1d4ed8"}}>{fmt(cum)}</td>
+                    </tr>
+                  );
+                })}
+                <tr style={{background:"#f0fdf4",borderTop:"2px solid #22c55e"}}>
+                  <td style={{...td,fontWeight:800}}>סה״כ</td>
+                  <td style={{...td,textAlign:"left",fontWeight:800,color:"#16a34a"}}>
+                    {fmt(sortedMonthKeys.reduce((s,k)=>s+calcMonthTotals(k).donors,0))}
+                  </td>
+                  <td style={{...td,textAlign:"left",fontWeight:800,color:"#dc2626"}}>
+                    {fmt(sortedMonthKeys.reduce((s,k)=>s+calcMonthTotals(k).sent,0))}
+                  </td>
+                  <td style={{...td,textAlign:"left",fontWeight:800,color:(liveBalance-Number(rpBaseBalance.amount||0))>=0?"#16a34a":"#dc2626"}}>
+                    {(liveBalance-Number(rpBaseBalance.amount||0))>=0?"+":""}{fmt(liveBalance-Number(rpBaseBalance.amount||0))}
+                  </td>
+                  <td style={{...td,textAlign:"left",fontWeight:800,color:"#059669"}}>{fmt(liveBalance)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div style={{fontSize:11,color:"#94a3b8",marginTop:6,textAlign:"center"}}>לחץ על חודש לפרטים</div>
+        </div>
+      )}
+
       {[...sortedMonthKeys].reverse().map(key=>{
         const [y,m] = key.split("-");
         const label = mkMonthLabel(Number(y), Number(m)-1);
