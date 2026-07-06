@@ -2644,6 +2644,8 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
   const [newAv,      setNewAv]      = useState({name:"",amount:1000});
   const [editAvId,   setEditAvId]   = useState(null);
   const [showAdj,    setShowAdj]    = useState(false);
+  const [rpView,     setRpView]     = useState("month"); // "month" | "history"
+  const [openHist,   setOpenHist]   = useState(null);
 
   const getMD = (field,def) => rpMonths[selKey]?.[field] ?? def;
   const donors    = getMD("donors",[]);
@@ -2652,26 +2654,45 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
   const adjustment= Number(getMD("adjustment",0));
 
   const activeAvrechim = rpAvrechim.filter(a=>a.active!==false);
-  const getAvAmt = av => avAmounts[av.id]!==undefined ? Number(avAmounts[av.id]) : Number(av.amount||1000);
+  const allAvrechim    = rpAvrechim; // includes inactive (for history display)
+  const getAvAmt = (av, md) => {
+    const ovr = md ? md.avAmounts?.[av.id] : avAmounts[av.id];
+    return ovr !== undefined ? Number(ovr) : Number(av.amount||1000);
+  };
 
-  const monthDonors = donors.reduce((s,d)=>s+Number(d.amount||0),0);
-  const monthSent   = activeAvrechim.reduce((s,av)=>s+getAvAmt(av),0);
-  const monthNet    = monthDonors - monthSent + adjustment;
+  const calcMonthTotals = (key) => {
+    const md = rpMonths[key] || {};
+    const donors = (md.donors||[]).reduce((s,d)=>s+Number(d.amount||0),0);
+    const sent   = activeAvrechim.reduce((s,av)=>s+getAvAmt(av,md),0);
+    const adj    = Number(md.adjustment||0);
+    const net    = donors - sent + adj;
+    return { donors, sent, adj, net };
+  };
+
+  const monthHasData = key => {
+    const md = rpMonths[key]||{};
+    return (md.donors||[]).length>0 || Number(md.adjustment||0)!==0;
+  };
+
+  const sortedMonthKeys = Object.keys(rpMonths)
+    .filter(k => monthHasData(k))
+    .sort();
 
   const liveBalance = (() => {
     let sum = Number(rpBaseBalance.amount||0);
-    Object.entries(rpMonths).forEach(([,md])=>{
-      if((md.donors||[]).length>0 || Number(md.adjustment||0)!==0){
-        const d=(md.donors||[]).reduce((s,x)=>s+Number(x.amount||0),0);
-        const s=activeAvrechim.reduce((t,av)=>{
-          const ovr=md.avAmounts?.[av.id];
-          return t+(ovr!==undefined?Number(ovr):Number(av.amount||1000));
-        },0);
-        sum += d - s + Number(md.adjustment||0);
-      }
-    });
+    sortedMonthKeys.forEach(k => { sum += calcMonthTotals(k).net; });
     return sum;
   })();
+
+  const calcCumBalance = (upToKey) => {
+    let sum = Number(rpBaseBalance.amount||0);
+    sortedMonthKeys.filter(k=>k<=upToKey).forEach(k=>{ sum += calcMonthTotals(k).net; });
+    return sum;
+  };
+
+  const monthDonors = donors.reduce((s,d)=>s+Number(d.amount||0),0);
+  const monthSent   = activeAvrechim.reduce((s,av)=>s+getAvAmt(av,null),0);
+  const monthNet    = monthDonors - monthSent + adjustment;
 
   const setDonors   = val => setRpMonthField(selKey,"donors",val);
   const setAvAmt    = (avId,val) => setRpMonthField(selKey,"avAmounts",{...avAmounts,[avId]:val});
@@ -2682,10 +2703,145 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
   const paidCount   = activeAvrechim.filter(av=>avPaid[av.id]==="1").length;
   const allPaid     = paidCount===activeAvrechim.length && activeAvrechim.length>0;
 
+  // ── לשונית היסטוריה ──
+  if (rpView === "history") return (
+    <div style={col}>
+      <div style={{display:"flex",gap:6,background:"#fff",borderRadius:10,padding:"8px 12px",boxShadow:"0 1px 4px rgba(0,0,0,0.07)"}}>
+        {[["month","📅 חודש נוכחי"],["history","📂 היסטוריה"]].map(([v,l])=>(
+          <button key={v} onClick={()=>setRpView(v)}
+            style={{flex:1,padding:"7px",borderRadius:8,border:`2px solid ${rpView===v?"#059669":"#e2e8f0"}`,
+              background:rpView===v?"#059669":"#f8fafc",color:rpView===v?"#fff":"#64748b",
+              fontWeight:700,fontSize:13,cursor:"pointer"}}>
+            {l}
+          </button>
+        ))}
+      </div>
+      <div style={{background:"linear-gradient(135deg,#064e3b,#059669)",borderRadius:12,padding:"14px 16px",color:"#fff",boxShadow:"0 2px 8px rgba(0,0,0,0.15)"}}>
+        <div style={{fontSize:13,opacity:.75,marginBottom:4}}>💰 יתרה חיה — הרב פנחס</div>
+        <div style={{fontSize:32,fontWeight:800}}>{fmt(liveBalance)} ₪</div>
+        <div style={{fontSize:12,opacity:.7,marginTop:4}}>בסיס: {fmt(rpBaseBalance.amount)} ₪ ({rpBaseBalance.date||"—"}) + כל החודשים</div>
+      </div>
+
+      {sortedMonthKeys.length===0 && (
+        <div style={{...card,color:"#94a3b8",textAlign:"center"}}>אין נתונים עדיין</div>
+      )}
+
+      {[...sortedMonthKeys].reverse().map(key=>{
+        const [y,m] = key.split("-");
+        const label = mkMonthLabel(Number(y), Number(m)-1);
+        const t     = calcMonthTotals(key);
+        const md    = rpMonths[key]||{};
+        const isOpen= openHist===key;
+        const cumBal= calcCumBalance(key);
+        const avPaidMap = md.avPaid||{};
+
+        return (
+          <div key={key} style={card}>
+            <button onClick={()=>setOpenHist(isOpen?null:key)}
+              style={{background:"none",border:"none",cursor:"pointer",width:"100%",textAlign:"right",
+                display:"flex",justifyContent:"space-between",alignItems:"center",padding:0}}>
+              <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+                <span style={{fontWeight:700,fontSize:14}}>{label}</span>
+                <span style={{fontSize:12,color:t.net>=0?"#16a34a":"#dc2626",fontWeight:600}}>
+                  {t.net>=0?"+":""}{fmt(t.net)} ₪ נטו
+                </span>
+                {t.donors>0&&<span style={{fontSize:11,color:"#94a3b8"}}>תרומות: {fmt(t.donors)} ₪</span>}
+              </div>
+              <span style={{color:"#94a3b8"}}>{isOpen?"▲":"▼"}</span>
+            </button>
+
+            {isOpen&&(
+              <div style={{marginTop:12}}>
+                <MR l="💝 תרומות"       v={t.donors}/>
+                <MR l="👨‍🎓 לאברכים"   v={-t.sent} neg/>
+                {t.adj!==0&&<MR l="⚖️ התאמה" v={t.adj} color={t.adj>0?"#16a34a":"#dc2626"}/>}
+                <div style={divider}/>
+                <MR l="נטו חודש" v={t.net} bold color={t.net>=0?"#16a34a":"#dc2626"}/>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                  background:"#eff6ff",borderRadius:8,padding:"8px 12px",marginTop:8,border:"1.5px solid #bfdbfe"}}>
+                  <span style={{fontWeight:700,fontSize:13,color:"#1d4ed8"}}>💰 יתרה מצטברת עד חודש זה</span>
+                  <span style={{fontWeight:800,fontSize:18,color:"#1d4ed8"}}>{fmt(cumBal)} ₪</span>
+                </div>
+
+                {/* פירוט תורמים */}
+                {(md.donors||[]).length>0&&(
+                  <div style={{marginTop:10}}>
+                    <div style={{fontSize:12,fontWeight:700,color:"#475569",marginBottom:5}}>פירוט תורמים:</div>
+                    <table style={tbl}>
+                      <thead><tr><th style={th}>שם</th><th style={th}>סכום</th></tr></thead>
+                      <tbody>
+                        {(md.donors||[]).map((d,i)=>(
+                          <tr key={i} style={{borderBottom:"1px solid #f1f5f9"}}>
+                            <td style={td}>{d.name}</td>
+                            <td style={{...td,fontWeight:600}}>{fmt(d.amount)} ₪</td>
+                          </tr>
+                        ))}
+                        <tr style={{background:"#f0fdf4"}}>
+                          <td style={{...td,fontWeight:700}}>סה״כ</td>
+                          <td style={{...td,fontWeight:700}}>{fmt(t.donors)} ₪</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* פירוט אברכים */}
+                {activeAvrechim.length>0&&(
+                  <div style={{marginTop:10}}>
+                    <div style={{fontSize:12,fontWeight:700,color:"#475569",marginBottom:5}}>פירוט אברכים:</div>
+                    <table style={tbl}>
+                      <thead><tr><th style={th}>שם</th><th style={th}>סכום</th><th style={{...th,textAlign:"center"}}>שולם</th></tr></thead>
+                      <tbody>
+                        {activeAvrechim.map(av=>{
+                          const amt  = getAvAmt(av, md);
+                          const paid = avPaidMap[av.id]==="1";
+                          return (
+                            <tr key={av.id} style={{borderBottom:"1px solid #f1f5f9",background:paid?"#f0fdf4":"#fff"}}>
+                              <td style={td}>{av.name}</td>
+                              <td style={{...td,fontWeight:600}}>{fmt(amt)} ₪</td>
+                              <td style={{...td,textAlign:"center"}}>
+                                <span style={{fontSize:11,fontWeight:700,color:paid?"#16a34a":"#94a3b8"}}>
+                                  {paid?"✓ שולם":"—"}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        <tr style={{background:"#fef2f2"}}>
+                          <td style={{...td,fontWeight:700}}>סה״כ</td>
+                          <td style={{...td,fontWeight:700}}>{fmt(t.sent)} ₪</td>
+                          <td style={{...td,textAlign:"center",fontSize:11,color:"#94a3b8"}}>
+                            {activeAvrechim.filter(av=>avPaidMap[av.id]==="1").length}/{activeAvrechim.length}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+
   return (
     <div style={col}>
 
       {/* ── כרטיס יתרה ── */}
+      {/* ── toggle view ── */}
+      <div style={{display:"flex",gap:6,background:"#fff",borderRadius:10,padding:"8px 12px",boxShadow:"0 1px 4px rgba(0,0,0,0.07)"}}>
+        {[["month","📅 חודש נוכחי"],["history","📂 היסטוריה"]].map(([v,l])=>(
+          <button key={v} onClick={()=>setRpView(v)}
+            style={{flex:1,padding:"7px",borderRadius:8,border:`2px solid ${rpView===v?"#059669":"#e2e8f0"}`,
+              background:rpView===v?"#059669":"#f8fafc",color:rpView===v?"#fff":"#64748b",
+              fontWeight:700,fontSize:13,cursor:"pointer"}}>
+            {l}
+          </button>
+        ))}
+      </div>
+
       <div style={{background:"linear-gradient(135deg,#064e3b,#059669)",borderRadius:12,padding:"14px 16px",color:"#fff",boxShadow:"0 2px 8px rgba(0,0,0,0.15)"}}>
         <div style={{fontSize:13,opacity:.75,marginBottom:4}}>💰 יתרה חיה — הרב פנחס</div>
         <div style={{fontSize:36,fontWeight:800}}>{fmt(liveBalance)} ₪</div>
