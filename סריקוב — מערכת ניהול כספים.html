@@ -580,7 +580,7 @@ function App(){
         {tab==="summary"    && <SummaryTab avrechim={avrechim} allMonthKeys={allMonthKeys()} calcMonthTotals={calcMonthTotals} calcAvrechMonth={calcAvrechMonth} getPrevMonthKey={getPrevMonthKey} baseBalance={baseBalance} liveBalance={liveBalance} selKey={selKey} allMonths={allMonths} />}
         {tab==="bank"       && <BankTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} />}
         {tab==="settlement" && <SettlementTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} supplementSettings={supplementSettings} setSupplementSettings={setSupplementSettings} />}
-        {tab==="ravpinchas" && <RavPinchasTab rpAvrechim={rpAvrechim} setRpAvrechim={setRpAvrechim} rpMonths={rpMonths} setRpMonthField={setRpMonthField} rpBaseBalance={rpBaseBalance} setRpBaseBalance={setRpBaseBalance} rpContact={rpContact} setRpContact={setRpContact} selKey={selKey} selYear={selYear} selMonth={selMonth} allDonorNames={allDonorNames} donorHistory={donorHistory} syncing={syncing} />}
+        {tab==="ravpinchas" && <RavPinchasTab rpAvrechim={rpAvrechim} setRpAvrechim={setRpAvrechim} rpMonths={rpMonths} setRpMonthField={setRpMonthField} rpBaseBalance={rpBaseBalance} setRpBaseBalance={setRpBaseBalance} rpContact={rpContact} setRpContact={setRpContact} selKey={selKey} selYear={selYear} selMonth={selMonth} allDonorNames={allDonorNames} donorHistory={donorHistory} syncing={syncing} sarikowLiveBalance={liveBalance} />}
       </main>
     </div>
   );
@@ -2640,7 +2640,7 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
 }
 
 // ── RAV PINCHAS TAB ──────────────────────────────────────────
-function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, rpBaseBalance, setRpBaseBalance, rpContact, setRpContact, selKey, selYear, selMonth, allDonorNames, donorHistory, syncing }) {
+function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, rpBaseBalance, setRpBaseBalance, rpContact, setRpContact, selKey, selYear, selMonth, allDonorNames, donorHistory, syncing, sarikowLiveBalance }) {
   const [editBase,   setEditBase]   = useState(false);
   const [tempBase,   setTempBase]   = useState(rpBaseBalance.amount);
   const [showDonor,  setShowDonor]  = useState(false);
@@ -2699,6 +2699,9 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
     sortedMonthKeys.filter(k=>k<=upToKey).forEach(k=>{ sum += calcMonthTotals(k).net; });
     return sum;
   };
+
+  // סה״כ משולב (סריקוב + הרב פנחס) — לצפייה בלבד, לא משפיע על שום חישוב
+  const combinedTotal = Number(sarikowLiveBalance||0) + liveBalance;
 
   const monthDonors = donors.reduce((s,d)=>s+Number(d.amount||0),0);
   const monthSent   = activeAvrechim.reduce((s,av)=>s+getAvAmt(av,null),0);
@@ -2840,6 +2843,10 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
         <div style={{fontSize:13,opacity:.75,marginBottom:4}}>💰 יתרה חיה — הרב פנחס</div>
         <div style={{fontSize:32,fontWeight:800}}>{fmt(liveBalance)} ₪</div>
         <div style={{fontSize:12,opacity:.7,marginTop:4}}>בסיס: {fmt(rpBaseBalance.amount)} ₪ ({rpBaseBalance.date||"—"}) + כל החודשים</div>
+        <div style={{marginTop:10,background:"rgba(255,255,255,.14)",borderRadius:8,padding:"7px 10px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span style={{fontSize:12,opacity:.9}}>💰 סה״כ כללי (סריקוב + הרב פנחס) — לצפייה בלבד</span>
+          <span style={{fontWeight:800,fontSize:16}}>{fmt(combinedTotal)} ₪</span>
+        </div>
       </div>
 
       {sendReportCard}
@@ -3030,6 +3037,10 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
           בסיס נכון לתאריך: {rpBaseBalance.date||"—"}
           <button style={{background:"none",border:"none",color:"rgba(255,255,255,.7)",cursor:"pointer",fontSize:12,marginRight:10,textDecoration:"underline"}}
             onClick={()=>{setTempBase(rpBaseBalance.amount);setEditBase(true);}}>✏️ עדכן בסיס</button>
+        </div>
+        <div style={{marginTop:10,background:"rgba(255,255,255,.14)",borderRadius:8,padding:"7px 10px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span style={{fontSize:12,opacity:.9}}>💰 סה״כ כללי (סריקוב + הרב פנחס) — לצפייה בלבד</span>
+          <span style={{fontWeight:800,fontSize:16}}>{fmt(combinedTotal)} ₪</span>
         </div>
       </div>
 
