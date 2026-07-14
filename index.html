@@ -235,6 +235,7 @@ function App(){
   const [rpAvrechim, setRpAvrechimS]   = useState([]);
   const [rpMonths,   setRpMonthsS]     = useState({});
   const [rpBaseBalance, setRpBaseBS]   = useState({amount:0,date:""});
+  const [rpContact, setRpContactS]     = useState({email:"",phone:""});
   // allMonths: { "2026-01": { donors, datot, keren, sent2000, sent1000, sentKeren }, ... }
   const [allMonths,setAllMonthsS]= useState({});
   // avAllMonths: { "2026-01": { avId: { monthlyStipend, datot, keren, roundingByFriend, exams } } }
@@ -249,10 +250,10 @@ function App(){
 
   const selKey = mkMonthKey(selYear,selMonth);
 
-  const local = useRef({baseBalance,avrechim,allMonths,avAllMonths,attendance:{},customVacations:{},beinHazmanims:BEIN_HAZMANIM,hiddenHols:[],rpAvrechim:[],rpMonths:{},rpBaseBalance:{amount:0,date:""}});
+  const local = useRef({baseBalance,avrechim,allMonths,avAllMonths,attendance:{},customVacations:{},beinHazmanims:BEIN_HAZMANIM,hiddenHols:[],rpAvrechim:[],rpMonths:{},rpBaseBalance:{amount:0,date:""},rpContact:{email:"",phone:""}});
 
   useEffect(()=>{
-    let loaded={base:false,av:false,months:false,avmonths:false,att:false,cv:false,bh:false,hh:false,supp:false,rpav:false,rpmonths:false,rpbase:false};
+    let loaded={base:false,av:false,months:false,avmonths:false,att:false,cv:false,bh:false,hh:false,supp:false,rpav:false,rpmonths:false,rpbase:false,rpcontact:false};
     const check=()=>{ if(Object.values(loaded).every(Boolean)) setReady(true); };
     const u1=fbListen("baseBalance",v=>{ if(v){setBaseBS(v);local.current.baseBalance=v;} loaded.base=true;check(); });
     const u2=fbListen("avrechim",v=>{
@@ -283,7 +284,8 @@ function App(){
     const urp1=fbListen("ravPinchas/avrechim",v=>{ const d=v&&Array.isArray(v)?v:[]; setRpAvrechimS(d);local.current.rpAvrechim=d; loaded.rpav=true;check(); });
     const urp2=fbListen("ravPinchas/months",v=>{ const d=v||{}; setRpMonthsS(d);local.current.rpMonths=d; loaded.rpmonths=true;check(); });
     const urp3=fbListen("ravPinchas/baseBalance",v=>{ if(v){setRpBaseBS(v);local.current.rpBaseBalance=v;} loaded.rpbase=true;check(); });
-    return()=>{ u1();u2();u3();u4();u5();u6();u7();u8();u9();urp1();urp2();urp3(); };
+    const urp4=fbListen("ravPinchas/contact",v=>{ if(v){setRpContactS(v);local.current.rpContact=v;} loaded.rpcontact=true;check(); });
+    return()=>{ u1();u2();u3();u4();u5();u6();u7();u8();u9();urp1();urp2();urp3();urp4(); };
   },[]);
 
   const sync = fn => { setSyncing(true); fn(); setTimeout(()=>setSyncing(false),1200); };
@@ -354,6 +356,9 @@ function App(){
   };
   const setRpBaseBalance = v => {
     local.current.rpBaseBalance=v; setRpBaseBS(v); sync(()=>fbSet("ravPinchas/baseBalance",v));
+  };
+  const setRpContact = v => {
+    local.current.rpContact=v; setRpContactS(v); sync(()=>fbSet("ravPinchas/contact",v));
   };
   const setRpMonthField = (monthKey,field,val) => {
     const cur=local.current.rpMonths||{};
@@ -575,7 +580,7 @@ function App(){
         {tab==="summary"    && <SummaryTab avrechim={avrechim} allMonthKeys={allMonthKeys()} calcMonthTotals={calcMonthTotals} calcAvrechMonth={calcAvrechMonth} getPrevMonthKey={getPrevMonthKey} baseBalance={baseBalance} liveBalance={liveBalance} selKey={selKey} allMonths={allMonths} />}
         {tab==="bank"       && <BankTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} />}
         {tab==="settlement" && <SettlementTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} supplementSettings={supplementSettings} setSupplementSettings={setSupplementSettings} />}
-        {tab==="ravpinchas" && <RavPinchasTab rpAvrechim={rpAvrechim} setRpAvrechim={setRpAvrechim} rpMonths={rpMonths} setRpMonthField={setRpMonthField} rpBaseBalance={rpBaseBalance} setRpBaseBalance={setRpBaseBalance} selKey={selKey} selYear={selYear} selMonth={selMonth} allDonorNames={allDonorNames} donorHistory={donorHistory} syncing={syncing} />}
+        {tab==="ravpinchas" && <RavPinchasTab rpAvrechim={rpAvrechim} setRpAvrechim={setRpAvrechim} rpMonths={rpMonths} setRpMonthField={setRpMonthField} rpBaseBalance={rpBaseBalance} setRpBaseBalance={setRpBaseBalance} rpContact={rpContact} setRpContact={setRpContact} selKey={selKey} selYear={selYear} selMonth={selMonth} allDonorNames={allDonorNames} donorHistory={donorHistory} syncing={syncing} />}
       </main>
     </div>
   );
@@ -2635,7 +2640,7 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
 }
 
 // ── RAV PINCHAS TAB ──────────────────────────────────────────
-function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, rpBaseBalance, setRpBaseBalance, selKey, selYear, selMonth, allDonorNames, donorHistory, syncing }) {
+function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, rpBaseBalance, setRpBaseBalance, rpContact, setRpContact, selKey, selYear, selMonth, allDonorNames, donorHistory, syncing }) {
   const [editBase,   setEditBase]   = useState(false);
   const [tempBase,   setTempBase]   = useState(rpBaseBalance.amount);
   const [showDonor,  setShowDonor]  = useState(false);
@@ -2646,6 +2651,11 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
   const [showAdj,    setShowAdj]    = useState(false);
   const [rpView,     setRpView]     = useState("month"); // "month" | "history"
   const [openHist,   setOpenHist]   = useState(null);
+  const [editContact,setEditContact]= useState(false);
+  const [tempEmail,  setTempEmail]  = useState(rpContact.email||"");
+  const [tempPhone,  setTempPhone]  = useState(rpContact.phone||"");
+  const [sendScope,  setSendScope]  = useState("current"); // "current" | "specific" | "all"
+  const [sendMonthKey,setSendMonthKey] = useState(selKey);
 
   const getMD = (field,def) => rpMonths[selKey]?.[field] ?? def;
   const donors    = getMD("donors",[]);
@@ -2694,6 +2704,59 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
   const monthSent   = activeAvrechim.reduce((s,av)=>s+getAvAmt(av,null),0);
   const monthNet    = monthDonors - monthSent + adjustment;
 
+  // ── דו״ח לשליחה (מייל / סמס) ──
+  const keyLabel = key => { const [y,m]=key.split("-"); return mkMonthLabel(Number(y),Number(m)-1); };
+
+  const buildMonthReportText = key => {
+    const md  = rpMonths[key] || {};
+    const t   = calcMonthTotals(key);
+    const cum = calcCumBalance(key);
+    const avPaidMap = md.avPaid||{};
+    const lines = [`דו״ח תנועות — ${keyLabel(key)}`, "", "💝 תרומות:"];
+    if((md.donors||[]).length===0) lines.push("  אין תורמים");
+    else (md.donors||[]).forEach(d=>lines.push(`  ${d.name}: ${fmt(d.amount)} ₪`));
+    lines.push(`  סה״כ תרומות: ${fmt(t.donors)} ₪`, "", "👨‍🎓 לאברכים:");
+    if(activeAvrechim.length===0) lines.push("  אין אברכים");
+    else activeAvrechim.forEach(av=>{
+      const amt = getAvAmt(av, md);
+      const paid = avPaidMap[av.id]==="1";
+      lines.push(`  ${av.name}: ${fmt(amt)} ₪${paid?" (שולם)":""}`);
+    });
+    lines.push(`  סה״כ לאברכים: ${fmt(t.sent)} ₪`);
+    if(t.adj!==0) lines.push("", `⚖️ התאמה: ${fmtSigned(t.adj)} ₪`);
+    lines.push("", `נטו חודש: ${fmtSigned(t.net)} ₪`, `💰 יתרה מצטברת: ${fmt(cum)} ₪`);
+    return lines.join("\n");
+  };
+
+  const buildFullReportText = () => {
+    if(sortedMonthKeys.length===0) return "אין נתונים עדיין";
+    const lines = ["דו״ח תנועות מלא — כל החודשים", ""];
+    sortedMonthKeys.forEach(key=>{
+      lines.push(buildMonthReportText(key), "", "―――――――――――――――", "");
+    });
+    const totalDonors = sortedMonthKeys.reduce((s,k)=>s+calcMonthTotals(k).donors,0);
+    const totalSent   = sortedMonthKeys.reduce((s,k)=>s+calcMonthTotals(k).sent,0);
+    lines.push(`סה״כ כל התקופה — תרומות: ${fmt(totalDonors)} ₪, לאברכים: ${fmt(totalSent)} ₪`);
+    lines.push(`💰 יתרה נוכחית: ${fmt(liveBalance)} ₪`);
+    return lines.join("\n");
+  };
+
+  const monthOptions = Array.from(new Set([...sortedMonthKeys, selKey])).sort();
+
+  const getReportKey  = () => sendScope==="specific" ? sendMonthKey : selKey;
+  const getReportText = () => sendScope==="all" ? buildFullReportText() : buildMonthReportText(getReportKey());
+  const getReportSubject = () => sendScope==="all" ? "דו״ח תנועות מלא — הרב פנחס" : `דו״ח תנועות — ${keyLabel(getReportKey())}`;
+
+  const sendEmail = () => {
+    const subject = encodeURIComponent(getReportSubject());
+    const body    = encodeURIComponent(getReportText());
+    window.location.href = `mailto:${rpContact.email||""}?subject=${subject}&body=${body}`;
+  };
+  const sendSms = () => {
+    const body = encodeURIComponent(getReportText());
+    window.location.href = `sms:${rpContact.phone||""}?body=${body}`;
+  };
+
   const setDonors   = val => setRpMonthField(selKey,"donors",val);
   const setAvAmt    = (avId,val) => setRpMonthField(selKey,"avAmounts",{...avAmounts,[avId]:val});
   const clearAvAmt  = avId => { const u={...avAmounts}; delete u[avId]; setRpMonthField(selKey,"avAmounts",u); };
@@ -2702,6 +2765,63 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
 
   const paidCount   = activeAvrechim.filter(av=>avPaid[av.id]==="1").length;
   const allPaid     = paidCount===activeAvrechim.length && activeAvrechim.length>0;
+
+  // ── כרטיס שליחת דו״ח (מייל / סמס) ──
+  const sendReportCard = (
+    <div style={card}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:6}}>
+        <div style={{fontWeight:700,fontSize:14}}>📨 שליחת דו״ח תנועות לרב פנחס</div>
+        <button style={{...smallBtn,fontSize:11}} onClick={()=>{setTempEmail(rpContact.email||"");setTempPhone(rpContact.phone||"");setEditContact(p=>!p);}}>
+          {editContact?"סגור ✕":"✏️ פרטי קשר"}
+        </button>
+      </div>
+
+      {editContact && (
+        <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:10,padding:10,background:"#f8fafc",borderRadius:8}}>
+          <FG label="אימייל">
+            <input style={{...inp,direction:"ltr",textAlign:"left"}} type="email" value={tempEmail} onChange={e=>setTempEmail(e.target.value)} placeholder="name@example.com"/>
+          </FG>
+          <FG label="טלפון (לסמס)">
+            <input style={{...inp,direction:"ltr",textAlign:"left"}} type="tel" value={tempPhone} onChange={e=>setTempPhone(e.target.value)} placeholder="05XXXXXXXX"/>
+          </FG>
+          <button style={greenBtn} onClick={()=>{setRpContact({email:tempEmail,phone:tempPhone});setEditContact(false);}}>שמור פרטי קשר</button>
+        </div>
+      )}
+
+      {!editContact && (rpContact.email||rpContact.phone) && (
+        <div style={{fontSize:11,color:"#64748b",marginBottom:8}}>
+          {rpContact.email && <span>📧 {rpContact.email}</span>}
+          {rpContact.email && rpContact.phone && <span> · </span>}
+          {rpContact.phone && <span style={{direction:"ltr",display:"inline-block"}}>📱 {rpContact.phone}</span>}
+        </div>
+      )}
+      {!editContact && !rpContact.email && !rpContact.phone && (
+        <div style={{fontSize:11,color:"#f59e0b",marginBottom:8}}>לא הוגדרו פרטי קשר — לחץ ״פרטי קשר״ כדי להוסיף</div>
+      )}
+
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
+        {[["current","📅 חודש נוכחי"],["specific","🗓️ חודש נבחר"],["all","📂 הכל"]].map(([v,l])=>(
+          <button key={v} onClick={()=>setSendScope(v)}
+            style={{padding:"6px 10px",borderRadius:7,border:`1.5px solid ${sendScope===v?"#0369a1":"#e2e8f0"}`,
+              background:sendScope===v?"#0369a1":"#f8fafc",color:sendScope===v?"#fff":"#64748b",
+              fontWeight:600,fontSize:12,cursor:"pointer"}}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {sendScope==="specific" && (
+        <select style={{...inp,marginBottom:8}} value={sendMonthKey} onChange={e=>setSendMonthKey(e.target.value)}>
+          {monthOptions.map(k=><option key={k} value={k}>{keyLabel(k)}</option>)}
+        </select>
+      )}
+
+      <div style={{display:"flex",gap:8}}>
+        <button style={{...greenBtn,flex:1,opacity:rpContact.email?1:0.5}} disabled={!rpContact.email} onClick={sendEmail}>📧 שלח במייל</button>
+        <button style={{...greenBtn,flex:1,background:"#0369a1",opacity:rpContact.phone?1:0.5}} disabled={!rpContact.phone} onClick={sendSms}>💬 שלח בסמס</button>
+      </div>
+    </div>
+  );
 
   // ── לשונית היסטוריה ──
   if (rpView === "history") return (
@@ -2721,6 +2841,8 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
         <div style={{fontSize:32,fontWeight:800}}>{fmt(liveBalance)} ₪</div>
         <div style={{fontSize:12,opacity:.7,marginTop:4}}>בסיס: {fmt(rpBaseBalance.amount)} ₪ ({rpBaseBalance.date||"—"}) + כל החודשים</div>
       </div>
+
+      {sendReportCard}
 
       {sortedMonthKeys.length===0 && (
         <div style={{...card,color:"#94a3b8",textAlign:"center"}}>אין נתונים עדיין</div>
@@ -2921,6 +3043,8 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
           </div>
         </div>
       )}
+
+      {sendReportCard}
 
       {/* ── תורמים ── */}
       <datalist id="rp-donor-list">
