@@ -1003,10 +1003,34 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
   const avNames = avrechim.map(a=>a.name).filter(Boolean);
   const filteredAvrechim = avrechim.filter(a=>a.active && a.name.includes(search));
 
-  // תענית דיבור — "כל החודש" (כל ימי הלימוד בחודש) ו"לפי נוכחות" (הימים שסומנו בפועל לאברך)
-  const monthLearningDays = getMonthWeeks(selYear,selMonth).flat()
-    .filter(d=>d.inMonth && getDayType(d.dateStr,customVacations,beinHazmanims,hiddenHols).type==="learning").length;
-  const avAttendanceDays = av => Object.values((attendance[selKey]||{})[String(av.id)]||{}).filter(v=>v==="1").length;
+  // תענית דיבור — תקופת השכר של JB: מ-15 בחודש הקודם עד 14 בחודש הנבחר (לא חודש קלנדרי!)
+  const taanitPrevM = selMonth===0 ? 11 : selMonth-1;
+  const taanitPrevY = selMonth===0 ? selYear-1 : selYear;
+  const taanitPeriodStart = new Date(taanitPrevY, taanitPrevM, 15);
+  const taanitPeriodEnd   = new Date(selYear, selMonth, 14);
+  const taanitPeriodLabel = `15/${String(taanitPrevM+1).padStart(2,"0")}-14/${String(selMonth+1).padStart(2,"0")}`;
+
+  const forEachTaanitDay = fn => {
+    let d = new Date(taanitPeriodStart);
+    while(d<=taanitPeriodEnd){
+      const y=d.getFullYear(), m=d.getMonth(), da=d.getDate();
+      const dateStr=`${y}-${String(m+1).padStart(2,"0")}-${String(da).padStart(2,"0")}`;
+      fn(dateStr, mkMonthKey(y,m));
+      d.setDate(d.getDate()+1);
+    }
+  };
+
+  // "כל החודש" (כל ימי הלימוד בתקופה) ו"לפי נוכחות" (הימים שסומנו בפועל לאברך, גם אם חוצה שני חודשים קלנדריים)
+  let monthLearningDays = 0;
+  forEachTaanitDay(dateStr=>{ if(getDayType(dateStr,customVacations,beinHazmanims,hiddenHols).type==="learning") monthLearningDays++; });
+
+  const avAttendanceDays = av => {
+    let count=0;
+    forEachTaanitDay((dateStr,monthKeyForDate)=>{
+      if((attendance[monthKeyForDate]||{})[String(av.id)]?.[dateStr]==="1") count++;
+    });
+    return count;
+  };
 
   return (
     <div style={col}>
@@ -1107,15 +1131,16 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
                   <div style={{display:"flex",gap:4,marginTop:4}}>
                     <button type="button" style={{...smallBtn,fontSize:10,padding:"3px 6px",flex:1}}
                       onClick={()=>setAvMonthField(selKey,av.id,"taanitDays",monthLearningDays)}
-                      title="ממלא את כל ימי הלימוד בחודש">
-                      📅 כל החודש ({monthLearningDays})
+                      title={`ממלא את כל ימי הלימוד בתקופה ${taanitPeriodLabel}`}>
+                      📅 כל התקופה ({monthLearningDays})
                     </button>
                     <button type="button" style={{...smallBtn,fontSize:10,padding:"3px 6px",flex:1}}
                       onClick={()=>setAvMonthField(selKey,av.id,"taanitDays",avAttendanceDays(av))}
-                      title="ממלא לפי הימים שסומנו בלשונית נוכחות">
+                      title={`ממלא לפי נוכחות בתקופה ${taanitPeriodLabel}`}>
                       ✓ לפי נוכחות ({avAttendanceDays(av)})
                     </button>
                   </div>
+                  <div style={{fontSize:9,color:"#94a3b8",marginTop:2,textAlign:"center"}}>תקופה: {taanitPeriodLabel}</div>
                 </div>
                 <div style={{textAlign:"center"}}>
                   {c.taanitDays>0 ? (
