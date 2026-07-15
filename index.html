@@ -577,7 +577,7 @@ function App(){
         {tab==="main"       && <MainTab selKey={selKey} selYear={selYear} selMonth={selMonth} baseBalance={baseBalance} setBaseBalance={setBaseBalance} liveBalance={liveBalance} curTotals={curTotals} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} syncing={syncing} allDonorNames={allDonorNames} donorHistory={donorHistory} avrechim={avrechim} />}
         {tab==="avrechim"   && <AvrechimTab avrechim={avrechim} setAvrechim={setAvrechim} selKey={selKey} prevKey={prevKey} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} calcAvrechMonth={calcAvrechMonth} totalOwed={totalOwed} attendance={attendance} customVacations={customVacations} beinHazmanims={beinHazmanims} hiddenHols={hiddenHols} />}
         {tab==="attendance" && <AttendanceTab avrechim={avrechim} selKey={selKey} selYear={selYear} selMonth={selMonth} attendance={attendance} setAttendanceDay={setAttendanceDay} fillMonthBatch={fillMonthBatch} customVacations={customVacations} setCustomVacation={setCustomVacation} removeCustomVacation={removeCustomVacation} beinHazmanims={beinHazmanims} addBeinHazmanim={addBeinHazmanim} removeBeinHazmanim={removeBeinHazmanim} updateBeinHazmanim={updateBeinHazmanim} hiddenHols={hiddenHols} toggleHolidayHidden={toggleHolidayHidden} />}
-        {tab==="summary"    && <SummaryTab avrechim={avrechim} allMonthKeys={allMonthKeys()} calcMonthTotals={calcMonthTotals} calcAvrechMonth={calcAvrechMonth} getPrevMonthKey={getPrevMonthKey} baseBalance={baseBalance} liveBalance={liveBalance} selKey={selKey} allMonths={allMonths} />}
+        {tab==="summary"    && <SummaryTab avrechim={avrechim} allMonthKeys={allMonthKeys()} calcMonthTotals={calcMonthTotals} calcAvrechMonth={calcAvrechMonth} getPrevMonthKey={getPrevMonthKey} baseBalance={baseBalance} liveBalance={liveBalance} selKey={selKey} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} />}
         {tab==="bank"       && <BankTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} />}
         {tab==="settlement" && <SettlementTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} supplementSettings={supplementSettings} setSupplementSettings={setSupplementSettings} />}
         {tab==="ravpinchas" && <RavPinchasTab rpAvrechim={rpAvrechim} setRpAvrechim={setRpAvrechim} rpMonths={rpMonths} setRpMonthField={setRpMonthField} rpBaseBalance={rpBaseBalance} setRpBaseBalance={setRpBaseBalance} rpContact={rpContact} setRpContact={setRpContact} selKey={selKey} selYear={selYear} selMonth={selMonth} allDonorNames={allDonorNames} donorHistory={donorHistory} syncing={syncing} sarikowLiveBalance={liveBalance} />}
@@ -1379,13 +1379,36 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
 }
 
 // ── SUMMARY TAB ──────────────────────────────────────────────
-function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, getPrevMonthKey, baseBalance, liveBalance, selKey, allMonths }){
+function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, getPrevMonthKey, baseBalance, liveBalance, selKey, allMonths, getMD, setMonthField }){
   const [openMonth,setOpenMonth]=useState(selKey);
+  const [pendingInput,setPendingInput]=useState({}); // { "monthKey|datot": "1234", ... }
   const baseMonthKey = baseBalance.monthKey || "0000-00";
   const calcCumBalance = (upToKey) => {
     let sum = Number(baseBalance.amount||0);
     allMonthKeys.filter(k=>k>=baseMonthKey&&k<=upToKey).forEach(k=>{ sum+=calcMonthTotals(k).net; });
     return sum;
+  };
+
+  // ── חודשים ממתינים להעברת דתות/קרן ──
+  const isKerenGroup = a => (a.incomeGroup||(a.track==="keren"?"keren":"datot"))==="keren";
+  const datotAvrechim = avrechim.filter(a=>a.active && !isKerenGroup(a));
+  const kerenAvrechim  = avrechim.filter(a=>a.active && isKerenGroup(a));
+
+  const pendingRows = allMonthKeys.map(key=>{
+    const prevK = getPrevMonthKey(key);
+    const datotPaid = datotAvrechim.reduce((s,av)=>s+calcAvrechMonth(av,key,prevK).monthly,0);
+    const kerenPaid = kerenAvrechim.reduce((s,av)=>s+calcAvrechMonth(av,key,prevK).monthly,0);
+    const datotPending = datotPaid>0 && Number(getMD(key,"datot"))===0;
+    const kerenPending = kerenPaid>0 && Number(getMD(key,"keren"))===0;
+    return { key, datotPending, kerenPending, datotPaid, kerenPaid };
+  }).filter(r=>r.datotPending||r.kerenPending).reverse();
+
+  const confirmPending = (key,field,val) => {
+    const n = Number(val)||0;
+    if(n<=0) return;
+    setMonthField(key,field,n);
+    setMonthField(key,field+"Confirmed",n);
+    setPendingInput(p=>({...p,[key+"|"+field]:""}));
   };
 
   return (
@@ -1395,6 +1418,42 @@ function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, 
         <div style={{fontSize:32,fontWeight:800}}>{fmt(liveBalance)} ₪</div>
         <div style={{fontSize:12,opacity:.7,marginTop:4}}>בסיס {fmt(baseBalance.amount)} ₪ (נכון ל-{baseBalance.date}) + סיכום כל החודשים</div>
       </div>
+
+      {pendingRows.length>0 && (
+        <div style={{...card,border:"1.5px solid #f59e0b",background:"#fffbeb"}}>
+          <div style={{fontWeight:700,fontSize:14,marginBottom:4,color:"#92400e"}}>⏳ חודשים ממתינים להעברת דתות/קרן</div>
+          <div style={{fontSize:11,color:"#78716c",marginBottom:10}}>האברכים כבר קיבלו את הכסף מהקופה — אבל טרם הוזנה העברה מדתות/קרן עבור החודשים האלה. כשמתקבל הרטרו, הזן כאן את הסכום המדויק לכל חודש.</div>
+          {pendingRows.map(r=>{
+            const [y,m]=r.key.split("-");
+            const label=mkMonthLabel(Number(y),Number(m)-1);
+            return (
+              <div key={r.key} style={{background:"#fff",borderRadius:8,padding:"8px 10px",marginBottom:6,border:"1px solid #fde68a"}}>
+                <div style={{fontWeight:700,fontSize:13,marginBottom:6}}>{label}</div>
+                {r.datotPending && (
+                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:r.kerenPending?6:0}}>
+                    <span style={{fontSize:11,color:"#b45309",whiteSpace:"nowrap"}}>🏛️ דתות (שולם {fmt(r.datotPaid)} ₪):</span>
+                    <input style={{...iinp,textAlign:"left",flex:1}} type="number" placeholder="סכום שהתקבל"
+                      value={pendingInput[r.key+"|datot"]||""}
+                      onChange={e=>setPendingInput(p=>({...p,[r.key+"|datot"]:e.target.value}))} />
+                    <button style={{...smallBtn,background:"#16a34a",color:"#fff"}}
+                      onClick={()=>confirmPending(r.key,"datot",pendingInput[r.key+"|datot"])}>אשר קבלה</button>
+                  </div>
+                )}
+                {r.kerenPending && (
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{fontSize:11,color:"#059669",whiteSpace:"nowrap"}}>📚 קרן (שולם {fmt(r.kerenPaid)} ₪):</span>
+                    <input style={{...iinp,textAlign:"left",flex:1}} type="number" placeholder="סכום שהתקבל"
+                      value={pendingInput[r.key+"|keren"]||""}
+                      onChange={e=>setPendingInput(p=>({...p,[r.key+"|keren"]:e.target.value}))} />
+                    <button style={{...smallBtn,background:"#16a34a",color:"#fff"}}
+                      onClick={()=>confirmPending(r.key,"keren",pendingInput[r.key+"|keren"])}>אשר קבלה</button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {allMonthKeys.length===0 && <div style={{...card,...{color:"#94a3b8",textAlign:"center"}}}>אין נתונים עדיין</div>}
 
