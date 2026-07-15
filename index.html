@@ -575,7 +575,7 @@ function App(){
 
       <main style={{maxWidth:720,margin:"0 auto",padding:"12px 14px"}}>
         {tab==="main"       && <MainTab selKey={selKey} selYear={selYear} selMonth={selMonth} baseBalance={baseBalance} setBaseBalance={setBaseBalance} liveBalance={liveBalance} curTotals={curTotals} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} syncing={syncing} allDonorNames={allDonorNames} donorHistory={donorHistory} avrechim={avrechim} />}
-        {tab==="avrechim"   && <AvrechimTab avrechim={avrechim} setAvrechim={setAvrechim} selKey={selKey} prevKey={prevKey} getAV={getAV} setAvMonthField={setAvMonthField} calcAvrechMonth={calcAvrechMonth} totalOwed={totalOwed} />}
+        {tab==="avrechim"   && <AvrechimTab avrechim={avrechim} setAvrechim={setAvrechim} selKey={selKey} prevKey={prevKey} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} calcAvrechMonth={calcAvrechMonth} totalOwed={totalOwed} attendance={attendance} customVacations={customVacations} beinHazmanims={beinHazmanims} hiddenHols={hiddenHols} />}
         {tab==="attendance" && <AttendanceTab avrechim={avrechim} selKey={selKey} selYear={selYear} selMonth={selMonth} attendance={attendance} setAttendanceDay={setAttendanceDay} fillMonthBatch={fillMonthBatch} customVacations={customVacations} setCustomVacation={setCustomVacation} removeCustomVacation={removeCustomVacation} beinHazmanims={beinHazmanims} addBeinHazmanim={addBeinHazmanim} removeBeinHazmanim={removeBeinHazmanim} updateBeinHazmanim={updateBeinHazmanim} hiddenHols={hiddenHols} toggleHolidayHidden={toggleHolidayHidden} />}
         {tab==="summary"    && <SummaryTab avrechim={avrechim} allMonthKeys={allMonthKeys()} calcMonthTotals={calcMonthTotals} calcAvrechMonth={calcAvrechMonth} getPrevMonthKey={getPrevMonthKey} baseBalance={baseBalance} liveBalance={liveBalance} selKey={selKey} allMonths={allMonths} />}
         {tab==="bank"       && <BankTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} />}
@@ -993,7 +993,7 @@ function ImportModal({ avrechim, selKey, setAvMonthField, onClose }){
 }
 
 // ── AVRECHIM TAB ─────────────────────────────────────────────
-function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, getAV, setAvMonthField, calcAvrechMonth, totalOwed }){
+function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth, getAV, setAvMonthField, calcAvrechMonth, totalOwed, attendance, customVacations, beinHazmanims, hiddenHols }){
   const [editId,setEditId]=useState(null);
   const [showAdd,setShowAdd]=useState(false);
   const [showImport,setShowImport]=useState(false);
@@ -1002,6 +1002,11 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, getAV, setAvMonth
   const updAv=(id,k,v)=>setAvrechim(p=>p.map(a=>a.id===id?{...a,[k]:v}:a));
   const avNames = avrechim.map(a=>a.name).filter(Boolean);
   const filteredAvrechim = avrechim.filter(a=>a.active && a.name.includes(search));
+
+  // תענית דיבור — "כל החודש" (כל ימי הלימוד בחודש) ו"לפי נוכחות" (הימים שסומנו בפועל לאברך)
+  const monthLearningDays = getMonthWeeks(selYear,selMonth).flat()
+    .filter(d=>d.inMonth && getDayType(d.dateStr,customVacations,beinHazmanims,hiddenHols).type==="learning").length;
+  const avAttendanceDays = av => Object.values((attendance[selKey]||{})[String(av.id)]||{}).filter(v=>v==="1").length;
 
   return (
     <div style={col}>
@@ -1099,6 +1104,18 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, getAV, setAvMonth
                     onChange={e=>setAvMonthField(selKey,av.id,"taanitDays",e.target.value)}
                     style={{border:"1.5px solid #7dd3fc",borderRadius:6,padding:"6px 8px",fontSize:13,width:"100%",boxSizing:"border-box",background:"#fff"}}
                   />
+                  <div style={{display:"flex",gap:4,marginTop:4}}>
+                    <button type="button" style={{...smallBtn,fontSize:10,padding:"3px 6px",flex:1}}
+                      onClick={()=>setAvMonthField(selKey,av.id,"taanitDays",monthLearningDays)}
+                      title="ממלא את כל ימי הלימוד בחודש">
+                      📅 כל החודש ({monthLearningDays})
+                    </button>
+                    <button type="button" style={{...smallBtn,fontSize:10,padding:"3px 6px",flex:1}}
+                      onClick={()=>setAvMonthField(selKey,av.id,"taanitDays",avAttendanceDays(av))}
+                      title="ממלא לפי הימים שסומנו בלשונית נוכחות">
+                      ✓ לפי נוכחות ({avAttendanceDays(av)})
+                    </button>
+                  </div>
                 </div>
                 <div style={{textAlign:"center"}}>
                   {c.taanitDays>0 ? (
