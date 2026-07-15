@@ -579,7 +579,7 @@ function App(){
         {tab==="attendance" && <AttendanceTab avrechim={avrechim} selKey={selKey} selYear={selYear} selMonth={selMonth} attendance={attendance} setAttendanceDay={setAttendanceDay} fillMonthBatch={fillMonthBatch} customVacations={customVacations} setCustomVacation={setCustomVacation} removeCustomVacation={removeCustomVacation} beinHazmanims={beinHazmanims} addBeinHazmanim={addBeinHazmanim} removeBeinHazmanim={removeBeinHazmanim} updateBeinHazmanim={updateBeinHazmanim} hiddenHols={hiddenHols} toggleHolidayHidden={toggleHolidayHidden} />}
         {tab==="summary"    && <SummaryTab avrechim={avrechim} allMonthKeys={allMonthKeys()} calcMonthTotals={calcMonthTotals} calcAvrechMonth={calcAvrechMonth} getPrevMonthKey={getPrevMonthKey} baseBalance={baseBalance} liveBalance={liveBalance} selKey={selKey} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} />}
         {tab==="bank"       && <BankTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} />}
-        {tab==="settlement" && <SettlementTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} supplementSettings={supplementSettings} setSupplementSettings={setSupplementSettings} />}
+        {tab==="settlement" && <SettlementTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} supplementSettings={supplementSettings} setSupplementSettings={setSupplementSettings} allMonthKeys={allMonthKeys()} getPrevMonthKey={getPrevMonthKey} />}
         {tab==="ravpinchas" && <RavPinchasTab rpAvrechim={rpAvrechim} setRpAvrechim={setRpAvrechim} rpMonths={rpMonths} setRpMonthField={setRpMonthField} rpBaseBalance={rpBaseBalance} setRpBaseBalance={setRpBaseBalance} rpContact={rpContact} setRpContact={setRpContact} selKey={selKey} selYear={selYear} selMonth={selMonth} allDonorNames={allDonorNames} donorHistory={donorHistory} syncing={syncing} sarikowLiveBalance={liveBalance} />}
       </main>
     </div>
@@ -2518,10 +2518,27 @@ const smallBtn  = {padding:"4px 9px",borderRadius:6,background:"#f1f5f9",border:
 const delBtn    = {background:"#fee2e2",color:"#dc2626",border:"none",borderRadius:6,padding:"3px 8px",cursor:"pointer"};
 
 // ── SETTLEMENT TAB ───────────────────────────────────────────
-function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, selMonth, getAV, setAvMonthField, supplementSettings, setSupplementSettings }){
+function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, selMonth, getAV, setAvMonthField, supplementSettings, setSupplementSettings, allMonthKeys, getPrevMonthKey }){
   const [editSupp,setEditSupp] = useState(false);
   const [tempDatot,setTempDatot] = useState(String(supplementSettings.datot||1000));
   const [tempKeren,setTempKeren] = useState(String(supplementSettings.keren||1000));
+  const [showCumulative,setShowCumulative] = useState(false);
+
+  // מצטבר לאורך כל החודשים: לכל אברך — בכל חודש שלא סומן כ"שולם", כמה מגיע לו מעבר למה שקיבל (חיצוני+השלמה)
+  const cumulativeByAv = avrechim.filter(a=>a.active).map(av=>{
+    const monthsOwed = (allMonthKeys||[]).map(key=>{
+      const pk = getPrevMonthKey(key);
+      const c = calcAvrechMonth(av,key,pk);
+      if(c.monthly<=0) return null;
+      if(getAV(key,av.id,"settlementPaid")==="1") return null;
+      const gap = Math.max(0, c.monthly - c.totalReceived);
+      if(gap<=0) return null;
+      return { key, amount:gap };
+    }).filter(Boolean);
+    const total = monthsOwed.reduce((s,m)=>s+m.amount,0);
+    return { av, total, monthsOwed };
+  }).filter(r=>r.total>0).sort((a,b)=>b.total-a.total);
+  const grandTotalCumulative = cumulativeByAv.reduce((s,r)=>s+r.total,0);
 
   const rows = avrechim.filter(a=>a.active).map(av=>({
     av,
@@ -2647,6 +2664,44 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
 
   return (
     <div style={col}>
+      {/* כפתור מעבר: חודש נוכחי / מצטבר */}
+      <div style={{display:"flex",gap:6,background:"#fff",borderRadius:10,padding:"8px 12px",boxShadow:"0 1px 4px rgba(0,0,0,0.07)"}}>
+        {[[false,"📅 חודש נוכחי"],[true,"📊 מצטבר לפי אברך — כמה לתת ברטרו"]].map(([v,l])=>(
+          <button key={String(v)} onClick={()=>setShowCumulative(v)}
+            style={{flex:1,padding:"7px",borderRadius:8,border:`2px solid ${showCumulative===v?"#7c3aed":"#e2e8f0"}`,
+              background:showCumulative===v?"#7c3aed":"#f8fafc",color:showCumulative===v?"#fff":"#64748b",
+              fontWeight:700,fontSize:12,cursor:"pointer"}}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {showCumulative ? (
+        <div style={col}>
+          <div style={{background:"linear-gradient(135deg,#4c1d95,#7c3aed)",borderRadius:12,padding:"14px 16px",color:"#fff"}}>
+            <div style={{fontSize:13,opacity:.8}}>סה״כ מגיע לאברכים (דתות/קרן שלא כוסו, כל החודשים שלא סומנו כשולם)</div>
+            <div style={{fontSize:30,fontWeight:800}}>{fmt(grandTotalCumulative)} ₪</div>
+          </div>
+          {cumulativeByAv.length===0 && <div style={{...card,color:"#94a3b8",textAlign:"center"}}>אין סכומים מצטברים ממתינים — הכל מסומן כשולם או מכוסה</div>}
+          {cumulativeByAv.map(({av,total,monthsOwed})=>(
+            <div key={av.id} style={{...card,borderRight:"4px solid #7c3aed"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{fontWeight:700,fontSize:14}}>{av.name}</span>
+                <span style={{fontWeight:800,fontSize:18,color:"#7c3aed"}}>{fmt(total)} ₪</span>
+              </div>
+              <div style={{fontSize:11,color:"#64748b",marginTop:6,display:"flex",flexWrap:"wrap",gap:6}}>
+                {monthsOwed.map(m=>{
+                  const [y,mo]=m.key.split("-");
+                  return <span key={m.key} style={{background:"#f5f3ff",borderRadius:6,padding:"2px 8px"}}>
+                    {mkMonthLabel(Number(y),Number(mo)-1)}: {fmt(m.amount)} ₪
+                  </span>;
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+      <>
       {/* כרטיס הגדרות השלמה */}
       <div style={{...card,borderRight:"4px solid #7c3aed"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:editSupp?10:0}}>
@@ -2735,6 +2790,8 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
           <div style={{fontWeight:600,fontSize:12,color:"#94a3b8",marginBottom:5}}>⬜ ללא נתוני מגיע ({noDataRows.length})</div>
           <div style={{fontSize:12,color:"#94a3b8"}}>{noDataRows.map(({av})=>av.name).join(" | ")}</div>
         </div>
+      )}
+      </>
       )}
     </div>
   );
