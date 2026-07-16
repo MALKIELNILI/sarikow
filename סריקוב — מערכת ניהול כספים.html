@@ -232,6 +232,7 @@ function App(){
   const [baseBalance,setBaseBS]  = useState({amount:191321,date:"29.1.26"});
   const [avrechim,setAvrechimS]  = useState(defaultAvrechim);
   const [supplementSettings,setSupplementS] = useState({datot:1000,keren:1000});
+  const [expectedExternal,setExpectedExternalS] = useState({datot:675,keren:675});
   const [rpAvrechim, setRpAvrechimS]   = useState([]);
   const [rpMonths,   setRpMonthsS]     = useState({});
   const [rpBaseBalance, setRpBaseBS]   = useState({amount:0,date:""});
@@ -253,7 +254,7 @@ function App(){
   const local = useRef({baseBalance,avrechim,allMonths,avAllMonths,attendance:{},customVacations:{},beinHazmanims:BEIN_HAZMANIM,hiddenHols:[],rpAvrechim:[],rpMonths:{},rpBaseBalance:{amount:0,date:""},rpContact:{email:"",phone:""}});
 
   useEffect(()=>{
-    let loaded={base:false,av:false,months:false,avmonths:false,att:false,cv:false,bh:false,hh:false,supp:false,rpav:false,rpmonths:false,rpbase:false,rpcontact:false};
+    let loaded={base:false,av:false,months:false,avmonths:false,att:false,cv:false,bh:false,hh:false,supp:false,expext:false,rpav:false,rpmonths:false,rpbase:false,rpcontact:false};
     const check=()=>{ if(Object.values(loaded).every(Boolean)) setReady(true); };
     const u1=fbListen("baseBalance",v=>{ if(v){setBaseBS(v);local.current.baseBalance=v;} loaded.base=true;check(); });
     const u2=fbListen("avrechim",v=>{
@@ -281,11 +282,12 @@ function App(){
     });
     const u8=fbListen("hiddenHols",v=>{ const d=v||[]; setHiddenHols(d);local.current.hiddenHols=d; loaded.hh=true;check(); });
     const u9=fbListen("supplementSettings",v=>{ if(v&&typeof v==="object"){setSupplementS(v);local.current.supplementSettings=v;} loaded.supp=true;check(); });
+    const u10=fbListen("expectedExternal",v=>{ if(v&&typeof v==="object"){setExpectedExternalS(v);local.current.expectedExternal=v;} loaded.expext=true;check(); });
     const urp1=fbListen("ravPinchas/avrechim",v=>{ const d=v&&Array.isArray(v)?v:[]; setRpAvrechimS(d);local.current.rpAvrechim=d; loaded.rpav=true;check(); });
     const urp2=fbListen("ravPinchas/months",v=>{ const d=v||{}; setRpMonthsS(d);local.current.rpMonths=d; loaded.rpmonths=true;check(); });
     const urp3=fbListen("ravPinchas/baseBalance",v=>{ if(v){setRpBaseBS(v);local.current.rpBaseBalance=v;} loaded.rpbase=true;check(); });
     const urp4=fbListen("ravPinchas/contact",v=>{ if(v){setRpContactS(v);local.current.rpContact=v;} loaded.rpcontact=true;check(); });
-    return()=>{ u1();u2();u3();u4();u5();u6();u7();u8();u9();urp1();urp2();urp3();urp4(); };
+    return()=>{ u1();u2();u3();u4();u5();u6();u7();u8();u9();u10();urp1();urp2();urp3();urp4(); };
   },[]);
 
   const sync = fn => { setSyncing(true); fn(); setTimeout(()=>setSyncing(false),1200); };
@@ -293,6 +295,7 @@ function App(){
   const setAvrechim    = fn => { const n=typeof fn==="function"?fn(local.current.avrechim):fn; local.current.avrechim=n; setAvrechimS(n); sync(()=>fbSet("avrechim",n)); };
 
   const setSupplementSettings = v => { setSupplementS(v); local.current.supplementSettings=v; sync(()=>fbSet("supplementSettings",v)); };
+  const setExpectedExternal = v => { setExpectedExternalS(v); local.current.expectedExternal=v; sync(()=>fbSet("expectedExternal",v)); };
 
   const setMonthField = (key,field,val) => {
     const cur = local.current.allMonths;
@@ -579,7 +582,7 @@ function App(){
         {tab==="attendance" && <AttendanceTab avrechim={avrechim} selKey={selKey} selYear={selYear} selMonth={selMonth} attendance={attendance} setAttendanceDay={setAttendanceDay} fillMonthBatch={fillMonthBatch} customVacations={customVacations} setCustomVacation={setCustomVacation} removeCustomVacation={removeCustomVacation} beinHazmanims={beinHazmanims} addBeinHazmanim={addBeinHazmanim} removeBeinHazmanim={removeBeinHazmanim} updateBeinHazmanim={updateBeinHazmanim} hiddenHols={hiddenHols} toggleHolidayHidden={toggleHolidayHidden} />}
         {tab==="summary"    && <SummaryTab avrechim={avrechim} allMonthKeys={allMonthKeys()} calcMonthTotals={calcMonthTotals} calcAvrechMonth={calcAvrechMonth} getPrevMonthKey={getPrevMonthKey} baseBalance={baseBalance} liveBalance={liveBalance} selKey={selKey} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} />}
         {tab==="bank"       && <BankTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} />}
-        {tab==="settlement" && <SettlementTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} supplementSettings={supplementSettings} setSupplementSettings={setSupplementSettings} allMonthKeys={allMonthKeys()} getPrevMonthKey={getPrevMonthKey} />}
+        {tab==="settlement" && <SettlementTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} supplementSettings={supplementSettings} setSupplementSettings={setSupplementSettings} allMonthKeys={allMonthKeys()} getPrevMonthKey={getPrevMonthKey} expectedExternal={expectedExternal} setExpectedExternal={setExpectedExternal} />}
         {tab==="ravpinchas" && <RavPinchasTab rpAvrechim={rpAvrechim} setRpAvrechim={setRpAvrechim} rpMonths={rpMonths} setRpMonthField={setRpMonthField} rpBaseBalance={rpBaseBalance} setRpBaseBalance={setRpBaseBalance} rpContact={rpContact} setRpContact={setRpContact} selKey={selKey} selYear={selYear} selMonth={selMonth} allDonorNames={allDonorNames} donorHistory={donorHistory} syncing={syncing} sarikowLiveBalance={liveBalance} />}
       </main>
     </div>
@@ -2518,22 +2521,29 @@ const smallBtn  = {padding:"4px 9px",borderRadius:6,background:"#f1f5f9",border:
 const delBtn    = {background:"#fee2e2",color:"#dc2626",border:"none",borderRadius:6,padding:"3px 8px",cursor:"pointer"};
 
 // ── SETTLEMENT TAB ───────────────────────────────────────────
-function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, selMonth, getAV, setAvMonthField, supplementSettings, setSupplementSettings, allMonthKeys, getPrevMonthKey }){
+function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, selMonth, getAV, setAvMonthField, supplementSettings, setSupplementSettings, allMonthKeys, getPrevMonthKey, expectedExternal, setExpectedExternal }){
   const [editSupp,setEditSupp] = useState(false);
   const [tempDatot,setTempDatot] = useState(String(supplementSettings.datot||1000));
   const [tempKeren,setTempKeren] = useState(String(supplementSettings.keren||1000));
   const [showCumulative,setShowCumulative] = useState(false);
+  const [editExpected,setEditExpected] = useState(false);
+  const [tempExpDatot,setTempExpDatot] = useState(String(expectedExternal.datot||675));
+  const [tempExpKeren,setTempExpKeren] = useState(String(expectedExternal.keren||675));
 
   // מצטבר לאורך כל החודשים: לכל אברך — בכל חודש שלא סומן כ"שולם", כמה מגיע לו מעבר למה שקיבל (חיצוני+השלמה)
+  // אם החודש עדיין ממתין להעברה (חיצוני=0) — משתמשים בסכום הצפוי הריאלי (675 ברירת מחדל) ולא בפער התיאורטי המלא
   const cumulativeByAv = avrechim.filter(a=>a.active).map(av=>{
     const monthsOwed = (allMonthKeys||[]).map(key=>{
       const pk = getPrevMonthKey(key);
       const c = calcAvrechMonth(av,key,pk);
       if(c.monthly<=0) return null;
       if(getAV(key,av.id,"settlementPaid")==="1") return null;
-      const gap = Math.max(0, c.monthly - c.totalReceived);
+      const isPending = c.incomeGroup==="keren" ? c.autoKeren===0 : c.autoDatot===0;
+      const gap = isPending
+        ? Number((c.incomeGroup==="keren" ? expectedExternal.keren : expectedExternal.datot)||0)
+        : Math.max(0, c.monthly - c.totalReceived);
       if(gap<=0) return null;
-      return { key, amount:gap };
+      return { key, amount:gap, isPending };
     }).filter(Boolean);
     const total = monthsOwed.reduce((s,m)=>s+m.amount,0);
     return { av, total, monthsOwed };
@@ -2682,6 +2692,41 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
             <div style={{fontSize:13,opacity:.8}}>סה״כ מגיע לאברכים (דתות/קרן שלא כוסו, כל החודשים שלא סומנו כשולם)</div>
             <div style={{fontSize:30,fontWeight:800}}>{fmt(grandTotalCumulative)} ₪</div>
           </div>
+
+          <div style={{...card,borderRight:"4px solid #a78bfa"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:editExpected?10:0}}>
+              <div style={{fontWeight:700,fontSize:13,color:"#7c3aed"}}>⚙️ סכום צפוי לאברך בחודש ממתין (₪)</div>
+              <button style={{...smallBtn,color:"#7c3aed",borderColor:"#c4b5fd"}}
+                onClick={()=>{ setTempExpDatot(String(expectedExternal.datot||675)); setTempExpKeren(String(expectedExternal.keren||675)); setEditExpected(!editExpected); }}>
+                {editExpected?"סגור":"✏️ ערוך"}
+              </button>
+            </div>
+            {!editExpected && (
+              <div style={{display:"flex",gap:16,marginTop:6}}>
+                <div style={{fontSize:13}}><span style={{color:"#b45309",fontWeight:700}}>דתות:</span> <b>{fmt(expectedExternal.datot||0)} ₪</b></div>
+                <div style={{fontSize:13}}><span style={{color:"#059669",fontWeight:700}}>קרן:</span> <b>{fmt(expectedExternal.keren||0)} ₪</b></div>
+              </div>
+            )}
+            {editExpected && (
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <div>
+                  <label style={{fontSize:12,color:"#b45309",fontWeight:700,display:"block",marginBottom:4}}>דתות — צפוי לאברך (₪)</label>
+                  <input type="number" style={inp} value={tempExpDatot} onChange={e=>setTempExpDatot(e.target.value)}/>
+                </div>
+                <div>
+                  <label style={{fontSize:12,color:"#059669",fontWeight:700,display:"block",marginBottom:4}}>קרן — צפוי לאברך (₪)</label>
+                  <input type="number" style={inp} value={tempExpKeren} onChange={e=>setTempExpKeren(e.target.value)}/>
+                </div>
+                <div style={{gridColumn:"1/-1"}}>
+                  <button style={{...primaryBtn,background:"#7c3aed"}} onClick={()=>{
+                    setExpectedExternal({datot:Number(tempExpDatot)||0,keren:Number(tempExpKeren)||0});
+                    setEditExpected(false);
+                  }}>💾 שמור</button>
+                </div>
+              </div>
+            )}
+          </div>
+
           {cumulativeByAv.length===0 && <div style={{...card,color:"#94a3b8",textAlign:"center"}}>אין סכומים מצטברים ממתינים — הכל מסומן כשולם או מכוסה</div>}
           {cumulativeByAv.map(({av,total,monthsOwed})=>(
             <div key={av.id} style={{...card,borderRight:"4px solid #7c3aed"}}>
@@ -2692,8 +2737,8 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
               <div style={{fontSize:11,color:"#64748b",marginTop:6,display:"flex",flexWrap:"wrap",gap:6}}>
                 {monthsOwed.map(m=>{
                   const [y,mo]=m.key.split("-");
-                  return <span key={m.key} style={{background:"#f5f3ff",borderRadius:6,padding:"2px 8px"}}>
-                    {mkMonthLabel(Number(y),Number(mo)-1)}: {fmt(m.amount)} ₪
+                  return <span key={m.key} style={{background:m.isPending?"#fffbeb":"#f5f3ff",borderRadius:6,padding:"2px 8px"}}>
+                    {mkMonthLabel(Number(y),Number(mo)-1)}: {fmt(m.amount)} ₪{m.isPending?" (משוער)":""}
                   </span>;
                 })}
               </div>
