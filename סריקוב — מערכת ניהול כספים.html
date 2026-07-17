@@ -575,7 +575,7 @@ function App(){
 
       <main style={{maxWidth:720,margin:"0 auto",padding:"12px 14px"}}>
         {tab==="main"       && <MainTab selKey={selKey} selYear={selYear} selMonth={selMonth} baseBalance={baseBalance} setBaseBalance={setBaseBalance} liveBalance={liveBalance} curTotals={curTotals} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} syncing={syncing} allDonorNames={allDonorNames} donorHistory={donorHistory} avrechim={avrechim} />}
-        {tab==="avrechim"   && <AvrechimTab avrechim={avrechim} setAvrechim={setAvrechim} selKey={selKey} prevKey={prevKey} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} calcAvrechMonth={calcAvrechMonth} totalOwed={totalOwed} attendance={attendance} customVacations={customVacations} beinHazmanims={beinHazmanims} hiddenHols={hiddenHols} />}
+        {tab==="avrechim"   && <AvrechimTab avrechim={avrechim} setAvrechim={setAvrechim} selKey={selKey} prevKey={prevKey} selYear={selYear} selMonth={selMonth} getAV={getAV} getMD={getMD} setAvMonthField={setAvMonthField} calcAvrechMonth={calcAvrechMonth} totalOwed={totalOwed} attendance={attendance} customVacations={customVacations} beinHazmanims={beinHazmanims} hiddenHols={hiddenHols} />}
         {tab==="attendance" && <AttendanceTab avrechim={avrechim} selKey={selKey} selYear={selYear} selMonth={selMonth} attendance={attendance} setAttendanceDay={setAttendanceDay} fillMonthBatch={fillMonthBatch} customVacations={customVacations} setCustomVacation={setCustomVacation} removeCustomVacation={removeCustomVacation} beinHazmanims={beinHazmanims} addBeinHazmanim={addBeinHazmanim} removeBeinHazmanim={removeBeinHazmanim} updateBeinHazmanim={updateBeinHazmanim} hiddenHols={hiddenHols} toggleHolidayHidden={toggleHolidayHidden} />}
         {tab==="summary"    && <SummaryTab avrechim={avrechim} allMonthKeys={allMonthKeys()} calcMonthTotals={calcMonthTotals} calcAvrechMonth={calcAvrechMonth} getPrevMonthKey={getPrevMonthKey} baseBalance={baseBalance} liveBalance={liveBalance} selKey={selKey} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} />}
         {tab==="bank"       && <BankTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} />}
@@ -993,7 +993,7 @@ function ImportModal({ avrechim, selKey, setAvMonthField, onClose }){
 }
 
 // ── AVRECHIM TAB ─────────────────────────────────────────────
-function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth, getAV, setAvMonthField, calcAvrechMonth, totalOwed, attendance, customVacations, beinHazmanims, hiddenHols }){
+function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth, getAV, getMD, setAvMonthField, calcAvrechMonth, totalOwed, attendance, customVacations, beinHazmanims, hiddenHols }){
   const [editId,setEditId]=useState(null);
   const [showAdd,setShowAdd]=useState(false);
   const [showImport,setShowImport]=useState(false);
@@ -1032,6 +1032,26 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
     return count;
   };
 
+  // "הכניס סריקוב" — לפי מה שמוזן בראשי ב"נשלח לאברכים" (לא לפי מסלול קבוע):
+  // אם רק שדה אחד מתוך sent2000/sent1000/sentKeren לא-אפס — כולם קיבלו את אותו סכום החודש.
+  // אם כמה שדות מלאים בו-זמנית (חודש מעורב) — משתמשים במסלול/קבוצה של כל אברך.
+  const sent2000 = Number(getMD(selKey,"sent2000"))||0;
+  const sent1000 = Number(getMD(selKey,"sent1000"))||0;
+  const sentKeren = Number(getMD(selKey,"sentKeren"))||0;
+  const filledSentFields = [sent2000,sent1000,sentKeren].filter(n=>n>0).length;
+  const applySarikowGivenToAll = () => {
+    avrechim.filter(a=>a.active).forEach(av=>{
+      const isKerenGroup = (av.incomeGroup||(av.track==="keren"?"keren":"datot"))==="keren";
+      let amt;
+      if(filledSentFields<=1){
+        amt = sent2000>0 ? 2000 : (sent1000>0||sentKeren>0) ? 1000 : null;
+      } else {
+        amt = isKerenGroup ? 1000 : (Number(av.track)||1000);
+      }
+      if(amt!=null) setAvMonthField(selKey,av.id,"sarikowGiven",amt);
+    });
+  };
+
   return (
     <div style={col}>
       <div style={{background:"linear-gradient(135deg,#3b0764,#7c3aed)",borderRadius:12,padding:"14px 16px",color:"#fff",boxShadow:"0 2px 8px rgba(0,0,0,0.15)"}}>
@@ -1052,6 +1072,21 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
           <button style={addBtn} onClick={()=>setShowAdd(true)}>+ הוסף אברך</button>
         </div>
       </div>
+
+      {(sent2000>0||sent1000>0||sentKeren>0) && (
+        <div style={{background:"#f5f3ff",border:"1.5px solid #c4b5fd",borderRadius:10,padding:"9px 12px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+          <div style={{fontSize:11,color:"#5b21b6"}}>
+            לפי "נשלח לאברכים" בראשי:
+            {sent2000>0&&` ${sent2000}×2,000`}
+            {sent1000>0&&` | ${sent1000}×1,000`}
+            {sentKeren>0&&` | ${sentKeren}×1,000 (קרן)`}
+          </div>
+          <button style={{...smallBtn,background:"#7c3aed",color:"#fff",fontWeight:700}}
+            onClick={()=>{ if(window.confirm("זה ימלא את שדה \"הכניס סריקוב\" לכל האברכים הפעילים לפי הסכומים שהוזנו בראשי. אפשר עדיין לשנות ידנית לאברך ספציפי אחרי כן. להמשיך?")) applySarikowGivenToAll(); }}>
+            🔄 החל על כולם
+          </button>
+        </div>
+      )}
       {showImport&&<ImportModal avrechim={avrechim} selKey={selKey} setAvMonthField={setAvMonthField} onClose={()=>setShowImport(false)}/>}
 
       <div style={{position:"relative"}}>
