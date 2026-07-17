@@ -398,11 +398,11 @@ function App(){
     const datot = datotRaw!==""?Number(datotRaw):autoDatot;
     const keren = kerenRaw!==""?Number(kerenRaw):autoKeren;
 
-    // עיגול אוטומטי: מסלול − דתות − קרן
-    const rounding = Math.max(0, trackNum - datot - keren);
     // כמה הכניס סריקוב בפועל לאברך (ברירת מחדל: לפי המסלול)
     const sarikowGivenRaw = getAV(monthKey,av.id,"sarikowGiven");
     const sarikowGiven = sarikowGivenRaw!==""?Number(sarikowGivenRaw):trackNum;
+    // עיגול אוטומטי: מה שסריקוב הכניס בפועל − דתות − קרן (לא המסלול הקבוע — כדי לשקף מה שבאמת ניתן החודש)
+    const rounding = Math.max(0, sarikowGiven - datot - keren);
     // מה מתוך מה שסריקוב הכניס מקורו בקופה (אחרי קיזוז דתות/קרן)
     const kupaPortion = sarikowGiven - datot - keren;
     // בנק בסיסי: מגיע לו − מה שמקורו בקופה + בחינות
@@ -1244,17 +1244,14 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
                 <span style={{color:"#1d4ed8",fontWeight:600}}>⚖️ עיגול סריקוב מהקופה:</span>
                 <span style={{color:"#1e293b",fontWeight:700,fontSize:13}}>
                   {c.incomeGroup==="datot"
-                    ? `${fmt(c.trackNum)} − ${fmt(c.datot)} = `
-                    : `${fmt(c.trackNum)} − ${fmt(c.keren)} = `}
+                    ? `${fmt(c.sarikowGiven)} − ${fmt(c.datot)} = `
+                    : `${fmt(c.sarikowGiven)} − ${fmt(c.keren)} = `}
                   <span style={{color:"#2563eb",fontSize:14}}>{fmt(c.rounding)} ₪</span>
                 </span>
               </div>
               {c.sarikowGiven!==c.trackNum && (
-                <div style={{marginTop:4,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <span style={{color:"#7c3aed",fontWeight:600}}>
-                    💵 סריקוב הכניס בפועל {fmt(c.sarikowGiven)} ₪ ⇒ מהקופה:
-                  </span>
-                  <span style={{color:"#7c3aed",fontWeight:700,fontSize:13}}>{fmt(c.kupaPortion)} ₪</span>
+                <div style={{marginTop:4,fontSize:11,color:"#94a3b8",textAlign:"left"}}>
+                  (מסלול קבוע: {fmt(c.trackNum)} ₪ — סריקוב הכניס בפועל {fmt(c.sarikowGiven)} ₪)
                 </div>
               )}
             </div>
