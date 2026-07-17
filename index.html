@@ -410,9 +410,10 @@ function App(){
     const effectiveBank = bank;
 
     // תענית דיבור — מזומן נפרד, 15 ₪ ליום (מחושב כאן כי נחוץ להתחשבנות)
+    // מוצג תמיד ב"מגיע לו סה״כ" בלשונית חשבון, בלי תלות בסימון "קיבל" בלשונית בנק (זה מעקב תשלום מזומן נפרד)
     const taanitDays   = Number(getAV(monthKey,av.id,"taanitDays"))||0;
     const taanitAmount = taanitDays * 15;
-    const taanitOwed   = getAV(monthKey,av.id,"taanitPaid")==="1" ? 0 : taanitAmount;
+    const taanitOwed   = taanitAmount;
 
     // ── חישוב יתרה לחשבון ──
     // מה מגיע לאברך מהקופה עצמה בלבד — לא כולל את חלק הדתות/קרן (זה כסף חיצוני שעובר דרך סריקוב, לא מקזז מהמחויבות של הקופה)
