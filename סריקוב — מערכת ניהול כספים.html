@@ -2573,7 +2573,10 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
       const pk = getPrevMonthKey(key);
       const c = calcAvrechMonth(av,key,pk);
       if(c.monthly<=0) return null;
-      const isPending = c.incomeGroup==="keren" ? c.keren===0 : c.datot===0;
+      // "ממתין" נבדק לפי הסכום הקבוצתי (autoDatot/autoKeren) ולא לפי c.datot/c.keren —
+      // עקיפה ידנית ישנה שהוקפאה על 0 (מתקופה שבה זה באמת היה ממתין) לא אמורה להמשיך
+      // לסמן ממתין לנצח אחרי שההעברה הקבוצתית כבר הוזנה בפועל לחודשים מאוחרים יותר.
+      const isPending = c.incomeGroup==="keren" ? c.autoKeren===0 : c.autoDatot===0;
       if(!isPending) return null;
       const amount = Number((c.incomeGroup==="keren" ? recentKerenLookup[key] : recentDatotLookup[key])||0);
       if(amount<=0) return null;
