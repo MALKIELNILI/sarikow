@@ -231,7 +231,6 @@ function App(){
   const [syncing,setSyncing]     = useState(false);
   const [baseBalance,setBaseBS]  = useState({amount:191321,date:"29.1.26"});
   const [avrechim,setAvrechimS]  = useState(defaultAvrechim);
-  const [supplementSettings,setSupplementS] = useState({datot:1000,keren:1000});
   const [rpAvrechim, setRpAvrechimS]   = useState([]);
   const [rpMonths,   setRpMonthsS]     = useState({});
   const [rpBaseBalance, setRpBaseBS]   = useState({amount:0,date:""});
@@ -253,7 +252,7 @@ function App(){
   const local = useRef({baseBalance,avrechim,allMonths,avAllMonths,attendance:{},customVacations:{},beinHazmanims:BEIN_HAZMANIM,hiddenHols:[],rpAvrechim:[],rpMonths:{},rpBaseBalance:{amount:0,date:""},rpContact:{email:"",phone:""}});
 
   useEffect(()=>{
-    let loaded={base:false,av:false,months:false,avmonths:false,att:false,cv:false,bh:false,hh:false,supp:false,rpav:false,rpmonths:false,rpbase:false,rpcontact:false};
+    let loaded={base:false,av:false,months:false,avmonths:false,att:false,cv:false,bh:false,hh:false,rpav:false,rpmonths:false,rpbase:false,rpcontact:false};
     const check=()=>{ if(Object.values(loaded).every(Boolean)) setReady(true); };
     const u1=fbListen("baseBalance",v=>{ if(v){setBaseBS(v);local.current.baseBalance=v;} loaded.base=true;check(); });
     const u2=fbListen("avrechim",v=>{
@@ -280,19 +279,17 @@ function App(){
       loaded.bh=true;check();
     });
     const u8=fbListen("hiddenHols",v=>{ const d=v||[]; setHiddenHols(d);local.current.hiddenHols=d; loaded.hh=true;check(); });
-    const u9=fbListen("supplementSettings",v=>{ if(v&&typeof v==="object"){setSupplementS(v);local.current.supplementSettings=v;} loaded.supp=true;check(); });
     const urp1=fbListen("ravPinchas/avrechim",v=>{ const d=v&&Array.isArray(v)?v:[]; setRpAvrechimS(d);local.current.rpAvrechim=d; loaded.rpav=true;check(); });
     const urp2=fbListen("ravPinchas/months",v=>{ const d=v||{}; setRpMonthsS(d);local.current.rpMonths=d; loaded.rpmonths=true;check(); });
     const urp3=fbListen("ravPinchas/baseBalance",v=>{ if(v){setRpBaseBS(v);local.current.rpBaseBalance=v;} loaded.rpbase=true;check(); });
     const urp4=fbListen("ravPinchas/contact",v=>{ if(v){setRpContactS(v);local.current.rpContact=v;} loaded.rpcontact=true;check(); });
-    return()=>{ u1();u2();u3();u4();u5();u6();u7();u8();u9();urp1();urp2();urp3();urp4(); };
+    return()=>{ u1();u2();u3();u4();u5();u6();u7();u8();urp1();urp2();urp3();urp4(); };
   },[]);
 
   const sync = fn => { setSyncing(true); fn(); setTimeout(()=>setSyncing(false),1200); };
   const setBaseBalance = v => { setBaseBS(v); sync(()=>fbSet("baseBalance",v)); };
   const setAvrechim    = fn => { const n=typeof fn==="function"?fn(local.current.avrechim):fn; local.current.avrechim=n; setAvrechimS(n); sync(()=>fbSet("avrechim",n)); };
 
-  const setSupplementSettings = v => { setSupplementS(v); local.current.supplementSettings=v; sync(()=>fbSet("supplementSettings",v)); };
 
   const setMonthField = (key,field,val) => {
     const cur = local.current.allMonths;
@@ -413,15 +410,12 @@ function App(){
     const effectiveBank = bank;
 
     // ── חישוב יתרה לחשבון ──
-    const suppAmt = incomeGroup==="keren"
-      ? Number((local.current.supplementSettings||supplementSettings)?.keren||0)
-      : Number((local.current.supplementSettings||supplementSettings)?.datot||0);
-    // מה האברך מקבל בפועל: חיצוני (דתות/קרן) + השלמת סריקוב
+    // מה האברך מקבל בפועל בסה״כ: מה שהכניס סריקוב (כולל את מה שמקורו בדתות/קרן וכולל את חלק הקופה)
     const externalPerAvrech = autoDatot + autoKeren;
-    const totalReceived = externalPerAvrech + suppAmt;
-    // יתרה: חיובי = סריקוב חייב לאברך | שלילי = אברך חייב לסריקוב
+    const totalReceived = sarikowGiven;
+    // יתרה: חיובי = סריקוב חייב לאברך | שלילי = אברך חייב לסריקוב (מגיע לו כולל בחינות, מול מה שקיבל בפועל)
     const prevSettlementCarryover = prevMonthKey ? Number(getAV(prevMonthKey,av.id,"settlementCarryover")||0) : 0;
-    const settlementBalance = (monthly > 0 ? monthly - totalReceived : 0) + prevSettlementCarryover;
+    const settlementBalance = (monthly > 0 ? (monthly+exams) - totalReceived : 0) + prevSettlementCarryover;
     // מה הוכנס בפועל לבנק
     const actualBankRaw = getAV(monthKey,av.id,"actualBank");
     const actualBank = actualBankRaw!==""?Number(actualBankRaw):null;
@@ -442,7 +436,7 @@ function App(){
     const taanitDays   = Number(getAV(monthKey,av.id,"taanitDays"))||0;
     const taanitAmount = taanitDays * 15;
 
-    return { monthly, datot, keren, autoDatot, autoKeren, datotRaw, kerenRaw, rounding, sarikowGivenRaw, sarikowGiven, kupaPortion, exams, bank, prevBankGap, effectiveBank, actualBank, holiday, depositRounding, totalToBank, bankDeposit, cashAmount, bankGapAuto, bankGap, trackNum, datotCount, kerenCount, incomeGroup, totalDatot, totalKeren, taanitDays, taanitAmount, suppAmt, externalPerAvrech, totalReceived, settlementBalance, prevSettlementCarryover, prevRefundCarryover };
+    return { monthly, datot, keren, autoDatot, autoKeren, datotRaw, kerenRaw, rounding, sarikowGivenRaw, sarikowGiven, kupaPortion, exams, bank, prevBankGap, effectiveBank, actualBank, holiday, depositRounding, totalToBank, bankDeposit, cashAmount, bankGapAuto, bankGap, trackNum, datotCount, kerenCount, incomeGroup, totalDatot, totalKeren, taanitDays, taanitAmount, externalPerAvrech, totalReceived, settlementBalance, prevSettlementCarryover, prevRefundCarryover };
   };
 
   // Get sorted month keys
@@ -579,7 +573,7 @@ function App(){
         {tab==="attendance" && <AttendanceTab avrechim={avrechim} selKey={selKey} selYear={selYear} selMonth={selMonth} attendance={attendance} setAttendanceDay={setAttendanceDay} fillMonthBatch={fillMonthBatch} customVacations={customVacations} setCustomVacation={setCustomVacation} removeCustomVacation={removeCustomVacation} beinHazmanims={beinHazmanims} addBeinHazmanim={addBeinHazmanim} removeBeinHazmanim={removeBeinHazmanim} updateBeinHazmanim={updateBeinHazmanim} hiddenHols={hiddenHols} toggleHolidayHidden={toggleHolidayHidden} />}
         {tab==="summary"    && <SummaryTab avrechim={avrechim} allMonthKeys={allMonthKeys()} calcMonthTotals={calcMonthTotals} calcAvrechMonth={calcAvrechMonth} getPrevMonthKey={getPrevMonthKey} baseBalance={baseBalance} liveBalance={liveBalance} selKey={selKey} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} />}
         {tab==="bank"       && <BankTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} />}
-        {tab==="settlement" && <SettlementTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} supplementSettings={supplementSettings} setSupplementSettings={setSupplementSettings} allMonthKeys={allMonthKeys()} getPrevMonthKey={getPrevMonthKey} />}
+        {tab==="settlement" && <SettlementTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} allMonthKeys={allMonthKeys()} getPrevMonthKey={getPrevMonthKey} />}
         {tab==="ravpinchas" && <RavPinchasTab rpAvrechim={rpAvrechim} setRpAvrechim={setRpAvrechim} rpMonths={rpMonths} setRpMonthField={setRpMonthField} rpBaseBalance={rpBaseBalance} setRpBaseBalance={setRpBaseBalance} rpContact={rpContact} setRpContact={setRpContact} selKey={selKey} selYear={selYear} selMonth={selMonth} allDonorNames={allDonorNames} donorHistory={donorHistory} syncing={syncing} sarikowLiveBalance={liveBalance} />}
       </main>
     </div>
@@ -1249,11 +1243,6 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
                   <span style={{color:"#2563eb",fontSize:14}}>{fmt(c.rounding)} ₪</span>
                 </span>
               </div>
-              {c.sarikowGiven!==c.trackNum && (
-                <div style={{marginTop:4,fontSize:11,color:"#94a3b8",textAlign:"left"}}>
-                  (מסלול קבוע: {fmt(c.trackNum)} ₪ — סריקוב הכניס בפועל {fmt(c.sarikowGiven)} ₪)
-                </div>
-              )}
             </div>
 
             {/* נוסחת בנק — מוצגת רק כשיש ערך */}
@@ -2550,10 +2539,7 @@ const smallBtn  = {padding:"4px 9px",borderRadius:6,background:"#f1f5f9",border:
 const delBtn    = {background:"#fee2e2",color:"#dc2626",border:"none",borderRadius:6,padding:"3px 8px",cursor:"pointer"};
 
 // ── SETTLEMENT TAB ───────────────────────────────────────────
-function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, selMonth, getAV, setAvMonthField, supplementSettings, setSupplementSettings, allMonthKeys, getPrevMonthKey }){
-  const [editSupp,setEditSupp] = useState(false);
-  const [tempDatot,setTempDatot] = useState(String(supplementSettings.datot||1000));
-  const [tempKeren,setTempKeren] = useState(String(supplementSettings.keren||1000));
+function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, selMonth, getAV, setAvMonthField, allMonthKeys, getPrevMonthKey }){
   const [showCumulative,setShowCumulative] = useState(false);
 
   // לכל קבוצה (דתות/קרן) — הסכום האחרון שבאמת הוזן לאברך (לא 0), לשימוש כהערכה לחודשים ממתינים.
@@ -2586,7 +2572,7 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
       const isPending = c.incomeGroup==="keren" ? c.autoKeren===0 : c.autoDatot===0;
       const gap = isPending
         ? Number((c.incomeGroup==="keren" ? recentKerenLookup[key] : recentDatotLookup[key])||0)
-        : Math.max(0, c.monthly - c.totalReceived);
+        : Math.max(0, (c.monthly+c.exams) - c.totalReceived);
       if(gap<=0) return null;
       return { key, amount:gap, isPending };
     }).filter(Boolean);
@@ -2642,9 +2628,9 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontWeight:700,fontSize:14}}>{av.name}</div>
             <div style={{fontSize:11,color:"#64748b",marginTop:2}}>
-              מגיע לו: <b>{fmt(c.monthly)} ₪</b> &nbsp;|&nbsp;
+              מגיע לו: <b>{fmt(c.monthly+c.exams)} ₪</b>{c.exams>0&&` (${fmt(c.monthly)}+${fmt(c.exams)} בחינות)`} &nbsp;|&nbsp;
               חיצוני: {fmt(c.externalPerAvrech)} ₪ &nbsp;|&nbsp;
-              השלמה: {fmt(c.suppAmt)} ₪
+              מהקופה: {fmt(c.kupaPortion)} ₪
               {c.prevSettlementCarryover!==0&&<span style={{color:c.prevSettlementCarryover>0?"#d97706":"#dc2626",fontWeight:700}}>&nbsp;|&nbsp;פ׳קודם: {fmtSigned(c.prevSettlementCarryover)} ₪</span>}
             </div>
           </div>
@@ -2762,41 +2748,6 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
         </div>
       ) : (
       <>
-      {/* כרטיס הגדרות השלמה */}
-      <div style={{...card,borderRight:"4px solid #7c3aed"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:editSupp?10:0}}>
-          <div style={{fontWeight:700,fontSize:14,color:"#7c3aed"}}>⚙️ הגדרות השלמה חודשית (₪ לאברך)</div>
-          <button style={{...smallBtn,color:"#7c3aed",borderColor:"#c4b5fd"}}
-            onClick={()=>{ setTempDatot(String(supplementSettings.datot||1000)); setTempKeren(String(supplementSettings.keren||1000)); setEditSupp(!editSupp); }}>
-            {editSupp?"סגור":"✏️ ערוך"}
-          </button>
-        </div>
-        {!editSupp && (
-          <div style={{display:"flex",gap:16,marginTop:6}}>
-            <div style={{fontSize:13}}><span style={{color:"#b45309",fontWeight:700}}>דתות:</span> <b>{fmt(supplementSettings.datot||0)} ₪</b> לאברך</div>
-            <div style={{fontSize:13}}><span style={{color:"#059669",fontWeight:700}}>קרן:</span> <b>{fmt(supplementSettings.keren||0)} ₪</b> לאברך</div>
-          </div>
-        )}
-        {editSupp && (
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            <div>
-              <label style={{fontSize:12,color:"#b45309",fontWeight:700,display:"block",marginBottom:4}}>השלמה — דתות (₪ לאברך)</label>
-              <input type="number" style={inp} value={tempDatot} onChange={e=>setTempDatot(e.target.value)}/>
-            </div>
-            <div>
-              <label style={{fontSize:12,color:"#059669",fontWeight:700,display:"block",marginBottom:4}}>השלמה — קרן (₪ לאברך)</label>
-              <input type="number" style={inp} value={tempKeren} onChange={e=>setTempKeren(e.target.value)}/>
-            </div>
-            <div style={{gridColumn:"1/-1"}}>
-              <button style={{...primaryBtn,background:"#7c3aed"}} onClick={()=>{
-                setSupplementSettings({datot:Number(tempDatot)||0,keren:Number(tempKeren)||0});
-                setEditSupp(false);
-              }}>💾 שמור הגדרות</button>
-            </div>
-          </div>
-        )}
-      </div>
-
       {/* סיכום כולל */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
         <div style={{background:"linear-gradient(135deg,#92400e,#d97706)",borderRadius:12,padding:"14px",color:"#fff"}}>
