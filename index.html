@@ -2566,22 +2566,19 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
   const recentDatotLookup = buildRecentExternalLookup("datot");
   const recentKerenLookup = buildRecentExternalLookup("keren");
 
-  // מצטבר לאורך כל החודשים: לכל אברך — בכל חודש שלא סומן כ"שולם", כמה עדיין מגיע לו.
-  // אם דתות/קרן עדיין לא הוזן בראשי לאותו חודש — מוסיפים גם את ההערכה (מה שבאמת ייחשב כמגיע ברגע שיוזן),
-  // כי ברגע שיוזן הסכום החיצוני, הוא לא יקזז את מחויבות הקופה (ראה לוגיקת kupaPortion) אלא רק יחשוף שיש עוד לתת.
+  // מצטבר לאורך כל החודשים: רק סכומי דתות/קרן שעדיין לא הוזנו בראשי לאותו חודש (לכל אברך, לפי הקבוצה שלו).
+  // לדוגמה: יולי — דתות הוזן, קרן לא — אז רק אברכי קרן יופיעו עם הערכה עבור יולי.
   const cumulativeByAv = avrechim.filter(a=>a.active).map(av=>{
     const monthsOwed = (allMonthKeys||[]).map(key=>{
       const pk = getPrevMonthKey(key);
       const c = calcAvrechMonth(av,key,pk);
-      if(c.totalOwedToAv<=0) return null;
+      if(c.monthly<=0) return null;
       if(getAV(key,av.id,"settlementPaid")==="1") return null;
       const isPending = c.incomeGroup==="keren" ? c.autoKeren===0 : c.autoDatot===0;
-      const pendingEstimate = isPending
-        ? Number((c.incomeGroup==="keren" ? recentKerenLookup[key] : recentDatotLookup[key])||0)
-        : 0;
-      const gap = Math.max(0, c.totalOwedToAv - c.totalReceived) + pendingEstimate;
-      if(gap<=0) return null;
-      return { key, amount:gap, isPending };
+      if(!isPending) return null;
+      const amount = Number((c.incomeGroup==="keren" ? recentKerenLookup[key] : recentDatotLookup[key])||0);
+      if(amount<=0) return null;
+      return { key, amount, isPending:true };
     }).filter(Boolean);
     const total = monthsOwed.reduce((s,m)=>s+m.amount,0);
     return { av, total, monthsOwed };
@@ -2716,7 +2713,7 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
     <div style={col}>
       {/* כפתור מעבר: חודש נוכחי / מצטבר */}
       <div style={{display:"flex",gap:6,background:"#fff",borderRadius:10,padding:"8px 12px",boxShadow:"0 1px 4px rgba(0,0,0,0.07)"}}>
-        {[[false,"📅 חודש נוכחי"],[true,"📊 מצטבר לפי אברך — כמה לתת ברטרו"]].map(([v,l])=>(
+        {[[false,"📅 חודש נוכחי"],[true,"📊 דתות/קרן שטרם הוזנו — מצטבר לפי אברך"]].map(([v,l])=>(
           <button key={String(v)} onClick={()=>setShowCumulative(v)}
             style={{flex:1,padding:"7px",borderRadius:8,border:`2px solid ${showCumulative===v?"#7c3aed":"#e2e8f0"}`,
               background:showCumulative===v?"#7c3aed":"#f8fafc",color:showCumulative===v?"#fff":"#64748b",
@@ -2729,12 +2726,12 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
       {showCumulative ? (
         <div style={col}>
           <div style={{background:"linear-gradient(135deg,#4c1d95,#7c3aed)",borderRadius:12,padding:"14px 16px",color:"#fff"}}>
-            <div style={{fontSize:13,opacity:.8}}>סה״כ מגיע לאברכים (דתות/קרן שלא כוסו, כל החודשים שלא סומנו כשולם)</div>
+            <div style={{fontSize:13,opacity:.8}}>סה״כ דתות/קרן שטרם הוזנו בראשי (כל החודשים שלא סומנו כשולם)</div>
             <div style={{fontSize:30,fontWeight:800}}>{fmt(grandTotalCumulative)} ₪</div>
           </div>
 
           <div style={{...card,borderRight:"4px solid #a78bfa",fontSize:11,color:"#78716c"}}>
-            ℹ️ עבור חודשים שההעברה עדיין לא התקבלה, ההערכה מבוססת אוטומטית על הסכום האמיתי האחרון שהוזן ב״ראשי → הכנסות נוספות״ לדתות/קרן — אין צורך לעדכן ידנית, זה מסתנכרן לבד.
+            ℹ️ מוצגים כאן רק סכומי דתות/קרן שעדיין לא הוזנו בראשי לאותו חודש (למשל: יולי — דתות הוזן, קרן לא — יופיע כאן רק החלק של קרן). ההערכה מבוססת אוטומטית על הסכום האמיתי האחרון שכן הוזן לאותה קבוצה — אין צורך לעדכן ידנית.
           </div>
 
           {cumulativeByAv.length===0 && <div style={{...card,color:"#94a3b8",textAlign:"center"}}>אין סכומים מצטברים ממתינים — הכל מסומן כשולם או מכוסה</div>}
