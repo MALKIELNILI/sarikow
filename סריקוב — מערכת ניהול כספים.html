@@ -2573,8 +2573,7 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
       const pk = getPrevMonthKey(key);
       const c = calcAvrechMonth(av,key,pk);
       if(c.monthly<=0) return null;
-      if(getAV(key,av.id,"settlementPaid")==="1") return null;
-      const isPending = c.incomeGroup==="keren" ? c.autoKeren===0 : c.autoDatot===0;
+      const isPending = c.incomeGroup==="keren" ? c.keren===0 : c.datot===0;
       if(!isPending) return null;
       const amount = Number((c.incomeGroup==="keren" ? recentKerenLookup[key] : recentDatotLookup[key])||0);
       if(amount<=0) return null;
