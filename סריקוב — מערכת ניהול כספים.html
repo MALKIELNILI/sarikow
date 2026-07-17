@@ -2572,7 +2572,8 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
     const monthsOwed = (allMonthKeys||[]).map(key=>{
       const pk = getPrevMonthKey(key);
       const c = calcAvrechMonth(av,key,pk);
-      if(c.monthly<=0) return null;
+      // לא מסננים לפי c.monthly — "ממתין" הוא עובדה קבוצתית (האם דתות/קרן הוזן),
+      // לא תלוי אם ל"מגיע לו" האישי כבר הוזן ערך לאותו חודש (למשל JB עוד לא יובא).
       // "ממתין" נבדק לפי הסכום הקבוצתי (autoDatot/autoKeren) ולא לפי c.datot/c.keren —
       // עקיפה ידנית ישנה שהוקפאה על 0 (מתקופה שבה זה באמת היה ממתין) לא אמורה להמשיך
       // לסמן ממתין לנצח אחרי שההעברה הקבוצתית כבר הוזנה בפועל לחודשים מאוחרים יותר.
