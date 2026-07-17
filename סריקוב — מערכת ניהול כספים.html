@@ -2547,17 +2547,41 @@ const delBtn    = {background:"#fee2e2",color:"#dc2626",border:"none",borderRadi
 function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, selMonth, getAV, setAvMonthField, allMonthKeys, getPrevMonthKey }){
   const [showCumulative,setShowCumulative] = useState(false);
 
-  // מצטבר לאורך כל החודשים: לכל אברך — בכל חודש שלא סומן כ"שולם", כמה עדיין מגיע לו
-  // (מגיע לו + בחינות + תענית דיבור שטרם שולמה) מעבר לחלק הקופה (לא כולל דתות/קרן — זה כסף חיצוני נפרד)
+  // לכל קבוצה (דתות/קרן) — הסכום האחרון שבאמת הוזן לאברך (לא 0), לשימוש כהערכה לחודשים שההעברה בהם עדיין לא הוזנה בראשי.
+  // מסונכרן אוטומטית עם מה שמוזן בלשונית ראשי — כשמוזן סכום אמיתי חדש, ההערכה מתעדכנת ממנו לבד.
+  const buildRecentExternalLookup = group => {
+    const sampleAv = avrechim.find(a=>a.active && (a.incomeGroup||(a.track==="keren"?"keren":"datot"))===group);
+    const lookup = {};
+    if(!sampleAv) return lookup;
+    let lastKnown = 0;
+    [...(allMonthKeys||[])].sort().forEach(key=>{
+      const pk = getPrevMonthKey(key);
+      const c = calcAvrechMonth(sampleAv,key,pk);
+      const val = group==="keren" ? c.autoKeren : c.autoDatot;
+      if(val>0) lastKnown = val;
+      lookup[key] = lastKnown;
+    });
+    return lookup;
+  };
+  const recentDatotLookup = buildRecentExternalLookup("datot");
+  const recentKerenLookup = buildRecentExternalLookup("keren");
+
+  // מצטבר לאורך כל החודשים: לכל אברך — בכל חודש שלא סומן כ"שולם", כמה עדיין מגיע לו.
+  // אם דתות/קרן עדיין לא הוזן בראשי לאותו חודש — מוסיפים גם את ההערכה (מה שבאמת ייחשב כמגיע ברגע שיוזן),
+  // כי ברגע שיוזן הסכום החיצוני, הוא לא יקזז את מחויבות הקופה (ראה לוגיקת kupaPortion) אלא רק יחשוף שיש עוד לתת.
   const cumulativeByAv = avrechim.filter(a=>a.active).map(av=>{
     const monthsOwed = (allMonthKeys||[]).map(key=>{
       const pk = getPrevMonthKey(key);
       const c = calcAvrechMonth(av,key,pk);
       if(c.totalOwedToAv<=0) return null;
       if(getAV(key,av.id,"settlementPaid")==="1") return null;
-      const gap = Math.max(0, c.totalOwedToAv - c.totalReceived);
+      const isPending = c.incomeGroup==="keren" ? c.autoKeren===0 : c.autoDatot===0;
+      const pendingEstimate = isPending
+        ? Number((c.incomeGroup==="keren" ? recentKerenLookup[key] : recentDatotLookup[key])||0)
+        : 0;
+      const gap = Math.max(0, c.totalOwedToAv - c.totalReceived) + pendingEstimate;
       if(gap<=0) return null;
-      return { key, amount:gap };
+      return { key, amount:gap, isPending };
     }).filter(Boolean);
     const total = monthsOwed.reduce((s,m)=>s+m.amount,0);
     return { av, total, monthsOwed };
