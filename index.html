@@ -409,13 +409,20 @@ function App(){
     const prevBankGap = 0;
     const effectiveBank = bank;
 
+    // תענית דיבור — מזומן נפרד, 15 ₪ ליום (מחושב כאן כי נחוץ להתחשבנות)
+    const taanitDays   = Number(getAV(monthKey,av.id,"taanitDays"))||0;
+    const taanitAmount = taanitDays * 15;
+    const taanitOwed   = getAV(monthKey,av.id,"taanitPaid")==="1" ? 0 : taanitAmount;
+
     // ── חישוב יתרה לחשבון ──
-    // מה האברך מקבל בפועל בסה״כ: מה שהכניס סריקוב (כולל את מה שמקורו בדתות/קרן וכולל את חלק הקופה)
+    // מה מגיע לאברך מהקופה עצמה בלבד — לא כולל את חלק הדתות/קרן (זה כסף חיצוני שעובר דרך סריקוב, לא מקזז מהמחויבות של הקופה)
     const externalPerAvrech = autoDatot + autoKeren;
-    const totalReceived = sarikowGiven;
-    // יתרה: חיובי = סריקוב חייב לאברך | שלילי = אברך חייב לסריקוב (מגיע לו כולל בחינות, מול מה שקיבל בפועל)
+    const totalReceived = kupaPortion;
+    // סה״כ מגיע לאברך (מגיע לו + בחינות + תענית דיבור שטרם שולמה)
+    const totalOwedToAv = monthly + exams + taanitOwed;
+    // יתרה: חיובי = סריקוב חייב לאברך | שלילי = אברך חייב לסריקוב
     const prevSettlementCarryover = prevMonthKey ? Number(getAV(prevMonthKey,av.id,"settlementCarryover")||0) : 0;
-    const settlementBalance = (monthly > 0 ? (monthly+exams) - totalReceived : 0) + prevSettlementCarryover;
+    const settlementBalance = (totalOwedToAv > 0 ? totalOwedToAv - totalReceived : 0) + prevSettlementCarryover;
     // מה הוכנס בפועל לבנק
     const actualBankRaw = getAV(monthKey,av.id,"actualBank");
     const actualBank = actualBankRaw!==""?Number(actualBankRaw):null;
@@ -432,11 +439,8 @@ function App(){
     const bankGapRaw = getAV(monthKey,av.id,"bankGap");
     const bankGapAuto = actualBankForGap!==null ? effectiveBank - (actualBankForGap + cashAmount - holiday - depositRounding) : 0;
     const bankGap = bankGapRaw!==""?Number(bankGapRaw):bankGapAuto;
-    // תענית דיבור — מזומן נפרד, 15 ₪ ליום
-    const taanitDays   = Number(getAV(monthKey,av.id,"taanitDays"))||0;
-    const taanitAmount = taanitDays * 15;
 
-    return { monthly, datot, keren, autoDatot, autoKeren, datotRaw, kerenRaw, rounding, sarikowGivenRaw, sarikowGiven, kupaPortion, exams, bank, prevBankGap, effectiveBank, actualBank, holiday, depositRounding, totalToBank, bankDeposit, cashAmount, bankGapAuto, bankGap, trackNum, datotCount, kerenCount, incomeGroup, totalDatot, totalKeren, taanitDays, taanitAmount, externalPerAvrech, totalReceived, settlementBalance, prevSettlementCarryover, prevRefundCarryover };
+    return { monthly, datot, keren, autoDatot, autoKeren, datotRaw, kerenRaw, rounding, sarikowGivenRaw, sarikowGiven, kupaPortion, exams, bank, prevBankGap, effectiveBank, actualBank, holiday, depositRounding, totalToBank, bankDeposit, cashAmount, bankGapAuto, bankGap, trackNum, datotCount, kerenCount, incomeGroup, totalDatot, totalKeren, taanitDays, taanitAmount, taanitOwed, externalPerAvrech, totalReceived, totalOwedToAv, settlementBalance, prevSettlementCarryover, prevRefundCarryover };
   };
 
   // Get sorted month keys
@@ -2542,39 +2546,17 @@ const delBtn    = {background:"#fee2e2",color:"#dc2626",border:"none",borderRadi
 function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, selMonth, getAV, setAvMonthField, allMonthKeys, getPrevMonthKey }){
   const [showCumulative,setShowCumulative] = useState(false);
 
-  // לכל קבוצה (דתות/קרן) — הסכום האחרון שבאמת הוזן לאברך (לא 0), לשימוש כהערכה לחודשים ממתינים.
-  // מסונכרן אוטומטית עם מה שמוזן בלשונית ראשי — כשמוזן סכום אמיתי חדש, ההערכה מתעדכנת ממנו לבד.
-  const buildRecentExternalLookup = group => {
-    const sampleAv = avrechim.find(a=>a.active && (a.incomeGroup||(a.track==="keren"?"keren":"datot"))===group);
-    const lookup = {};
-    if(!sampleAv) return lookup;
-    let lastKnown = 0;
-    [...(allMonthKeys||[])].sort().forEach(key=>{
-      const pk = getPrevMonthKey(key);
-      const c = calcAvrechMonth(sampleAv,key,pk);
-      const val = group==="keren" ? c.autoKeren : c.autoDatot;
-      if(val>0) lastKnown = val;
-      lookup[key] = lastKnown;
-    });
-    return lookup;
-  };
-  const recentDatotLookup = buildRecentExternalLookup("datot");
-  const recentKerenLookup = buildRecentExternalLookup("keren");
-
-  // מצטבר לאורך כל החודשים: לכל אברך — בכל חודש שלא סומן כ"שולם", כמה מגיע לו מעבר למה שקיבל (חיצוני+השלמה)
-  // אם החודש עדיין ממתין להעברה (חיצוני=0) — משתמשים בסכום הידוע האחרון שהוזן בפועל לקבוצה, ולא בפער התיאורטי המלא
+  // מצטבר לאורך כל החודשים: לכל אברך — בכל חודש שלא סומן כ"שולם", כמה עדיין מגיע לו
+  // (מגיע לו + בחינות + תענית דיבור שטרם שולמה) מעבר לחלק הקופה (לא כולל דתות/קרן — זה כסף חיצוני נפרד)
   const cumulativeByAv = avrechim.filter(a=>a.active).map(av=>{
     const monthsOwed = (allMonthKeys||[]).map(key=>{
       const pk = getPrevMonthKey(key);
       const c = calcAvrechMonth(av,key,pk);
-      if(c.monthly<=0) return null;
+      if(c.totalOwedToAv<=0) return null;
       if(getAV(key,av.id,"settlementPaid")==="1") return null;
-      const isPending = c.incomeGroup==="keren" ? c.autoKeren===0 : c.autoDatot===0;
-      const gap = isPending
-        ? Number((c.incomeGroup==="keren" ? recentKerenLookup[key] : recentDatotLookup[key])||0)
-        : Math.max(0, (c.monthly+c.exams) - c.totalReceived);
+      const gap = Math.max(0, c.totalOwedToAv - c.totalReceived);
       if(gap<=0) return null;
-      return { key, amount:gap, isPending };
+      return { key, amount:gap };
     }).filter(Boolean);
     const total = monthsOwed.reduce((s,m)=>s+m.amount,0);
     return { av, total, monthsOwed };
@@ -2588,10 +2570,10 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
   }));
 
   // חיובי = סריקוב חייב לאברך | שלילי = אברך חייב לסריקוב
-  const iOweRows    = rows.filter(({c})=>c.settlementBalance>0 && (c.monthly>0||c.prevSettlementCarryover!==0));
-  const theyOweRows = rows.filter(({c})=>c.settlementBalance<0 && (c.monthly>0||c.prevSettlementCarryover!==0));
-  const evenRows    = rows.filter(({c})=>c.settlementBalance===0 && c.monthly>0);
-  const noDataRows  = rows.filter(({c})=>c.monthly===0 && c.settlementBalance===0);
+  const iOweRows    = rows.filter(({c})=>c.settlementBalance>0 && (c.totalOwedToAv>0||c.prevSettlementCarryover!==0));
+  const theyOweRows = rows.filter(({c})=>c.settlementBalance<0 && (c.totalOwedToAv>0||c.prevSettlementCarryover!==0));
+  const evenRows    = rows.filter(({c})=>c.settlementBalance===0 && c.totalOwedToAv>0);
+  const noDataRows  = rows.filter(({c})=>c.totalOwedToAv===0 && c.settlementBalance===0);
 
   const totalIOwe   = iOweRows.reduce((s,{c})=>s+c.settlementBalance,0);
   const totalOwedMe = theyOweRows.reduce((s,{c})=>s+Math.abs(c.settlementBalance),0);
@@ -2628,8 +2610,10 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontWeight:700,fontSize:14}}>{av.name}</div>
             <div style={{fontSize:11,color:"#64748b",marginTop:2}}>
-              מגיע לו: <b>{fmt(c.monthly+c.exams)} ₪</b>{c.exams>0&&` (${fmt(c.monthly)}+${fmt(c.exams)} בחינות)`} &nbsp;|&nbsp;
-              חיצוני: {fmt(c.externalPerAvrech)} ₪ &nbsp;|&nbsp;
+              מגיע לו סה״כ: <b>{fmt(c.totalOwedToAv)} ₪</b>
+              {(c.exams>0||c.taanitOwed>0)&&` (${fmt(c.monthly)}${c.exams>0?`+${fmt(c.exams)} בחינות`:""}${c.taanitOwed>0?`+${fmt(c.taanitOwed)} תענית דיבור`:""})`}
+              &nbsp;|&nbsp;
+              חיצוני (דתות/קרן, נפרד): {fmt(c.externalPerAvrech)} ₪ &nbsp;|&nbsp;
               מהקופה: {fmt(c.kupaPortion)} ₪
               {c.prevSettlementCarryover!==0&&<span style={{color:c.prevSettlementCarryover>0?"#d97706":"#dc2626",fontWeight:700}}>&nbsp;|&nbsp;פ׳קודם: {fmtSigned(c.prevSettlementCarryover)} ₪</span>}
             </div>
@@ -2789,7 +2773,7 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
           {evenRows.map(({av,c})=>(
             <div key={av.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 8px",borderRadius:7,background:"#f0fdf4",marginBottom:4}}>
               <span style={{fontWeight:600,fontSize:13}}>{av.name}</span>
-              <span style={{fontSize:12,color:"#16a34a",fontWeight:700}}>✓ מאוזן — {fmt(c.monthly)} ₪</span>
+              <span style={{fontSize:12,color:"#16a34a",fontWeight:700}}>✓ מאוזן — {fmt(c.totalOwedToAv)} ₪</span>
             </div>
           ))}
         </div>
