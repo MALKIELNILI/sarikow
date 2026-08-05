@@ -1032,20 +1032,20 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
   };
 
   // "הכניס סריקוב" — לפי מה שמוזן בראשי ב"נשלח לאברכים" (לא לפי מסלול קבוע):
-  // אם רק שדה אחד מתוך sent2000/sent1000/sentKeren לא-אפס — כולם קיבלו את אותו סכום החודש.
-  // אם כמה שדות מלאים בו-זמנית (חודש מעורב) — משתמשים במסלול/קבוצה של כל אברך.
+  // אם רק שדה אחד מתוך sent2000/sent1000 לא-אפס — כולם (זכאי דתות בלבד) קיבלו את אותו סכום החודש.
+  // אם שני השדות מלאים בו-זמנית (חודש מעורב) — משתמשים במסלול האישי של כל אברך.
+  // חל רק על זכאי דתות — סריקוב מפסיק כרגע להעביר למושהי קרן.
   const sent2000 = Number(getMD(selKey,"sent2000"))||0;
   const sent1000 = Number(getMD(selKey,"sent1000"))||0;
   const sentKeren = Number(getMD(selKey,"sentKeren"))||0;
-  const filledSentFields = [sent2000,sent1000,sentKeren].filter(n=>n>0).length;
+  const filledSentFields = [sent2000,sent1000].filter(n=>n>0).length;
   const applySarikowGivenToAll = () => {
-    avrechim.filter(a=>a.active).forEach(av=>{
-      const isKerenGroup = (av.incomeGroup||(av.track==="keren"?"keren":"datot"))==="keren";
+    avrechim.filter(a=>a.active && (a.incomeGroup||(a.track==="keren"?"keren":"datot"))==="datot").forEach(av=>{
       let amt;
       if(filledSentFields<=1){
-        amt = sent2000>0 ? 2000 : (sent1000>0||sentKeren>0) ? 1000 : null;
+        amt = sent2000>0 ? 2000 : sent1000>0 ? 1000 : null;
       } else {
-        amt = isKerenGroup ? 1000 : (Number(av.track)||1000);
+        amt = Number(av.track)||1000;
       }
       if(amt!=null) setAvMonthField(selKey,av.id,"sarikowGiven",amt);
     });
@@ -1081,8 +1081,8 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
             {sentKeren>0&&` | ${sentKeren}×1,000 (קרן)`}
           </div>
           <button style={{...smallBtn,background:"#7c3aed",color:"#fff",fontWeight:700}}
-            onClick={()=>{ if(window.confirm("זה ימלא את שדה \"הכניס סריקוב\" לכל האברכים הפעילים לפי הסכומים שהוזנו בראשי. אפשר עדיין לשנות ידנית לאברך ספציפי אחרי כן. להמשיך?")) applySarikowGivenToAll(); }}>
-            🔄 החל על כולם
+            onClick={()=>{ if(window.confirm("זה ימלא את שדה \"הכניס סריקוב\" לזכאי דתות בלבד (לא למושהי קרן) לפי הסכומים שהוזנו בראשי. אפשר עדיין לשנות ידנית לאברך ספציפי אחרי כן. להמשיך?")) applySarikowGivenToAll(); }}>
+            🔄 החל על כולם (זכאי דתות)
           </button>
         </div>
       )}
@@ -2708,6 +2708,19 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
             {carryover===0&&<span>| ✓ מאוזן</span>}
           </div>
         )}
+
+        {/* הערות */}
+        <div style={{borderTop:`1px solid ${paid?"#86efac":iOwe?"#fde68a":"#fecaca"}`,padding:"6px 12px",
+          background:"rgba(148,163,184,.1)"}}>
+          <input
+            type="text"
+            value={getAV(selKey,av.id,"settlementNote")}
+            placeholder="📝 הערה..."
+            onChange={e=>setAvMonthField(selKey,av.id,"settlementNote",e.target.value)}
+            style={{border:"1px solid #cbd5e1",borderRadius:6,padding:"5px 8px",fontSize:12,
+              width:"100%",boxSizing:"border-box",background:"#fff"}}
+          />
+        </div>
       </div>
     );
   };
