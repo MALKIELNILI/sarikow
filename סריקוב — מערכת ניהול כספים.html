@@ -2544,6 +2544,127 @@ const smallBtn  = {padding:"4px 9px",borderRadius:6,background:"#f1f5f9",border:
 const delBtn    = {background:"#fee2e2",color:"#dc2626",border:"none",borderRadius:6,padding:"3px 8px",cursor:"pointer"};
 
 // ── SETTLEMENT TAB ───────────────────────────────────────────
+// רכיב יציב ברמת המודול (לא מוגדר בתוך SettlementTab) — כדי שהקלדה בשדות (סכום בפועל / הערה)
+// לא תגרום ל-unmount/remount בכל הקשה (שיאבד פוקוס אחרי תו אחד)
+function ARow({av,c,paid,selKey,getAV,setAvMonthField}){
+  const bal = c.settlementBalance;
+  const absBal = Math.abs(bal);
+  const iOwe = bal>0;
+  const actualRaw = getAV(selKey,av.id,"settlementActual");
+  const actual = actualRaw!==""?Number(actualRaw):null;
+  const carryover = actual!==null ? (iOwe ? bal-actual : bal+actual) : null;
+
+  const onActualChange = v => {
+    setAvMonthField(selKey,av.id,"settlementActual",v);
+    if(v!==""){
+      const a=Number(v);
+      setAvMonthField(selKey,av.id,"settlementCarryover", iOwe ? bal-a : bal+a);
+    } else {
+      setAvMonthField(selKey,av.id,"settlementCarryover","");
+    }
+  };
+
+  return (
+    <div style={{borderRadius:9,marginBottom:5,overflow:"hidden",
+      border:`1.5px solid ${paid?"#86efac":iOwe?"#fde68a":"#fecaca"}`,
+      background:paid?"#f0fdf4":iOwe?"#fffbeb":"#fef2f2",transition:"all .2s"}}>
+
+      {/* שורה ראשית */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+        padding:"9px 12px",opacity:paid?0.7:1,gap:8}}>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontWeight:700,fontSize:14}}>{av.name}</div>
+          <div style={{fontSize:11,color:"#64748b",marginTop:2}}>
+            מגיע לו סה״כ: <b>{fmt(c.totalOwedToAv)} ₪</b>
+            {(c.exams>0||c.taanitOwed>0)&&` (${fmt(c.monthly)}${c.exams>0?`+${fmt(c.exams)} בחינות`:""}${c.taanitOwed>0?`+${fmt(c.taanitOwed)} תענית דיבור`:""})`}
+            &nbsp;|&nbsp;
+            חיצוני (דתות/קרן, נפרד): {fmt(c.externalPerAvrech)} ₪ &nbsp;|&nbsp;
+            מהקופה: {fmt(c.kupaPortion)} ₪
+            {c.prevSettlementCarryover!==0&&<span style={{color:c.prevSettlementCarryover>0?"#d97706":"#dc2626",fontWeight:700}}>&nbsp;|&nbsp;פ׳קודם: {fmtSigned(c.prevSettlementCarryover)} ₪</span>}
+          </div>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+          <div style={{textAlign:"center"}}>
+            <div style={{fontSize:16,fontWeight:800,color:iOwe?"#d97706":"#dc2626"}}>
+              {iOwe?"▲":"▼"} {fmt(absBal)} ₪
+            </div>
+            <div style={{fontSize:10,color:"#94a3b8"}}>{iOwe?"סריקוב חייב":"אברך חייב"}</div>
+          </div>
+          <label style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer",
+            background:paid?"#16a34a":"#f1f5f9",border:`2px solid ${paid?"#16a34a":"#cbd5e1"}`,
+            borderRadius:7,padding:"4px 10px",fontSize:12,fontWeight:600,
+            color:paid?"#fff":"#64748b",transition:"all .2s",userSelect:"none"}}>
+            <input type="checkbox"
+              checked={paid}
+              onChange={e=>setAvMonthField(selKey,av.id,"settlementPaid",e.target.checked?"1":"")}
+              style={{width:15,height:15,cursor:"pointer",accentColor:"#16a34a"}}/>
+            {paid?"✓ בוצע":"סמן"}
+          </label>
+        </div>
+      </div>
+
+      {/* שורת תשלום בפועל */}
+      {!paid&&(
+        <div style={{borderTop:`1px solid ${iOwe?"#fde68a":"#fecaca"}`,padding:"8px 12px",
+          background:iOwe?"rgba(253,230,138,.15)":"rgba(254,202,202,.15)",
+          display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+          <div style={{flex:1,minWidth:110}}>
+            <div style={{fontSize:11,color:"#475569",fontWeight:600,marginBottom:3}}>
+              💰 {iOwe?"שולם לאברך בפועל":"התקבל מהאברך"} (₪)
+            </div>
+            <input type="number"
+              style={{border:`2px solid ${actual!==null?"#f59e0b":"#cbd5e1"}`,
+                borderRadius:7,padding:"6px 9px",fontSize:14,width:"100%",
+                boxSizing:"border-box",textAlign:"left",background:"#fff"}}
+              value={actualRaw}
+              placeholder={String(absBal)}
+              onChange={e=>onActualChange(e.target.value)}
+            />
+          </div>
+          {carryover!==null&&(
+            carryover===0
+              ? <div style={{fontSize:13,color:"#16a34a",fontWeight:800,padding:"6px 0"}}>✅ מאוזן לגמרי</div>
+              : <div style={{textAlign:"center",background:carryover>0?"#fffbeb":"#fef2f2",
+                  borderRadius:8,padding:"5px 12px",
+                  border:`1.5px solid ${carryover>0?"#f59e0b":"#f87171"}`}}>
+                  <div style={{fontSize:10,color:"#64748b"}}>עובר לחודש הבא</div>
+                  <div style={{fontSize:15,fontWeight:800,color:carryover>0?"#d97706":"#dc2626"}}>
+                    {carryover>0?"▲":"▼"} {fmt(Math.abs(carryover))} ₪
+                  </div>
+                  <div style={{fontSize:9,color:"#94a3b8"}}>{carryover>0?"סריקוב עדיין חייב":"אברך עדיין חייב"}</div>
+                </div>
+          )}
+        </div>
+      )}
+
+      {/* כשסגור — הצג סיכום */}
+      {paid&&actual!==null&&(
+        <div style={{borderTop:"1px solid #86efac",padding:"5px 12px",
+          background:"rgba(134,239,172,.15)",fontSize:11,color:"#166534",display:"flex",gap:10,flexWrap:"wrap"}}>
+          <span>שולם: <b>{fmt(actual)} ₪</b></span>
+          {carryover!==null&&carryover!==0&&<span style={{color:carryover>0?"#d97706":"#dc2626",fontWeight:700}}>
+            | עובר לחודש הבא: {fmtSigned(carryover)} ₪
+          </span>}
+          {carryover===0&&<span>| ✓ מאוזן</span>}
+        </div>
+      )}
+
+      {/* הערות */}
+      <div style={{borderTop:`1px solid ${paid?"#86efac":iOwe?"#fde68a":"#fecaca"}`,padding:"6px 12px",
+        background:"rgba(148,163,184,.1)"}}>
+        <input
+          type="text"
+          value={getAV(selKey,av.id,"settlementNote")}
+          placeholder="📝 הערה..."
+          onChange={e=>setAvMonthField(selKey,av.id,"settlementNote",e.target.value)}
+          style={{border:"1px solid #cbd5e1",borderRadius:6,padding:"5px 8px",fontSize:12,
+            width:"100%",boxSizing:"border-box",background:"#fff"}}
+        />
+      </div>
+    </div>
+  );
+}
+
 function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, selMonth, getAV, setAvMonthField, allMonthKeys, getPrevMonthKey }){
   const [showCumulative,setShowCumulative] = useState(false);
 
@@ -2605,125 +2726,6 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
 
   const paidIOwe    = iOweRows.filter(({paid})=>paid).reduce((s,{c})=>s+c.settlementBalance,0);
   const paidOwedMe  = theyOweRows.filter(({paid})=>paid).reduce((s,{c})=>s+Math.abs(c.settlementBalance),0);
-
-  const ARow = ({av,c,paid})=>{
-    const bal = c.settlementBalance;
-    const absBal = Math.abs(bal);
-    const iOwe = bal>0;
-    const actualRaw = getAV(selKey,av.id,"settlementActual");
-    const actual = actualRaw!==""?Number(actualRaw):null;
-    const carryover = actual!==null ? (iOwe ? bal-actual : bal+actual) : null;
-
-    const onActualChange = v => {
-      setAvMonthField(selKey,av.id,"settlementActual",v);
-      if(v!==""){
-        const a=Number(v);
-        setAvMonthField(selKey,av.id,"settlementCarryover", iOwe ? bal-a : bal+a);
-      } else {
-        setAvMonthField(selKey,av.id,"settlementCarryover","");
-      }
-    };
-
-    return (
-      <div style={{borderRadius:9,marginBottom:5,overflow:"hidden",
-        border:`1.5px solid ${paid?"#86efac":iOwe?"#fde68a":"#fecaca"}`,
-        background:paid?"#f0fdf4":iOwe?"#fffbeb":"#fef2f2",transition:"all .2s"}}>
-
-        {/* שורה ראשית */}
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-          padding:"9px 12px",opacity:paid?0.7:1,gap:8}}>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontWeight:700,fontSize:14}}>{av.name}</div>
-            <div style={{fontSize:11,color:"#64748b",marginTop:2}}>
-              מגיע לו סה״כ: <b>{fmt(c.totalOwedToAv)} ₪</b>
-              {(c.exams>0||c.taanitOwed>0)&&` (${fmt(c.monthly)}${c.exams>0?`+${fmt(c.exams)} בחינות`:""}${c.taanitOwed>0?`+${fmt(c.taanitOwed)} תענית דיבור`:""})`}
-              &nbsp;|&nbsp;
-              חיצוני (דתות/קרן, נפרד): {fmt(c.externalPerAvrech)} ₪ &nbsp;|&nbsp;
-              מהקופה: {fmt(c.kupaPortion)} ₪
-              {c.prevSettlementCarryover!==0&&<span style={{color:c.prevSettlementCarryover>0?"#d97706":"#dc2626",fontWeight:700}}>&nbsp;|&nbsp;פ׳קודם: {fmtSigned(c.prevSettlementCarryover)} ₪</span>}
-            </div>
-          </div>
-          <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-            <div style={{textAlign:"center"}}>
-              <div style={{fontSize:16,fontWeight:800,color:iOwe?"#d97706":"#dc2626"}}>
-                {iOwe?"▲":"▼"} {fmt(absBal)} ₪
-              </div>
-              <div style={{fontSize:10,color:"#94a3b8"}}>{iOwe?"סריקוב חייב":"אברך חייב"}</div>
-            </div>
-            <label style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer",
-              background:paid?"#16a34a":"#f1f5f9",border:`2px solid ${paid?"#16a34a":"#cbd5e1"}`,
-              borderRadius:7,padding:"4px 10px",fontSize:12,fontWeight:600,
-              color:paid?"#fff":"#64748b",transition:"all .2s",userSelect:"none"}}>
-              <input type="checkbox"
-                checked={paid}
-                onChange={e=>setAvMonthField(selKey,av.id,"settlementPaid",e.target.checked?"1":"")}
-                style={{width:15,height:15,cursor:"pointer",accentColor:"#16a34a"}}/>
-              {paid?"✓ בוצע":"סמן"}
-            </label>
-          </div>
-        </div>
-
-        {/* שורת תשלום בפועל */}
-        {!paid&&(
-          <div style={{borderTop:`1px solid ${iOwe?"#fde68a":"#fecaca"}`,padding:"8px 12px",
-            background:iOwe?"rgba(253,230,138,.15)":"rgba(254,202,202,.15)",
-            display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
-            <div style={{flex:1,minWidth:110}}>
-              <div style={{fontSize:11,color:"#475569",fontWeight:600,marginBottom:3}}>
-                💰 {iOwe?"שולם לאברך בפועל":"התקבל מהאברך"} (₪)
-              </div>
-              <input type="number"
-                style={{border:`2px solid ${actual!==null?"#f59e0b":"#cbd5e1"}`,
-                  borderRadius:7,padding:"6px 9px",fontSize:14,width:"100%",
-                  boxSizing:"border-box",textAlign:"left",background:"#fff"}}
-                value={actualRaw}
-                placeholder={String(absBal)}
-                onChange={e=>onActualChange(e.target.value)}
-              />
-            </div>
-            {carryover!==null&&(
-              carryover===0
-                ? <div style={{fontSize:13,color:"#16a34a",fontWeight:800,padding:"6px 0"}}>✅ מאוזן לגמרי</div>
-                : <div style={{textAlign:"center",background:carryover>0?"#fffbeb":"#fef2f2",
-                    borderRadius:8,padding:"5px 12px",
-                    border:`1.5px solid ${carryover>0?"#f59e0b":"#f87171"}`}}>
-                    <div style={{fontSize:10,color:"#64748b"}}>עובר לחודש הבא</div>
-                    <div style={{fontSize:15,fontWeight:800,color:carryover>0?"#d97706":"#dc2626"}}>
-                      {carryover>0?"▲":"▼"} {fmt(Math.abs(carryover))} ₪
-                    </div>
-                    <div style={{fontSize:9,color:"#94a3b8"}}>{carryover>0?"סריקוב עדיין חייב":"אברך עדיין חייב"}</div>
-                  </div>
-            )}
-          </div>
-        )}
-
-        {/* כשסגור — הצג סיכום */}
-        {paid&&actual!==null&&(
-          <div style={{borderTop:"1px solid #86efac",padding:"5px 12px",
-            background:"rgba(134,239,172,.15)",fontSize:11,color:"#166534",display:"flex",gap:10,flexWrap:"wrap"}}>
-            <span>שולם: <b>{fmt(actual)} ₪</b></span>
-            {carryover!==null&&carryover!==0&&<span style={{color:carryover>0?"#d97706":"#dc2626",fontWeight:700}}>
-              | עובר לחודש הבא: {fmtSigned(carryover)} ₪
-            </span>}
-            {carryover===0&&<span>| ✓ מאוזן</span>}
-          </div>
-        )}
-
-        {/* הערות */}
-        <div style={{borderTop:`1px solid ${paid?"#86efac":iOwe?"#fde68a":"#fecaca"}`,padding:"6px 12px",
-          background:"rgba(148,163,184,.1)"}}>
-          <input
-            type="text"
-            value={getAV(selKey,av.id,"settlementNote")}
-            placeholder="📝 הערה..."
-            onChange={e=>setAvMonthField(selKey,av.id,"settlementNote",e.target.value)}
-            style={{border:"1px solid #cbd5e1",borderRadius:6,padding:"5px 8px",fontSize:12,
-              width:"100%",boxSizing:"border-box",background:"#fff"}}
-          />
-        </div>
-      </div>
-    );
-  };
 
   return (
     <div style={col}>
@@ -2790,7 +2792,7 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
           <div style={{fontWeight:700,fontSize:14,color:"#d97706",marginBottom:8}}>
             🟡 אני חייב לאברך ({iOweRows.length})
           </div>
-          {iOweRows.map(({av,c,paid})=><ARow key={av.id} av={av} c={c} paid={paid}/>)}
+          {iOweRows.map(({av,c,paid})=><ARow key={av.id} av={av} c={c} paid={paid} selKey={selKey} getAV={getAV} setAvMonthField={setAvMonthField}/>)}
         </div>
       )}
 
@@ -2800,7 +2802,7 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
           <div style={{fontWeight:700,fontSize:14,color:"#dc2626",marginBottom:8}}>
             🔴 אברך חייב לי ({theyOweRows.length})
           </div>
-          {theyOweRows.map(({av,c,paid})=><ARow key={av.id} av={av} c={c} paid={paid}/>)}
+          {theyOweRows.map(({av,c,paid})=><ARow key={av.id} av={av} c={c} paid={paid} selKey={selKey} getAV={getAV} setAvMonthField={setAvMonthField}/>)}
         </div>
       )}
 
