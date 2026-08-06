@@ -1,0 +1,18 @@
+{
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "src/**",
+      "dist/**",
+      "public/**",
+      "package*.json",
+      "vite.config.js",
+      "eslint.config.js",
+      "README.md",
+      "*.md"
+    ]
+  }
+}
