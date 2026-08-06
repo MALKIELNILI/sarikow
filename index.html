@@ -424,6 +424,11 @@ function App(){
     // יתרה: חיובי = סריקוב חייב לאברך | שלילי = אברך חייב לסריקוב
     const prevSettlementCarryover = prevMonthKey ? Number(getAV(prevMonthKey,av.id,"settlementCarryover")||0) : 0;
     const settlementBalance = (totalOwedToAv > 0 ? totalOwedToAv - totalReceived : 0) + prevSettlementCarryover;
+    // העברות ישירות בין אברכים (למשל: מי שקיבל יותר ממה שמגיע לו מעביר את העודף לאברך שלא קיבל ישירות מסריקוב)
+    // לא משפיע על יתרת הקופה עצמה — רק על ההתחשבנות בין האברך לקופה בלשונית חשבון
+    const monthTransfers = (allMonths[monthKey]?.transfers)||[];
+    const transferredOut = monthTransfers.filter(t=>String(t.fromAvId)===String(av.id)).reduce((s,t)=>s+Number(t.amount||0),0);
+    const transferredIn  = monthTransfers.filter(t=>String(t.toAvId)===String(av.id)).reduce((s,t)=>s+Number(t.amount||0),0);
     // מה הוכנס בפועל לבנק
     const actualBankRaw = getAV(monthKey,av.id,"actualBank");
     const actualBank = actualBankRaw!==""?Number(actualBankRaw):null;
@@ -441,7 +446,7 @@ function App(){
     const bankGapAuto = actualBankForGap!==null ? effectiveBank - (actualBankForGap + cashAmount - holiday - depositRounding) : 0;
     const bankGap = bankGapRaw!==""?Number(bankGapRaw):bankGapAuto;
 
-    return { monthly, datot, keren, autoDatot, autoKeren, datotRaw, kerenRaw, rounding, sarikowGivenRaw, sarikowGiven, kupaPortion, exams, bank, prevBankGap, effectiveBank, actualBank, holiday, depositRounding, totalToBank, bankDeposit, cashAmount, bankGapAuto, bankGap, trackNum, datotCount, kerenCount, incomeGroup, totalDatot, totalKeren, taanitDays, taanitAmount, taanitOwed, externalPerAvrech, totalReceived, totalOwedToAv, settlementBalance, prevSettlementCarryover, prevRefundCarryover };
+    return { monthly, datot, keren, autoDatot, autoKeren, datotRaw, kerenRaw, rounding, sarikowGivenRaw, sarikowGiven, kupaPortion, exams, bank, prevBankGap, effectiveBank, actualBank, holiday, depositRounding, totalToBank, bankDeposit, cashAmount, bankGapAuto, bankGap, trackNum, datotCount, kerenCount, incomeGroup, totalDatot, totalKeren, taanitDays, taanitAmount, taanitOwed, externalPerAvrech, totalReceived, totalOwedToAv, settlementBalance, prevSettlementCarryover, prevRefundCarryover, transferredOut, transferredIn };
   };
 
   // Get sorted month keys
@@ -586,7 +591,7 @@ function App(){
         {tab==="attendance" && <AttendanceTab avrechim={avrechim} selKey={selKey} selYear={selYear} selMonth={selMonth} attendance={attendance} setAttendanceDay={setAttendanceDay} fillMonthBatch={fillMonthBatch} customVacations={customVacations} setCustomVacation={setCustomVacation} removeCustomVacation={removeCustomVacation} beinHazmanims={beinHazmanims} addBeinHazmanim={addBeinHazmanim} removeBeinHazmanim={removeBeinHazmanim} updateBeinHazmanim={updateBeinHazmanim} hiddenHols={hiddenHols} toggleHolidayHidden={toggleHolidayHidden} />}
         {tab==="summary"    && <SummaryTab avrechim={avrechim} allMonthKeys={allMonthKeys()} calcMonthTotals={calcMonthTotals} calcAvrechMonth={calcAvrechMonth} getPrevMonthKey={getPrevMonthKey} baseBalance={baseBalance} liveBalance={liveBalance} selKey={selKey} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} />}
         {tab==="bank"       && <BankTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} />}
-        {tab==="settlement" && <SettlementTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} allMonthKeys={allMonthKeys()} getPrevMonthKey={getPrevMonthKey} />}
+        {tab==="settlement" && <SettlementTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} getMD={getMD} setMonthField={setMonthField} allMonthKeys={allMonthKeys()} getPrevMonthKey={getPrevMonthKey} />}
         {tab==="ravpinchas" && <RavPinchasTab rpAvrechim={rpAvrechim} setRpAvrechim={setRpAvrechim} rpMonths={rpMonths} setRpMonthField={setRpMonthField} rpBaseBalance={rpBaseBalance} setRpBaseBalance={setRpBaseBalance} rpContact={rpContact} setRpContact={setRpContact} selKey={selKey} selYear={selYear} selMonth={selMonth} allDonorNames={allDonorNames} donorHistory={donorHistory} syncing={syncing} sarikowLiveBalance={liveBalance} />}
       </main>
     </div>
@@ -2550,18 +2555,21 @@ const delBtn    = {background:"#fee2e2",color:"#dc2626",border:"none",borderRadi
 // ── SETTLEMENT TAB ───────────────────────────────────────────
 // רכיב יציב ברמת המודול (לא מוגדר בתוך SettlementTab) — כדי שהקלדה בשדות (סכום בפועל / הערה)
 // לא תגרום ל-unmount/remount בכל הקשה (שיאבד פוקוס אחרי תו אחד)
-function ARow({av,c,paid,selKey,getAV,setAvMonthField}){
+function ARow({av,c,paid,selKey,getAV,setAvMonthField,myTransfers}){
   const bal = c.settlementBalance;
   const absBal = Math.abs(bal);
   const iOwe = bal>0;
+  // סכום שהתקבל/הועבר דרך העברות בין אברכים (במקום מזומן מול הקופה) — נכנס אוטומטית לחישוב הפער
+  const transferAmt = iOwe ? c.transferredIn : c.transferredOut;
   const actualRaw = getAV(selKey,av.id,"settlementActual");
-  const actual = actualRaw!==""?Number(actualRaw):null;
+  const actualCash = actualRaw!==""?Number(actualRaw):0;
+  const actual = (actualRaw!==""||transferAmt>0) ? actualCash+transferAmt : null;
   const carryover = actual!==null ? (iOwe ? bal-actual : bal+actual) : null;
 
   const onActualChange = v => {
     setAvMonthField(selKey,av.id,"settlementActual",v);
-    if(v!==""){
-      const a=Number(v);
+    if(v!==""||transferAmt>0){
+      const a=(v!==""?Number(v):0)+transferAmt;
       setAvMonthField(selKey,av.id,"settlementCarryover", iOwe ? bal-a : bal+a);
     } else {
       setAvMonthField(selKey,av.id,"settlementCarryover","");
@@ -2607,6 +2615,18 @@ function ARow({av,c,paid,selKey,getAV,setAvMonthField}){
         </div>
       </div>
 
+      {/* העברות בין אברכים הקשורות לאברך זה */}
+      {myTransfers&&myTransfers.length>0&&(
+        <div style={{padding:"6px 12px",display:"flex",flexDirection:"column",gap:3,
+          borderTop:`1px solid ${paid?"#86efac":iOwe?"#fde68a":"#fecaca"}`,background:"rgba(124,58,237,.06)"}}>
+          {myTransfers.map(t=>(
+            <div key={t.id} style={{fontSize:11,color:"#6d28d9"}}>
+              🔀 {t.direction==="out" ? `הועבר ל${t.counterpartyName}` : `התקבל מ${t.counterpartyName}`}: <b>{fmt(t.amount)} ₪</b>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* שורת תשלום בפועל */}
       {!paid&&(
         <div style={{borderTop:`1px solid ${iOwe?"#fde68a":"#fecaca"}`,padding:"8px 12px",
@@ -2614,14 +2634,14 @@ function ARow({av,c,paid,selKey,getAV,setAvMonthField}){
           display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
           <div style={{flex:1,minWidth:110}}>
             <div style={{fontSize:11,color:"#475569",fontWeight:600,marginBottom:3}}>
-              💰 {iOwe?"שולם לאברך בפועל":"התקבל מהאברך"} (₪)
+              💰 {iOwe?"שולם לאברך בפועל":"התקבל מהאברך"} (₪) {transferAmt>0&&<span style={{color:"#7c3aed"}}>— בנוסף ל-{fmt(transferAmt)} ₪ שכבר {iOwe?"התקבלו":"הועברו"} בהעברה</span>}
             </div>
             <input type="number"
               style={{border:`2px solid ${actual!==null?"#f59e0b":"#cbd5e1"}`,
                 borderRadius:7,padding:"6px 9px",fontSize:14,width:"100%",
                 boxSizing:"border-box",textAlign:"left",background:"#fff"}}
               value={actualRaw}
-              placeholder={String(absBal)}
+              placeholder={String(Math.max(0,absBal-transferAmt))}
               onChange={e=>onActualChange(e.target.value)}
             />
           </div>
@@ -2669,8 +2689,57 @@ function ARow({av,c,paid,selKey,getAV,setAvMonthField}){
   );
 }
 
-function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, selMonth, getAV, setAvMonthField, allMonthKeys, getPrevMonthKey }){
+function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, selMonth, getAV, setAvMonthField, getMD, setMonthField, allMonthKeys, getPrevMonthKey }){
   const [showCumulative,setShowCumulative] = useState(false);
+
+  // ── העברות בין אברכים (למי שקיבל יותר ממה שמגיע לו — מעביר ישירות לאברך אחר, בד״כ מי שלא קיבל ישירות מסריקוב) ──
+  const monthTransfers = getMD(selKey,"transfers",[])||[];
+  const avById = id => avrechim.find(a=>String(a.id)===String(id));
+
+  // אחרי כל שינוי בהעברה — מחשבים מחדש ושומרים settlementCarryover לשני הצדדים, כדי שהפער לחודש הבא יישאר מסונכרן.
+  // מקבל את רשימת ההעברות המעודכנת במפורש (ולא קורא מ-state) כדי לא להסתמך על עדכון state שעדיין לא התבצע.
+  const recomputeCarryover = (avId, transfersList) => {
+    const av = avById(avId);
+    if(!av) return;
+    const c = calcAvrechMonth(av,selKey,prevKey); // settlementBalance לא תלוי בהעברות/actual, בטוח לחשב כאן
+    const bal = c.settlementBalance;
+    const iOwe = bal>0;
+    const transferAmt = iOwe
+      ? transfersList.filter(t=>String(t.toAvId)===String(av.id)).reduce((s,t)=>s+Number(t.amount||0),0)
+      : transfersList.filter(t=>String(t.fromAvId)===String(av.id)).reduce((s,t)=>s+Number(t.amount||0),0);
+    const actualRaw = getAV(selKey,av.id,"settlementActual");
+    const actualCash = actualRaw!==""?Number(actualRaw):0;
+    if(actualRaw!==""||transferAmt>0){
+      const a = actualCash+transferAmt;
+      setAvMonthField(selKey,av.id,"settlementCarryover", iOwe ? bal-a : bal+a);
+    } else {
+      setAvMonthField(selKey,av.id,"settlementCarryover","");
+    }
+  };
+
+  const addTransfer = () => {
+    const active = avrechim.filter(a=>a.active);
+    if(active.length<2) return;
+    const next = [...monthTransfers, { id: Date.now()+"-"+Math.random().toString(36).slice(2,7), fromAvId: active[0].id, toAvId: active[1].id, amount: 0 }];
+    setMonthField(selKey,"transfers",next);
+  };
+  const updateTransferField = (id, field, val) => {
+    const before = monthTransfers.find(t=>t.id===id);
+    const next = monthTransfers.map(t=>t.id===id?{...t,[field]:val}:t);
+    setMonthField(selKey,"transfers",next);
+    if(before){
+      recomputeCarryover(before.fromAvId, next);
+      recomputeCarryover(before.toAvId, next);
+      const after = next.find(t=>t.id===id);
+      if(after){ recomputeCarryover(after.fromAvId, next); recomputeCarryover(after.toAvId, next); }
+    }
+  };
+  const removeTransfer = (id) => {
+    const t = monthTransfers.find(x=>x.id===id);
+    const next = monthTransfers.filter(x=>x.id!==id);
+    setMonthField(selKey,"transfers",next);
+    if(t){ recomputeCarryover(t.fromAvId, next); recomputeCarryover(t.toAvId, next); }
+  };
 
   // לכל קבוצה (דתות/קרן) — הסכום האחרון שבאמת הוזן לאברך (לא 0), לשימוש כהערכה לחודשים שההעברה בהם עדיין לא הוזנה בראשי.
   // מסונכרן אוטומטית עם מה שמוזן בלשונית ראשי — כשמוזן סכום אמיתי חדש, ההערכה מתעדכנת ממנו לבד.
@@ -2716,7 +2785,13 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
   const rows = avrechim.filter(a=>a.active).map(av=>({
     av,
     c: calcAvrechMonth(av,selKey,prevKey),
-    paid: getAV(selKey,av.id,"settlementPaid")==="1"
+    paid: getAV(selKey,av.id,"settlementPaid")==="1",
+    myTransfers: monthTransfers.filter(t=>String(t.fromAvId)===String(av.id)||String(t.toAvId)===String(av.id)).map(t=>({
+      id: t.id,
+      direction: String(t.fromAvId)===String(av.id) ? "out" : "in",
+      counterpartyName: (avById(String(t.fromAvId)===String(av.id) ? t.toAvId : t.fromAvId)||{}).name || "?",
+      amount: Number(t.amount||0)
+    }))
   }));
 
   // חיובי = סריקוב חייב לאברך | שלילי = אברך חייב לסריקוב
@@ -2790,13 +2865,40 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
         </div>
       </div>
 
+      {/* העברות בין אברכים */}
+      <div style={card}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+          <div style={{fontWeight:700,fontSize:14,color:"#6d28d9"}}>🔀 העברות בין אברכים</div>
+          <button style={{...smallBtn,background:"#f5f3ff",color:"#6d28d9",border:"1px solid #ddd6fe"}} onClick={addTransfer}>+ הוסף העברה</button>
+        </div>
+        {monthTransfers.length===0
+          ? <div style={{fontSize:12,color:"#94a3b8"}}>אין העברות החודש — לדוגמה: אברך שקיבל יותר ממה שמגיע לו מעביר את העודף ישירות לאברך אחר (בד״כ מי שלא קיבל ישירות מסריקוב)</div>
+          : monthTransfers.map(t=>(
+            <div key={t.id} style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",padding:"6px 0",borderBottom:"1px solid #f1f5f9"}}>
+              <span style={{fontSize:11,color:"#64748b"}}>מ:</span>
+              <select style={{...inp,width:"auto",flex:1,minWidth:100}} value={t.fromAvId} onChange={e=>updateTransferField(t.id,"fromAvId",e.target.value)}>
+                {avrechim.filter(a=>a.active).map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+              <span style={{fontSize:11,color:"#64748b"}}>ל:</span>
+              <select style={{...inp,width:"auto",flex:1,minWidth:100}} value={t.toAvId} onChange={e=>updateTransferField(t.id,"toAvId",e.target.value)}>
+                {avrechim.filter(a=>a.active).map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+              <input type="number" style={{...inp,width:100,textAlign:"left"}} value={t.amount} placeholder="0"
+                onChange={e=>updateTransferField(t.id,"amount",Number(e.target.value)||0)} />
+              <span style={{fontSize:12,color:"#64748b"}}>₪</span>
+              <button style={delBtn} onClick={()=>removeTransfer(t.id)}>✕</button>
+            </div>
+          ))
+        }
+      </div>
+
       {/* רשימה: אני חייב */}
       {iOweRows.length>0&&(
         <div style={card}>
           <div style={{fontWeight:700,fontSize:14,color:"#d97706",marginBottom:8}}>
             🟡 אני חייב לאברך ({iOweRows.length})
           </div>
-          {iOweRows.map(({av,c,paid})=><ARow key={av.id} av={av} c={c} paid={paid} selKey={selKey} getAV={getAV} setAvMonthField={setAvMonthField}/>)}
+          {iOweRows.map(({av,c,paid,myTransfers})=><ARow key={av.id} av={av} c={c} paid={paid} selKey={selKey} getAV={getAV} setAvMonthField={setAvMonthField} myTransfers={myTransfers}/>)}
         </div>
       )}
 
@@ -2806,7 +2908,7 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
           <div style={{fontWeight:700,fontSize:14,color:"#dc2626",marginBottom:8}}>
             🔴 אברך חייב לי ({theyOweRows.length})
           </div>
-          {theyOweRows.map(({av,c,paid})=><ARow key={av.id} av={av} c={c} paid={paid} selKey={selKey} getAV={getAV} setAvMonthField={setAvMonthField}/>)}
+          {theyOweRows.map(({av,c,paid,myTransfers})=><ARow key={av.id} av={av} c={c} paid={paid} selKey={selKey} getAV={getAV} setAvMonthField={setAvMonthField} myTransfers={myTransfers}/>)}
         </div>
       )}
 
