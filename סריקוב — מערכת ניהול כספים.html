@@ -2909,8 +2909,9 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
         </div>
       </div>
 
-      {/* העברות בין אברכים — קבועה (sticky) בגלילה כדי שאפשר לגלול לראות יתרות ולהזין תוך כדי */}
-      <div style={{...card,position:"sticky",top:0,zIndex:5,boxShadow:"0 4px 10px rgba(0,0,0,0.12)"}}>
+      {/* העברות בין אברכים — קבועה (sticky) בגלילה כדי שאפשר לגלול לראות יתרות ולהזין תוך כדי.
+          top מתחת לגובה ה-header הקבוע (114px) — אחרת ה-header (z-index:100) יסתיר את הקופסה הזו */}
+      <div style={{...card,position:"sticky",top:114,zIndex:5,boxShadow:"0 4px 10px rgba(0,0,0,0.12)"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
           <div style={{fontWeight:700,fontSize:14,color:"#6d28d9"}}>🔀 העברות בין אברכים</div>
           <button style={{...smallBtn,background:"#f5f3ff",color:"#6d28d9",border:"1px solid #ddd6fe"}} onClick={addTransfer}>+ הוסף העברה</button>
