@@ -2826,12 +2826,15 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
       av, c, paid,
       // הושלם החודש — בין אם סומן "בוצע" ידנית, ובין אם היתרה התאפסה (מזומן ו/או העברות, בכל שילוב)
       settled: paid || carryover===0,
-      myTransfers: monthTransfers.filter(t=>String(t.fromAvId)===String(av.id)||String(t.toAvId)===String(av.id)).map(t=>({
-        id: t.id,
-        direction: String(t.fromAvId)===String(av.id) ? "out" : "in",
-        counterpartyName: (avById(String(t.fromAvId)===String(av.id) ? t.toAvId : t.fromAvId)||{}).name || "?",
-        amount: Number(t.amount||0)
-      }))
+      myTransfers: monthTransfers.filter(t=>String(t.fromAvId)===String(av.id)||String(t.toAvId)===String(av.id)).map(t=>{
+        const counterpartyId = String(t.fromAvId)===String(av.id) ? t.toAvId : t.fromAvId;
+        return {
+          id: t.id,
+          direction: String(t.fromAvId)===String(av.id) ? "out" : "in",
+          counterpartyName: counterpartyId==="self" ? "אני" : ((avById(counterpartyId)||{}).name || "?"),
+          amount: Number(t.amount||0)
+        };
+      })
     };
   });
 
@@ -2922,10 +2925,12 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
             <div key={t.id} style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",padding:"6px 0",borderBottom:"1px solid #f1f5f9"}}>
               <span style={{fontSize:11,color:"#64748b"}}>מ:</span>
               <select style={{...inp,width:"auto",flex:1,minWidth:100}} value={t.fromAvId} onChange={e=>updateTransferField(t.id,"fromAvId",e.target.value)}>
+                <option value="self">אני</option>
                 {avrechim.filter(a=>a.active).map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
               </select>
               <span style={{fontSize:11,color:"#64748b"}}>ל:</span>
               <select style={{...inp,width:"auto",flex:1,minWidth:100}} value={t.toAvId} onChange={e=>updateTransferField(t.id,"toAvId",e.target.value)}>
+                <option value="self">אני</option>
                 {avrechim.filter(a=>a.active).map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
               </select>
               <input type="number" style={{...inp,width:100,textAlign:"left"}} value={t.amount} placeholder="0"
