@@ -409,9 +409,9 @@ function App(){
     const datot = datotRaw!==""?Number(datotRaw):autoDatot;
     const keren = kerenRaw!==""?Number(kerenRaw):autoKeren;
 
-    // כמה הכניס סריקוב בפועל לאברך (ברירת מחדל: לפי המסלול)
+    // כמה הכניס סריקוב בפועל לאברך (ברירת מחדל: 0 — אם לא הוזן במפורש, מניחים שלא קיבל כלום)
     const sarikowGivenRaw = getAV(monthKey,av.id,"sarikowGiven");
-    const sarikowGiven = sarikowGivenRaw!==""?Number(sarikowGivenRaw):trackNum;
+    const sarikowGiven = sarikowGivenRaw!==""?Number(sarikowGivenRaw):0;
     // עיגול אוטומטי: מה שסריקוב הכניס בפועל − דתות − קרן (לא המסלול הקבוע — כדי לשקף מה שבאמת ניתן החודש)
     const rounding = Math.max(0, sarikowGiven - datot - keren);
     // מה מתוך מה שסריקוב הכניס מקורו בקופה (אחרי קיזוז דתות/קרן)
@@ -1171,7 +1171,7 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:5,marginTop:10}}>
               <AvF label="💰 מגיע לו" val={getAV(selKey,av.id,"monthlyStipend")} onChange={v=>setAvMonthField(selKey,av.id,"monthlyStipend",v)} placeholder={`עד ${fmt(maxS)}`} hi />
               <AvF label="🎓 בחינות"  val={getAV(selKey,av.id,"exams")}           onChange={v=>setAvMonthField(selKey,av.id,"exams",v)} />
-              <AvF label="💵 הכניס סריקוב" val={getAV(selKey,av.id,"sarikowGiven")} onChange={v=>setAvMonthField(selKey,av.id,"sarikowGiven",v)} placeholder={`${fmt(c.trackNum)}`} />
+              <AvF label="💵 הכניס סריקוב" val={getAV(selKey,av.id,"sarikowGiven")} onChange={v=>setAvMonthField(selKey,av.id,"sarikowGiven",v)} placeholder="0 (לא קיבל)" />
             </div>
             {/* תענית דיבור */}
             <div style={{background:"#f0f9ff",border:"1.5px solid #bae6fd",borderRadius:8,padding:"8px 10px",marginTop:6}}>
