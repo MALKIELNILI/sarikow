@@ -2751,6 +2751,41 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
   const monthTransfers = getMD(selKey,"transfers",[])||[];
   const avById = id => avrechim.find(a=>String(a.id)===String(id));
 
+  // יתרות לתפריטי "העברה מהירה": כמה עודף/חוסר נשאר לכל אברך, בניכוי העברות שכבר תוכננו
+  // החודש (גם אם עדיין לא סומנו "בוצע") — כדי שאפשר יהיה למזג מיד את מה שנשאר עם אברך נוסף,
+  // בלי לחכות שההעברה תסומן כבוצעה בפועל.
+  const qTransferBalances = avrechim.filter(a=>a.active).map(av=>{
+    const c = calcAvrechMonth(av,selKey,prevKey);
+    const { carryover, bal } = calcSettlementState(c, av, selKey, getAV);
+    const base = carryover!==null ? carryover : bal;
+    const pendingIn  = monthTransfers.filter(t=>!t.done && String(t.toAvId)===String(av.id)).reduce((s,t)=>s+Number(t.amount||0),0);
+    const pendingOut = monthTransfers.filter(t=>!t.done && String(t.fromAvId)===String(av.id)).reduce((s,t)=>s+Number(t.amount||0),0);
+    return { av, remaining: base - pendingIn + pendingOut };
+  });
+  const surplusAvs = qTransferBalances.filter(r=>r.remaining<-0.5).map(r=>({av:r.av,amount:Math.abs(r.remaining)})).sort((a,b)=>b.amount-a.amount);
+  const missingAvs = qTransferBalances.filter(r=>r.remaining>0.5).map(r=>({av:r.av,amount:r.remaining})).sort((a,b)=>b.amount-a.amount);
+  const surplusAmt = id => id==="self"?null:(surplusAvs.find(r=>String(r.av.id)===String(id))||{}).amount;
+  const missingAmt = id => id==="self"?null:(missingAvs.find(r=>String(r.av.id)===String(id))||{}).amount;
+  const suggestQAmount = (fromId,toId) => {
+    const s = surplusAmt(fromId), m = missingAmt(toId);
+    if(s!=null && m!=null) return Math.min(s,m);
+    return s!=null ? s : m;
+  };
+  const onQFromChange = v => {
+    setQFrom(v);
+    if(v && qTo && qAmount===""){
+      const s = suggestQAmount(v,qTo);
+      if(s!=null) setQAmount(String(Math.round(s)));
+    }
+  };
+  const onQToChange = v => {
+    setQTo(v);
+    if(qFrom && v && qAmount===""){
+      const s = suggestQAmount(qFrom,v);
+      if(s!=null) setQAmount(String(Math.round(s)));
+    }
+  };
+
   // אחרי כל שינוי בהעברה — מחשבים מחדש ושומרים settlementCarryover לשני הצדדים, כדי שהפער לחודש הבא יישאר מסונכרן.
   // מקבל את רשימת ההעברות המעודכנת במפורש (ולא קורא מ-state) כדי לא להסתמך על עדכון state שעדיין לא התבצע.
   const recomputeCarryover = (avId, transfersList) => {
@@ -2783,7 +2818,10 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
     if(!qFrom||!qTo||qFrom===qTo||!qAmount||Number(qAmount)<=0) return;
     const next = [...monthTransfers, { id: Date.now()+"-"+Math.random().toString(36).slice(2,7), fromAvId: qFrom, toAvId: qTo, amount: Number(qAmount), done:false }];
     setMonthField(selKey,"transfers",next);
-    setQFrom(""); setQTo(""); setQAmount("");
+    // משאירים את המקור נבחר אם נשאר לו עוד עודף — כדי לאפשר להמשיך לחלק אותו למספר אברכים חסרים ברצף
+    const srcRemaining = qFrom==="self" ? null : surplusAmt(qFrom);
+    const keepSource = srcRemaining!=null && (srcRemaining - Number(qAmount)) > 0.5;
+    setQFrom(keepSource ? qFrom : ""); setQTo(""); setQAmount("");
   };
   const updateTransferField = (id, field, val) => {
     const before = monthTransfers.find(t=>t.id===id);
@@ -2954,15 +2992,15 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
       <div style={{...card,position:"sticky",top:headerHeight,zIndex:5,boxShadow:"0 4px 10px rgba(0,0,0,0.12)",padding:"8px 10px"}}>
         <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
           <span style={{fontWeight:700,fontSize:12,color:"#6d28d9",whiteSpace:"nowrap"}}>🔀 העברה מהירה:</span>
-          <select style={{...inp,width:"auto",flex:1,minWidth:90}} value={qFrom} onChange={e=>setQFrom(e.target.value)}>
-            <option value="">מ...</option>
+          <select style={{...inp,width:"auto",flex:1,minWidth:90}} value={qFrom} onChange={e=>onQFromChange(e.target.value)}>
+            <option value="">מ... (יש להם עודף)</option>
             <option value="self">אני</option>
-            {avrechim.filter(a=>a.active).map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+            {surplusAvs.map(({av,amount})=><option key={av.id} value={av.id}>{av.name} (+{fmt(amount)} ₪)</option>)}
           </select>
-          <select style={{...inp,width:"auto",flex:1,minWidth:90}} value={qTo} onChange={e=>setQTo(e.target.value)}>
-            <option value="">ל...</option>
+          <select style={{...inp,width:"auto",flex:1,minWidth:90}} value={qTo} onChange={e=>onQToChange(e.target.value)}>
+            <option value="">ל... (חסר להם)</option>
             <option value="self">אני</option>
-            {avrechim.filter(a=>a.active).map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+            {missingAvs.map(({av,amount})=><option key={av.id} value={av.id}>{av.name} (חסר {fmt(amount)} ₪)</option>)}
           </select>
           <input type="number" style={{...inp,width:80,textAlign:"left"}} value={qAmount} placeholder="₪"
             onChange={e=>setQAmount(e.target.value)} />
