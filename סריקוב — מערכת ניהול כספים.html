@@ -1074,6 +1074,16 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
     });
   };
 
+  // קרן ששולמה לאברך "ממני" אישית (לא ממתין להעברת סריקוב בפועל) — כדי לדעת כמה צריך לחזור אליי
+  // כשקרן יאושר, בלי לערבב את זה עם כסף שהקופה כבר נתנה בפועל.
+  const kerenAdvances = avrechim.filter(a=>a.active && (a.incomeGroup||(a.track==="keren"?"keren":"datot"))==="keren").map(av=>{
+    const c = calcAvrechMonth(av,selKey,prevKey);
+    // הסכום ששולם אישית הוא מה שבאמת מגיע לאברך החודש (monthly) — לא רק חלק הקרן החיצוני,
+    // כי כשקרן מתעכב הגבאי בפועל משלם לאברך את מלוא הסכום שהוא זכאי לו מהקופה, לא רק פלח קטן ממנו.
+    return { av, amount:c.monthly, paidByMe: getAV(selKey,av.id,"kerenPaidByMe")==="1", reimbursed: getAV(selKey,av.id,"kerenMeReimbursed")==="1" };
+  }).filter(r=>r.paidByMe);
+  const kerenAdvancesPendingTotal = kerenAdvances.filter(r=>!r.reimbursed).reduce((s,r)=>s+r.amount,0);
+
   return (
     <div style={col}>
       <div style={{background:"linear-gradient(135deg,#3b0764,#7c3aed)",borderRadius:12,padding:"14px 16px",color:"#fff",boxShadow:"0 2px 8px rgba(0,0,0,0.15)"}}>
@@ -1081,6 +1091,19 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
         <div style={{fontSize:34,fontWeight:800}}>{fmt(totalOwed)} ₪</div>
         <div style={{fontSize:11,opacity:.7,marginTop:3}}>כולל פערים מחודש קודם</div>
       </div>
+
+      {kerenAdvances.length>0 && (
+        <div style={{...card,border:"1.5px solid #c4b5fd",background:"#f5f3ff",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+          <div>
+            <div style={{fontWeight:700,fontSize:13,color:"#5b21b6"}}>👤 קרן ששילמת אישית ({kerenAdvances.length})</div>
+            <div style={{fontSize:11,color:"#7c3aed",marginTop:2,maxWidth:340}}>כשקרן יאושר בראשי — סמן "✓ הוחזר לי" אצל כל אברך שבפועל לקחת עבורו בחזרה מהקופה.</div>
+          </div>
+          <div style={{textAlign:"center"}}>
+            <div style={{fontSize:22,fontWeight:800,color:"#6d28d9"}}>{fmt(kerenAdvancesPendingTotal)} ₪</div>
+            <div style={{fontSize:10,color:"#94a3b8"}}>עדיין לא הוחזר</div>
+          </div>
+        </div>
+      )}
 
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:6}}>
         <div style={{fontWeight:700,fontSize:14,color:"#475569"}}>רשימת אברכים</div>
@@ -1272,6 +1295,34 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
                   <span style={{color:"#2563eb",fontSize:14}}>{fmt(c.rounding)} ₪</span>
                 </span>
               </div>
+
+              {/* מקור תשלום הקרן — מקרן (רגיל) או ממני אישית (כשקרן מתעכב ולא רוצים לעכב את האברך) */}
+              {c.incomeGroup==="keren" && (
+                <div style={{marginTop:6,paddingTop:6,borderTop:"1px solid rgba(0,0,0,0.06)",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:6}}>
+                  <span style={{color:"#5b21b6",fontWeight:600,fontSize:11}}>מקור התשלום:</span>
+                  <div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap"}}>
+                    <div style={{display:"flex",borderRadius:7,overflow:"hidden",border:"1.5px solid #ddd6fe"}}>
+                      <button type="button" onClick={()=>setAvMonthField(selKey,av.id,"kerenPaidByMe","")}
+                        style={{border:"none",cursor:"pointer",fontSize:10,fontWeight:700,padding:"3px 9px",
+                          background:getAV(selKey,av.id,"kerenPaidByMe")!=="1"?"#6d28d9":"#fff",
+                          color:getAV(selKey,av.id,"kerenPaidByMe")!=="1"?"#fff":"#6d28d9"}}>מקרן</button>
+                      <button type="button" onClick={()=>setAvMonthField(selKey,av.id,"kerenPaidByMe","1")}
+                        style={{border:"none",cursor:"pointer",fontSize:10,fontWeight:700,padding:"3px 9px",
+                          background:getAV(selKey,av.id,"kerenPaidByMe")==="1"?"#6d28d9":"#fff",
+                          color:getAV(selKey,av.id,"kerenPaidByMe")==="1"?"#fff":"#6d28d9"}}>👤 ממני</button>
+                    </div>
+                    {getAV(selKey,av.id,"kerenPaidByMe")==="1" && (
+                      <label style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer",fontSize:10,fontWeight:700,
+                        color:getAV(selKey,av.id,"kerenMeReimbursed")==="1"?"#16a34a":"#92400e"}}>
+                        <input type="checkbox" checked={getAV(selKey,av.id,"kerenMeReimbursed")==="1"}
+                          onChange={e=>setAvMonthField(selKey,av.id,"kerenMeReimbursed",e.target.checked?"1":"")}
+                          style={{width:13,height:13,cursor:"pointer"}}/>
+                        {getAV(selKey,av.id,"kerenMeReimbursed")==="1" ? "✓ הוחזר לי" : "טרם הוחזר"}
+                      </label>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* נוסחת בנק — מוצגת רק כשיש ערך */}
@@ -2741,8 +2792,175 @@ function CompletedRow({av,c,paid,selKey,getAV,setAvMonthField,myTransfers}){
   );
 }
 
+// לוח התאמה חזותי — שתי עמודות זו מול זו (מי שיש לו עודף / מי שחסר לו), עם רמז חזותי
+// למי הכי מתאים למי (קו מקווקו לזוג עם ההפרש הכי קטן בסכום), ואפשרות להציע תוכנית מלאה
+// שממזערת את מספר ההעברות (קודם זוגות שמתאזנים בול, אח״כ הכי גדול מול הכי גדול).
+function MatchBoard({ surplusAvs, missingAvs, qFrom, qTo, onSelectFrom, onSelectTo, onApplyPlan }){
+  const boardRef = useRef(null);
+  const svgRef = useRef(null);
+  const [plan, setPlan] = useState(null);
+  const [, forceTick] = useState(0);
+
+  useEffect(()=>{
+    const onResize = () => forceTick(t=>t+1);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  },[]);
+
+  const bestPair = (() => {
+    if(!surplusAvs.length || !missingAvs.length) return null;
+    let best=null, bestDiff=Infinity;
+    surplusAvs.forEach(s=>missingAvs.forEach(m=>{
+      const d = Math.abs(s.amount-m.amount);
+      if(d<bestDiff){ bestDiff=d; best={fromId:s.av.id, toId:m.av.id}; }
+    }));
+    return best;
+  })();
+
+  useEffect(()=>{
+    const svg = svgRef.current, board = boardRef.current;
+    if(!svg||!board) return;
+    svg.innerHTML = "";
+    const boardRect = board.getBoundingClientRect();
+    const rectOf = (side,id) => {
+      const el = board.querySelector(`[data-side="${side}"][data-av="${id}"]`);
+      if(!el) return null;
+      const r = el.getBoundingClientRect();
+      return { x: r.left-boardRect.left, y: r.top-boardRect.top+r.height/2, w:r.width };
+    };
+    const drawPath = (x1,y1,x2,y2,color,dashed) => {
+      const midX=(x1+x2)/2;
+      const p = document.createElementNS("http://www.w3.org/2000/svg","path");
+      p.setAttribute("d", `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`);
+      p.setAttribute("fill","none"); p.setAttribute("stroke",color);
+      p.setAttribute("stroke-width", dashed?1.5:2.5);
+      if(dashed) p.setAttribute("stroke-dasharray","4 5");
+      p.setAttribute("stroke-linecap","round");
+      svg.appendChild(p);
+    };
+    if(qFrom && qTo && qFrom!=="self" && qTo!=="self"){
+      const rf=rectOf("from",qFrom), rt=rectOf("to",qTo);
+      if(rf&&rt) drawPath(rf.x,rf.y,rt.x+rt.w,rt.y,"#6d28d9",false);
+    } else if(bestPair){
+      const rf=rectOf("from",bestPair.fromId), rt=rectOf("to",bestPair.toId);
+      if(rf&&rt) drawPath(rf.x,rf.y,rt.x+rt.w,rt.y,"#94a3b8",true);
+    }
+  });
+
+  const buildPlan = () => {
+    let from = surplusAvs.map(r=>({id:r.av.id,name:r.av.name,amount:r.amount}));
+    let to   = missingAvs.map(r=>({id:r.av.id,name:r.av.name,amount:r.amount}));
+    const result = [];
+    let foundExact = true;
+    while(foundExact){
+      foundExact = false;
+      exactSearch: for(let i=0;i<from.length;i++){
+        for(let j=0;j<to.length;j++){
+          if(Math.abs(from[i].amount-to[j].amount)<1){
+            result.push({fromId:from[i].id, fromName:from[i].name, toId:to[j].id, toName:to[j].name, amount:Math.min(from[i].amount,to[j].amount), exact:true});
+            from.splice(i,1); to.splice(j,1);
+            foundExact = true;
+            break exactSearch;
+          }
+        }
+      }
+    }
+    // ממצה בכל צעד: לפני כל התאמה ממיינים מחדש כדי להצמיד תמיד את הגדול-שנשאר מול הגדול-שנשאר —
+    // מיון חד-פעמי לפני הלולאה לא מספיק, כי אחרי הפחתה הראשון כבר לא בהכרח הגדול ביותר.
+    while(from.length && to.length){
+      from.sort((a,b)=>b.amount-a.amount);
+      to.sort((a,b)=>b.amount-a.amount);
+      const f=from[0], t=to[0];
+      const amt = Math.min(f.amount,t.amount);
+      result.push({fromId:f.id, fromName:f.name, toId:t.id, toName:t.name, amount:amt, exact:false});
+      f.amount-=amt; t.amount-=amt;
+      if(f.amount<1) from.shift();
+      if(t.amount<1) to.shift();
+    }
+    return result;
+  };
+
+  const cardStyle = (side,selected) => ({
+    display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,
+    background:selected?(side==="from"?"#fef2f2":"#fffbeb"):"#fff",
+    border:`1.5px solid ${selected?(side==="from"?"#dc2626":"#d97706"):"#e2e8f0"}`,
+    borderRadius:9,padding:"8px 10px",cursor:"pointer",transition:"all .12s"
+  });
+
+  const counts = plan ? (()=>{ const c={}; plan.forEach(r=>{ c[r.fromName]=(c[r.fromName]||0)+1; c[r.toName]=(c[r.toName]||0)+1; }); return Object.keys(c).filter(k=>c[k]>1).length; })() : 0;
+
+  return (
+    <div style={{...card,position:"relative"}}>
+      <div style={{fontSize:11,color:"#94a3b8",marginBottom:8}}>לוחצים כרטיס מימין וכרטיס משמאל — הקו המקווקו מרמז על ההתאמה הכי קרובה בסכום. ניתן לערוך את הסכום בשורת "העברה מהירה" הקבועה למעלה לפני "+ הוסף".</div>
+      <div ref={boardRef} style={{position:"relative",display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
+        <svg ref={svgRef} style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none",overflow:"visible"}}/>
+        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          <div style={{fontSize:12,fontWeight:800,color:"#dc2626"}}>מ · יש להם עודף</div>
+          {surplusAvs.length===0 && <div style={{fontSize:11,color:"#94a3b8"}}>אין כרגע עודף אצל אף אחד</div>}
+          {surplusAvs.map(({av,amount})=>(
+            <div key={av.id} data-side="from" data-av={av.id} style={cardStyle("from",String(qFrom)===String(av.id))}
+              onClick={()=>onSelectFrom(String(qFrom)===String(av.id)?"":av.id)}>
+              <span style={{fontWeight:700,fontSize:13}}>{av.name}</span>
+              <span style={{fontWeight:800,fontSize:13,color:"#dc2626"}}>+{fmt(amount)} ₪</span>
+            </div>
+          ))}
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          <div style={{fontSize:12,fontWeight:800,color:"#d97706"}}>ל · חסר להם</div>
+          {missingAvs.length===0 && <div style={{fontSize:11,color:"#94a3b8"}}>אין כרגע מי שחסר לו</div>}
+          {missingAvs.map(({av,amount})=>(
+            <div key={av.id} data-side="to" data-av={av.id} style={cardStyle("to",String(qTo)===String(av.id))}
+              onClick={()=>onSelectTo(String(qTo)===String(av.id)?"":av.id)}>
+              <span style={{fontWeight:700,fontSize:13}}>{av.name}</span>
+              <span style={{fontWeight:800,fontSize:13,color:"#d97706"}}>חסר {fmt(amount)} ₪</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid #f1f5f9"}}>
+        {!plan ? (
+          <button type="button" style={{...smallBtn,background:"#6d28d9",color:"#fff",fontWeight:700}}
+            onClick={()=>setPlan(buildPlan())} disabled={!surplusAvs.length||!missingAvs.length}>
+            🧮 הצע תוכנית עם הכי פחות העברות
+          </button>
+        ) : plan.length===0 ? (
+          <div style={{fontSize:12,color:"#94a3b8"}}>אין כרגע מה לתכנן.</div>
+        ) : (
+          <div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
+              <span style={{fontSize:11,background:"#f5f3ff",color:"#6d28d9",border:"1px solid #ddd6fe",borderRadius:999,padding:"3px 10px"}}>
+                סה״כ העברות: <b>{plan.length}</b>
+              </span>
+              <span style={{fontSize:11,background:counts>0?"#fef2f2":"#f0fdf4",color:counts>0?"#dc2626":"#16a34a",
+                border:`1px solid ${counts>0?"#fecaca":"#bbf7d0"}`,borderRadius:999,padding:"3px 10px"}}>
+                מעורבים ביותר מהעברה אחת: <b>{counts}</b>
+              </span>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:5,marginBottom:10}}>
+              {plan.map((r,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",gap:8,fontSize:12,background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:8,padding:"6px 10px"}}>
+                  {r.exact && <span style={{fontSize:9,fontWeight:800,background:"#efe5fd",color:"#6d28d9",borderRadius:999,padding:"1px 7px"}}>איזון מדויק</span>}
+                  <span>🔀 {r.fromName} ← {r.toName}</span>
+                  <span style={{marginRight:"auto",fontWeight:800,color:"#6d28d9"}}>{fmt(r.amount)} ₪</span>
+                </div>
+              ))}
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button type="button" style={{...smallBtn,background:"#6d28d9",color:"#fff",fontWeight:700}}
+                onClick={()=>{ onApplyPlan(plan); setPlan(null); }}>✓ אשר את כל התוכנית</button>
+              <button type="button" style={smallBtn} onClick={()=>setPlan(null)}>בטל הצעה</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, selMonth, getAV, setAvMonthField, getMD, setMonthField, allMonthKeys, getPrevMonthKey, headerHeight }){
   const [showCumulative,setShowCumulative] = useState(false);
+  const [showMatchBoard,setShowMatchBoard] = useState(false);
   const [qFrom,setQFrom] = useState("");
   const [qTo,setQTo] = useState("");
   const [qAmount,setQAmount] = useState("");
@@ -2822,6 +3040,12 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
     const srcRemaining = qFrom==="self" ? null : surplusAmt(qFrom);
     const keepSource = srcRemaining!=null && (srcRemaining - Number(qAmount)) > 0.5;
     setQFrom(keepSource ? qFrom : ""); setQTo(""); setQAmount("");
+  };
+  // מוסיף בבת אחת את כל ההעברות מתוכנית שהוצעה על ידי MatchBoard (לא סומנות "בוצע" — עדיין תכנון בלבד)
+  const applyPlanTransfers = (plan) => {
+    if(!plan || !plan.length) return;
+    const additions = plan.map((r,i)=>({ id: Date.now()+"-"+i+"-"+Math.random().toString(36).slice(2,7), fromAvId: r.fromId, toAvId: r.toId, amount: r.amount, done:false }));
+    setMonthField(selKey,"transfers",[...monthTransfers, ...additions]);
   };
   const updateTransferField = (id, field, val) => {
     const before = monthTransfers.find(t=>t.id===id);
@@ -3005,8 +3229,20 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
           <input type="number" style={{...inp,width:80,textAlign:"left"}} value={qAmount} placeholder="₪"
             onChange={e=>setQAmount(e.target.value)} />
           <button type="button" style={{...smallBtn,background:"#6d28d9",color:"#fff",fontWeight:700}} onClick={addQuickTransfer}>+ הוסף</button>
+          <button type="button" style={{...smallBtn,background:showMatchBoard?"#6d28d9":"#f5f3ff",color:showMatchBoard?"#fff":"#6d28d9",border:"1px solid #ddd6fe"}}
+            onClick={()=>setShowMatchBoard(v=>!v)}>🗂️ תצוגת התאמה</button>
         </div>
       </div>
+
+      {/* לוח התאמה חזותי — מ/ל זה מול זה, עם רמז להתאמה קרובה והצעת תוכנית שממזערת מספר העברות */}
+      {showMatchBoard && (
+        <MatchBoard
+          surplusAvs={surplusAvs} missingAvs={missingAvs}
+          qFrom={qFrom} qTo={qTo}
+          onSelectFrom={onQFromChange} onSelectTo={onQToChange}
+          onApplyPlan={applyPlanTransfers}
+        />
+      )}
 
       {/* היסטוריית ההעברות — לא קבועה (רק שורת ההוספה המהירה למעלה קבועה), כדי לא לחסום את הרשימות מתחת */}
       <div style={card}>
