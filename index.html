@@ -1187,6 +1187,9 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
                 <FG label="מלגה מקסימום (₪)">
                   <input style={inp} type="number" value={maxS} onChange={e=>updAv(av.id,"maxStipend",e.target.value)}/>
                 </FG>
+                <FG label="📞 טלפון">
+                  <input style={inp} type="tel" value={av.phone||""} placeholder="050-0000000" onChange={e=>updAv(av.id,"phone",e.target.value)}/>
+                </FG>
               </div>
             )}
 
@@ -1467,10 +1470,13 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
           <FG label="מלגה מקסימום (₪)">
             <input style={inp} type="number" value={newAv.maxStipend} onChange={e=>setNewAv(p=>({...p,maxStipend:e.target.value}))} placeholder="1600"/>
           </FG>
+          <FG label="📞 טלפון">
+            <input style={inp} type="tel" value={newAv.phone||""} onChange={e=>setNewAv(p=>({...p,phone:e.target.value}))} placeholder="050-0000000"/>
+          </FG>
           <button style={primaryBtn} onClick={()=>{
             if(!newAv.name) return;
             setAvrechim(p=>[...p,{...newAv,id:Date.now(),active:true,incomeGroup:newAv.incomeGroup||"datot"}]);
-            setNewAv({name:"",track:"1000",maxStipend:1600,incomeGroup:"datot"});
+            setNewAv({name:"",track:"1000",maxStipend:1600,incomeGroup:"datot",phone:""});
             setShowAdd(false);
           }}>הוסף אברך</button>
         </Modal>
@@ -2657,7 +2663,10 @@ function ARow({av,c,paid,selKey,getAV,setAvMonthField,myTransfers}){
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
         padding:"9px 12px",opacity:paid?0.7:1,gap:8}}>
         <div style={{flex:1,minWidth:0}}>
-          <div style={{fontWeight:700,fontSize:14}}>{av.name}</div>
+          <div style={{display:"flex",alignItems:"center",gap:6}}>
+            <div style={{fontWeight:700,fontSize:14}}>{av.name}</div>
+            <button type="button" onClick={()=>copyPhone(av)} title="הצג/העתק טלפון" style={{border:"none",background:"transparent",cursor:"pointer",fontSize:13,padding:0,lineHeight:1}}>📞</button>
+          </div>
           <div style={{fontSize:11,color:"#64748b",marginTop:2}}>
             מגיע לו סה״כ: <b>{fmt(c.totalOwedToAv)} ₪</b>
             {(c.exams>0||c.taanitOwed>0)&&` (${fmt(c.monthly)}${c.exams>0?`+${fmt(c.exams)} בחינות`:""}${c.taanitOwed>0?`+${fmt(c.taanitOwed)} תענית דיבור`:""})`}
@@ -2796,11 +2805,33 @@ function CompletedRow({av,c,paid,selKey,getAV,setAvMonthField,myTransfers}){
 // לוח התאמה חזותי — שתי עמודות זו מול זו (מי שיש לו עודף / מי שחסר לו), עם רמז חזותי
 // למי הכי מתאים למי (קו מקווקו לזוג עם ההפרש הכי קטן בסכום), ואפשרות להציע תוכנית מלאה
 // שממזערת את מספר ההעברות (קודם זוגות שמתאזנים בול, אח״כ הכי גדול מול הכי גדול).
-function MatchBoard({ surplusAvs, missingAvs, qFrom, qTo, onSelectFrom, onSelectTo, onApplyPlan }){
+// מציג/מעתיק את מספר הטלפון של אברך — לא חייגן, רק מציג את המספר כדי שיהיה קל להעתיק
+const copyPhone = av => {
+  if(!av || !av.phone){ alert(`אין מספר טלפון שמור ל${av?av.name:"אברך זה"}.\nאפשר להוסיף בלשונית "אברכים" → עריכה (✏️).`); return; }
+  const text = `${av.name}: ${av.phone}`;
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(av.phone).then(()=>alert(`📋 הועתק:\n${text}`)).catch(()=>alert(text));
+  } else {
+    alert(text);
+  }
+};
+
+function MatchBoard({ avrechim, surplusAvs, missingAvs, qFrom, qTo, onSelectFrom, onSelectTo, onApplyPlan }){
+  const avById = id => avrechim.find(a=>String(a.id)===String(id));
   const boardRef = useRef(null);
   const svgRef = useRef(null);
   const [plan, setPlan] = useState(null);
+  // "✓ אשר את כל התוכנית" נשאר מנוטרל לרגע אחרי שהתוכנית מוצגת — מגן מפני לחיצה כפולה/מקרית
+  // (לדוגמה הקשה כפולה במסך מגע) שתאשר הכל בטעות בלי שהספיקו לראות מה מוצע.
+  const [planReady, setPlanReady] = useState(false);
   const [, forceTick] = useState(0);
+
+  useEffect(()=>{
+    if(!plan){ setPlanReady(false); return; }
+    setPlanReady(false);
+    const t = setTimeout(()=>setPlanReady(true), 700);
+    return () => clearTimeout(t);
+  }, [plan]);
 
   useEffect(()=>{
     const onResize = () => forceTick(t=>t+1);
@@ -2858,7 +2889,7 @@ function MatchBoard({ surplusAvs, missingAvs, qFrom, qTo, onSelectFrom, onSelect
       exactSearch: for(let i=0;i<from.length;i++){
         for(let j=0;j<to.length;j++){
           if(Math.abs(from[i].amount-to[j].amount)<1){
-            result.push({fromId:from[i].id, fromName:from[i].name, toId:to[j].id, toName:to[j].name, amount:Math.min(from[i].amount,to[j].amount), exact:true});
+            result.push({fromId:from[i].id, fromName:from[i].name, toId:to[j].id, toName:to[j].name, amount:Math.min(from[i].amount,to[j].amount), exact:true, fromRemainingAfter:0, toRemainingAfter:0});
             from.splice(i,1); to.splice(j,1);
             foundExact = true;
             break exactSearch;
@@ -2873,8 +2904,8 @@ function MatchBoard({ surplusAvs, missingAvs, qFrom, qTo, onSelectFrom, onSelect
       to.sort((a,b)=>b.amount-a.amount);
       const f=from[0], t=to[0];
       const amt = Math.min(f.amount,t.amount);
-      result.push({fromId:f.id, fromName:f.name, toId:t.id, toName:t.name, amount:amt, exact:false});
       f.amount-=amt; t.amount-=amt;
+      result.push({fromId:f.id, fromName:f.name, toId:t.id, toName:t.name, amount:amt, exact:false, fromRemainingAfter:f.amount, toRemainingAfter:t.amount});
       if(f.amount<1) from.shift();
       if(t.amount<1) to.shift();
     }
@@ -2949,17 +2980,26 @@ function MatchBoard({ surplusAvs, missingAvs, qFrom, qTo, onSelectFrom, onSelect
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:5,marginBottom:10}}>
               {plan.map((r,i)=>(
-                <div key={i} style={{display:"flex",alignItems:"center",gap:8,fontSize:12,background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:8,padding:"6px 10px"}}>
-                  {r.exact && <span style={{fontSize:9,fontWeight:800,background:"#efe5fd",color:"#6d28d9",borderRadius:999,padding:"1px 7px"}}>איזון מדויק</span>}
-                  <span>🔀 {r.fromName} ← {r.toName}</span>
-                  <span style={{marginRight:"auto",fontWeight:800,color:"#6d28d9"}}>{fmt(r.amount)} ₪</span>
+                <div key={i} style={{display:"flex",flexDirection:"column",gap:3,fontSize:12,background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:8,padding:"6px 10px"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    {r.exact && <span style={{fontSize:9,fontWeight:800,background:"#efe5fd",color:"#6d28d9",borderRadius:999,padding:"1px 7px"}}>איזון מדויק</span>}
+                    <span>🔀 {r.fromName} ← {r.toName}</span>
+                    <span style={{marginRight:"auto",fontWeight:800,color:"#6d28d9"}}>{fmt(r.amount)} ₪</span>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:10,fontSize:10.5,color:"#94a3b8",flexWrap:"wrap"}}>
+                    <button type="button" onClick={()=>copyPhone(avById(r.fromId))} style={{...smallBtn,fontSize:10,padding:"1px 7px"}}>📞 {r.fromName}</button>
+                    {r.fromRemainingAfter>0 && <span>נשאר ל{r.fromName}: <b style={{color:"#dc2626"}}>{fmt(r.fromRemainingAfter)} ₪</b></span>}
+                    <button type="button" onClick={()=>copyPhone(avById(r.toId))} style={{...smallBtn,fontSize:10,padding:"1px 7px"}}>📞 {r.toName}</button>
+                    {r.toRemainingAfter>0 && <span>עדיין חסר ל{r.toName}: <b style={{color:"#d97706"}}>{fmt(r.toRemainingAfter)} ₪</b></span>}
+                  </div>
                 </div>
               ))}
             </div>
-            <div style={{display:"flex",gap:8}}>
-              <button type="button" style={{...smallBtn,background:"#6d28d9",color:"#fff",fontWeight:700}}
-                onClick={()=>{ onApplyPlan(plan); setPlan(null); }}>✓ אשר את כל התוכנית</button>
+            <div style={{display:"flex",gap:8,alignItems:"center"}}>
+              <button type="button" disabled={!planReady} style={{...smallBtn,background:planReady?"#6d28d9":"#c4b5fd",color:"#fff",fontWeight:700,cursor:planReady?"pointer":"not-allowed"}}
+                onClick={()=>{ if(!planReady) return; onApplyPlan(plan); setPlan(null); }}>✓ אשר את כל התוכנית</button>
               <button type="button" style={smallBtn} onClick={()=>setPlan(null)}>בטל הצעה</button>
+              {!planReady && <span style={{fontSize:10,color:"#94a3b8"}}>רגע... בודקים שראית את התוכנית</span>}
             </div>
           </div>
         )}
@@ -3264,6 +3304,7 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
       {/* לוח התאמה חזותי — מ/ל זה מול זה, עם רמז להתאמה קרובה והצעת תוכנית שממזערת מספר העברות */}
       {showMatchBoard && (
         <MatchBoard
+          avrechim={avrechim}
           surplusAvs={surplusAvs} missingAvs={missingAvs}
           qFrom={qFrom} qTo={qTo}
           onSelectFrom={onQFromChange} onSelectTo={onQToChange}
