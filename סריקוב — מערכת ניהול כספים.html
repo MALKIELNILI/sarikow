@@ -29,6 +29,13 @@ if('serviceWorker' in navigator){
 body { background:#f1f5f9; font-family:'Segoe UI',Arial,sans-serif; direction:rtl; }
 input,select,button { font-family:inherit; }
 @keyframes spin { to { transform:rotate(360deg); } }
+/* הדפסה נקייה של רשימת "מי מעביר למי" — כל שאר האפליקציה מוסתרת, מוצג רק #printTransferArea */
+@media print {
+  body * { visibility:hidden; }
+  #printTransferArea, #printTransferArea * { visibility:visible; }
+  #printTransferArea { position:absolute; inset:0; width:100%; padding:24px; }
+}
+#printTransferArea { display:none; }
 </style>
 </head>
 <body>
@@ -2806,6 +2813,54 @@ function CompletedRow({av,c,paid,selKey,getAV,setAvMonthField,myTransfers}){
 // למי הכי מתאים למי (קו מקווקו לזוג עם ההפרש הכי קטן בסכום), ואפשרות להציע תוכנית מלאה
 // שממזערת את מספר ההעברות (קודם זוגות שמתאזנים בול, אח״כ הכי גדול מול הכי גדול).
 // מציג/מעתיק את מספר הטלפון של אברך — לא חייגן, רק מציג את המספר כדי שיהיה קל להעתיק
+// מדפיס מסמך נקי "מי מעביר למי" — בונה טבלה בתוך #printTransferArea (מוסתר במסך, מוצג רק בהדפסה
+// דרך ה-CSS הגלובלי) ואז מפעיל את דיאלוג ההדפסה של הדפדפן. עובד גם על התוכנית המוצעת וגם על היסטוריית ההעברות בפועל.
+const printTransfers = (rows, monthLabel, title) => {
+  if(!rows || rows.length===0){ alert("אין העברות להדפסה."); return; }
+  let area = document.getElementById("printTransferArea");
+  if(!area){
+    area = document.createElement("div");
+    area.id = "printTransferArea";
+    document.body.appendChild(area);
+  }
+  const rowsHtml = rows.map((r,i)=>`
+    <tr>
+      <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:center;">${i+1}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;font-weight:700;">${r.fromName}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:center;">←</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;font-weight:700;">${r.toName}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:left;font-weight:800;">${fmt(r.amount)} ₪</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:center;">${r.done===true?"✓":"☐"}</td>
+    </tr>`).join("");
+  const total = rows.reduce((s,r)=>s+Number(r.amount||0),0);
+  area.innerHTML = `
+    <div style="font-family:'Segoe UI',Arial,sans-serif;direction:rtl;">
+      <h2 style="margin-bottom:4px;">${title}</h2>
+      <div style="color:#64748b;margin-bottom:16px;">${monthLabel} · הודפס ב-${new Date().toLocaleDateString("he-IL")}</div>
+      <table style="width:100%;border-collapse:collapse;font-size:14px;">
+        <thead>
+          <tr style="background:#f1f5f9;">
+            <th style="padding:8px 10px;text-align:center;">#</th>
+            <th style="padding:8px 10px;text-align:right;">מ (נותן)</th>
+            <th></th>
+            <th style="padding:8px 10px;text-align:right;">ל (מקבל)</th>
+            <th style="padding:8px 10px;text-align:left;">סכום</th>
+            <th style="padding:8px 10px;text-align:center;">בוצע</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+        <tfoot>
+          <tr>
+            <td colspan="4" style="padding:10px;text-align:left;font-weight:800;">סה״כ:</td>
+            <td style="padding:10px;font-weight:800;">${fmt(total)} ₪</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>`;
+  setTimeout(()=>window.print(), 50);
+};
+
 const copyPhone = av => {
   if(!av || !av.phone){ alert(`אין מספר טלפון שמור ל${av?av.name:"אברך זה"}.\nאפשר להוסיף בלשונית "אברכים" → עריכה (✏️).`); return; }
   const text = `${av.name}: ${av.phone}`;
@@ -2816,7 +2871,7 @@ const copyPhone = av => {
   }
 };
 
-function MatchBoard({ avrechim, surplusAvs, missingAvs, qFrom, qTo, onSelectFrom, onSelectTo, onApplyPlan }){
+function MatchBoard({ avrechim, surplusAvs, missingAvs, qFrom, qTo, onSelectFrom, onSelectTo, onApplyPlan, monthLabel }){
   const avById = id => avrechim.find(a=>String(a.id)===String(id));
   const boardRef = useRef(null);
   const svgRef = useRef(null);
@@ -2995,10 +3050,12 @@ function MatchBoard({ avrechim, surplusAvs, missingAvs, qFrom, qTo, onSelectFrom
                 </div>
               ))}
             </div>
-            <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
               <button type="button" disabled={!planReady} style={{...smallBtn,background:planReady?"#6d28d9":"#c4b5fd",color:"#fff",fontWeight:700,cursor:planReady?"pointer":"not-allowed"}}
                 onClick={()=>{ if(!planReady) return; onApplyPlan(plan); setPlan(null); }}>✓ אשר את כל התוכנית</button>
               <button type="button" style={smallBtn} onClick={()=>setPlan(null)}>בטל הצעה</button>
+              <button type="button" style={{...smallBtn,background:"#f1f5f9",color:"#334155",border:"1px solid #cbd5e1"}}
+                onClick={()=>printTransfers(plan, monthLabel, "🖨️ תוכנית העברות מוצעת — מי מעביר למי")}>🖨️ הדפס</button>
               {!planReady && <span style={{fontSize:10,color:"#94a3b8"}}>רגע... בודקים שראית את התוכנית</span>}
             </div>
           </div>
@@ -3309,14 +3366,30 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
           qFrom={qFrom} qTo={qTo}
           onSelectFrom={onQFromChange} onSelectTo={onQToChange}
           onApplyPlan={applyPlanTransfers}
+          monthLabel={mkMonthLabel(selYear,selMonth)}
         />
       )}
 
       {/* היסטוריית ההעברות — לא קבועה (רק שורת ההוספה המהירה למעלה קבועה), כדי לא לחסום את הרשימות מתחת */}
       <div style={card}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,flexWrap:"wrap",gap:6}}>
           <div style={{fontWeight:700,fontSize:14,color:"#6d28d9"}}>📋 היסטוריית העברות {monthTransfers.length>0&&`(${monthTransfers.length})`}</div>
-          <button style={{...smallBtn,background:"#f5f3ff",color:"#6d28d9",border:"1px solid #ddd6fe"}} onClick={addTransfer}>+ שורה ריקה</button>
+          <div style={{display:"flex",gap:6}}>
+            {monthTransfers.length>0 && (
+              <button style={{...smallBtn,background:"#f1f5f9",color:"#334155",border:"1px solid #cbd5e1"}}
+                onClick={()=>printTransfers(
+                  displayTransfers.map(t=>({
+                    fromName: t.fromAvId==="self"?"אני":((avById(t.fromAvId)||{}).name||"?"),
+                    toName: t.toAvId==="self"?"אני":((avById(t.toAvId)||{}).name||"?"),
+                    amount: Number(t.amount||0),
+                    done: !!t.done
+                  })),
+                  mkMonthLabel(selYear,selMonth),
+                  "🖨️ העברות בין אברכים — מי מעביר למי"
+                )}>🖨️ הדפס</button>
+            )}
+            <button style={{...smallBtn,background:"#f5f3ff",color:"#6d28d9",border:"1px solid #ddd6fe"}} onClick={addTransfer}>+ שורה ריקה</button>
+          </div>
         </div>
         {monthTransfers.length===0
           ? <div style={{fontSize:12,color:"#94a3b8"}}>אין העברות החודש — לדוגמה: אברך שקיבל יותר ממה שמגיע לו מעביר את העודף ישירות לאברך אחר (בד״כ מי שלא קיבל ישירות מסריקוב)</div>
