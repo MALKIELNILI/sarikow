@@ -29,13 +29,15 @@ if('serviceWorker' in navigator){
 body { background:#f1f5f9; font-family:'Segoe UI',Arial,sans-serif; direction:rtl; }
 input,select,button { font-family:inherit; }
 @keyframes spin { to { transform:rotate(360deg); } }
-/* הדפסה נקייה של רשימת "מי מעביר למי" — כל שאר האפליקציה מוסתרת, מוצג רק #printTransferArea */
+/* הדפסה נקייה של רשימת "מי מעביר למי" — כל שאר האפליקציה מוסתרת, מוצג רק #printTransferArea.
+   display:none מונע הצגה במסך הרגיל; ה-!important בהדפסה חייב לגבור עליו, אחרת visibility:visible
+   לא עוזר (display:none מסיר את האלמנט מעץ התצוגה בלי קשר ל-visibility). */
+#printTransferArea { display:none; }
 @media print {
   body * { visibility:hidden; }
-  #printTransferArea, #printTransferArea * { visibility:visible; }
-  #printTransferArea { position:absolute; inset:0; width:100%; padding:24px; }
+  #printTransferArea { display:block !important; position:absolute; inset:0; width:100%; padding:24px; }
+  #printTransferArea * { visibility:visible; }
 }
-#printTransferArea { display:none; }
 </style>
 </head>
 <body>
