@@ -2890,6 +2890,16 @@ function MatchBoard({ avrechim, surplusAvs, missingAvs, qFrom, qTo, onSelectFrom
     return () => clearTimeout(t);
   }, [plan]);
 
+  // מחשבים ומציגים תוכנית אוטומטית מיד עם פתיחת הלוח — כדי לחסוך את הלחיצה הנוספת על "הצע תוכנית".
+  // רץ פעם אחת עם הפתיחה (לא בכל שינוי), כך שבחירה ידנית של כרטיסים (qFrom/qTo) עדיין זמינה במקביל
+  // ולא "נדרסת" על ידי חישוב מחדש בכל רינדור.
+  useEffect(()=>{
+    if(surplusAvs.length && missingAvs.length){
+      setPlan(buildPlan());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(()=>{
     const onResize = () => forceTick(t=>t+1);
     window.addEventListener("resize", onResize);
@@ -3020,7 +3030,7 @@ function MatchBoard({ avrechim, surplusAvs, missingAvs, qFrom, qTo, onSelectFrom
         {!plan ? (
           <button type="button" style={{...smallBtn,background:"#6d28d9",color:"#fff",fontWeight:700}}
             onClick={()=>setPlan(buildPlan())} disabled={!surplusAvs.length||!missingAvs.length}>
-            🧮 הצע תוכנית עם הכי פחות העברות
+            🧮 חשב תוכנית עם הכי פחות העברות
           </button>
         ) : plan.length===0 ? (
           <div style={{fontSize:12,color:"#94a3b8"}}>אין כרגע מה לתכנן.</div>
