@@ -1103,6 +1103,11 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
   })();
   const kerenAdvancesPending = kerenAdvancesAllMonths.filter(r=>!r.reimbursed).sort((a,b)=>a.monthKey.localeCompare(b.monthKey));
   const kerenAdvancesPendingTotal = kerenAdvancesPending.reduce((s,r)=>s+r.amount,0);
+  // כשקרן נכנס בבת אחת לכולם (המקרה הרגיל) — עדיף לסמן הכל כהוחזר בלחיצה אחת, במקום שורה-שורה.
+  const markAllKerenReimbursed = () => {
+    if(!window.confirm(`לסמן ${kerenAdvancesPending.length} שורות (סה״כ ${fmt(kerenAdvancesPendingTotal)} ₪) כהוחזרו?`)) return;
+    kerenAdvancesPending.forEach(r=>setAvMonthField(r.monthKey,r.av.id,"kerenMeReimbursed","1"));
+  };
 
   return (
     <div style={col}>
@@ -1124,10 +1129,16 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
               <div style={{fontSize:10,color:"#94a3b8"}}>עדיין לא הוחזר</div>
             </div>
           </div>
-          <button type="button" style={{...smallBtn,marginTop:8,background:"#fff",color:"#6d28d9",border:"1px solid #ddd6fe"}}
-            onClick={()=>setShowKerenBreakdown(v=>!v)}>
-            {showKerenBreakdown ? "▲ הסתר פירוט" : "▼ הצג פירוט לפי חודש ואברך"}
-          </button>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:8}}>
+            <button type="button" style={{...smallBtn,background:"#16a34a",color:"#fff",fontWeight:700}}
+              onClick={markAllKerenReimbursed}>
+              ✓ סמן הכל כהוחזר ({kerenAdvancesPending.length})
+            </button>
+            <button type="button" style={{...smallBtn,background:"#fff",color:"#6d28d9",border:"1px solid #ddd6fe"}}
+              onClick={()=>setShowKerenBreakdown(v=>!v)}>
+              {showKerenBreakdown ? "▲ הסתר פירוט" : "▼ הצג פירוט לפי חודש ואברך"}
+            </button>
+          </div>
           {showKerenBreakdown && (
             <div style={{marginTop:8,display:"flex",flexDirection:"column",gap:5}}>
               {kerenAdvancesPending.map(r=>{
