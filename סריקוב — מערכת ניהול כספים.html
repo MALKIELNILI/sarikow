@@ -611,7 +611,7 @@ function App(){
 
       <main style={{maxWidth:720,margin:"0 auto",padding:"12px 14px"}}>
         {tab==="main"       && <MainTab selKey={selKey} selYear={selYear} selMonth={selMonth} baseBalance={baseBalance} setBaseBalance={setBaseBalance} liveBalance={liveBalance} curTotals={curTotals} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} syncing={syncing} allDonorNames={allDonorNames} donorHistory={donorHistory} avrechim={avrechim} />}
-        {tab==="avrechim"   && <AvrechimTab avrechim={avrechim} setAvrechim={setAvrechim} selKey={selKey} prevKey={prevKey} selYear={selYear} selMonth={selMonth} getAV={getAV} getMD={getMD} setAvMonthField={setAvMonthField} calcAvrechMonth={calcAvrechMonth} totalOwed={totalOwed} attendance={attendance} customVacations={customVacations} beinHazmanims={beinHazmanims} hiddenHols={hiddenHols} />}
+        {tab==="avrechim"   && <AvrechimTab avrechim={avrechim} setAvrechim={setAvrechim} selKey={selKey} prevKey={prevKey} selYear={selYear} selMonth={selMonth} getAV={getAV} getMD={getMD} setAvMonthField={setAvMonthField} calcAvrechMonth={calcAvrechMonth} totalOwed={totalOwed} attendance={attendance} customVacations={customVacations} beinHazmanims={beinHazmanims} hiddenHols={hiddenHols} allMonthKeys={allMonthKeys()} getPrevMonthKey={getPrevMonthKey} />}
         {tab==="attendance" && <AttendanceTab avrechim={avrechim} selKey={selKey} selYear={selYear} selMonth={selMonth} attendance={attendance} setAttendanceDay={setAttendanceDay} fillMonthBatch={fillMonthBatch} customVacations={customVacations} setCustomVacation={setCustomVacation} removeCustomVacation={removeCustomVacation} beinHazmanims={beinHazmanims} addBeinHazmanim={addBeinHazmanim} removeBeinHazmanim={removeBeinHazmanim} updateBeinHazmanim={updateBeinHazmanim} hiddenHols={hiddenHols} toggleHolidayHidden={toggleHolidayHidden} />}
         {tab==="summary"    && <SummaryTab avrechim={avrechim} allMonthKeys={allMonthKeys()} calcMonthTotals={calcMonthTotals} calcAvrechMonth={calcAvrechMonth} getPrevMonthKey={getPrevMonthKey} baseBalance={baseBalance} liveBalance={liveBalance} selKey={selKey} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} />}
         {tab==="bank"       && <BankTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} />}
@@ -1030,10 +1030,11 @@ function ImportModal({ avrechim, selKey, setAvMonthField, onClose }){
 }
 
 // ── AVRECHIM TAB ─────────────────────────────────────────────
-function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth, getAV, getMD, setAvMonthField, calcAvrechMonth, totalOwed, attendance, customVacations, beinHazmanims, hiddenHols }){
+function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth, getAV, getMD, setAvMonthField, calcAvrechMonth, totalOwed, attendance, customVacations, beinHazmanims, hiddenHols, allMonthKeys, getPrevMonthKey }){
   const [editId,setEditId]=useState(null);
   const [showAdd,setShowAdd]=useState(false);
   const [showImport,setShowImport]=useState(false);
+  const [showKerenBreakdown,setShowKerenBreakdown]=useState(false);
   const [newAv,setNewAv]=useState({name:"",track:"1000",maxStipend:1600,incomeGroup:"datot"});
   const [search,setSearch]=useState("");
   const updAv=(id,k,v)=>setAvrechim(p=>p.map(a=>a.id===id?{...a,[k]:v}:a));
@@ -1083,15 +1084,25 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
     });
   };
 
-  // קרן ששולמה לאברך "ממני" אישית (לא ממתין להעברת סריקוב בפועל) — כדי לדעת כמה צריך לחזור אליי
-  // כשקרן יאושר, בלי לערבב את זה עם כסף שהקופה כבר נתנה בפועל.
-  const kerenAdvances = avrechim.filter(a=>a.active && (a.incomeGroup||(a.track==="keren"?"keren":"datot"))==="keren").map(av=>{
-    const c = calcAvrechMonth(av,selKey,prevKey);
-    // הסכום ששולם אישית הוא מה שבאמת מגיע לאברך החודש (monthly) — לא רק חלק הקרן החיצוני,
-    // כי כשקרן מתעכב הגבאי בפועל משלם לאברך את מלוא הסכום שהוא זכאי לו מהקופה, לא רק פלח קטן ממנו.
-    return { av, amount:c.monthly, paidByMe: getAV(selKey,av.id,"kerenPaidByMe")==="1", reimbursed: getAV(selKey,av.id,"kerenMeReimbursed")==="1" };
-  }).filter(r=>r.paidByMe);
-  const kerenAdvancesPendingTotal = kerenAdvances.filter(r=>!r.reimbursed).reduce((s,r)=>s+r.amount,0);
+  // קרן ששולמה לאברך "ממני" אישית — נבדק על פני *כל* החודשים, לא רק הנוכחי. קרן לפעמים נכנס
+  // רטרו (מרוכז לכמה חודשים ביחד), אז ההחזר עלול להגיע כמה חודשים אחרי שכבר שילמת מהכיס.
+  // בלי בדיקה חוצת-חודשים, סכום פתוח מחודש קודם "נעלם" מהעין ברגע שעוברים לצפות בחודש אחר.
+  const kerenAdvancesAllMonths = (()=>{
+    const rows = [];
+    (allMonthKeys||[]).forEach(mk=>{
+      const pk = getPrevMonthKey ? getPrevMonthKey(mk) : null;
+      avrechim.filter(a=>a.active && (a.incomeGroup||(a.track==="keren"?"keren":"datot"))==="keren").forEach(av=>{
+        if(getAV(mk,av.id,"kerenPaidByMe")!=="1") return;
+        // הסכום ששולם אישית הוא מה שבאמת מגיע לאברך באותו חודש (monthly) — לא רק חלק הקרן החיצוני,
+        // כי כשקרן מתעכב הגבאי בפועל משלם לאברך את מלוא הסכום שהוא זכאי לו מהקופה, לא רק פלח קטן ממנו.
+        const c = calcAvrechMonth(av,mk,pk);
+        rows.push({ av, monthKey:mk, amount:c.monthly, reimbursed: getAV(mk,av.id,"kerenMeReimbursed")==="1" });
+      });
+    });
+    return rows;
+  })();
+  const kerenAdvancesPending = kerenAdvancesAllMonths.filter(r=>!r.reimbursed).sort((a,b)=>a.monthKey.localeCompare(b.monthKey));
+  const kerenAdvancesPendingTotal = kerenAdvancesPending.reduce((s,r)=>s+r.amount,0);
 
   return (
     <div style={col}>
@@ -1101,16 +1112,46 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
         <div style={{fontSize:11,opacity:.7,marginTop:3}}>כולל פערים מחודש קודם</div>
       </div>
 
-      {kerenAdvances.length>0 && (
-        <div style={{...card,border:"1.5px solid #c4b5fd",background:"#f5f3ff",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
-          <div>
-            <div style={{fontWeight:700,fontSize:13,color:"#5b21b6"}}>👤 קרן ששילמת אישית ({kerenAdvances.length})</div>
-            <div style={{fontSize:11,color:"#7c3aed",marginTop:2,maxWidth:340}}>כשקרן יאושר בראשי — סמן "✓ הוחזר לי" אצל כל אברך שבפועל לקחת עבורו בחזרה מהקופה.</div>
+      {kerenAdvancesPending.length>0 && (
+        <div style={{...card,border:"1.5px solid #c4b5fd",background:"#f5f3ff"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+            <div>
+              <div style={{fontWeight:700,fontSize:13,color:"#5b21b6"}}>👤 קרן ששילמת אישית — מכל החודשים ({kerenAdvancesPending.length})</div>
+              <div style={{fontSize:11,color:"#7c3aed",marginTop:2,maxWidth:340}}>כשקרן נכנס בפועל (גם אם באיחור, מרוכז לכמה חודשים) — סמן "✓ הוחזר" בכל שורה שקיבלת בחזרה.</div>
+            </div>
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:22,fontWeight:800,color:"#6d28d9"}}>{fmt(kerenAdvancesPendingTotal)} ₪</div>
+              <div style={{fontSize:10,color:"#94a3b8"}}>עדיין לא הוחזר</div>
+            </div>
           </div>
-          <div style={{textAlign:"center"}}>
-            <div style={{fontSize:22,fontWeight:800,color:"#6d28d9"}}>{fmt(kerenAdvancesPendingTotal)} ₪</div>
-            <div style={{fontSize:10,color:"#94a3b8"}}>עדיין לא הוחזר</div>
-          </div>
+          <button type="button" style={{...smallBtn,marginTop:8,background:"#fff",color:"#6d28d9",border:"1px solid #ddd6fe"}}
+            onClick={()=>setShowKerenBreakdown(v=>!v)}>
+            {showKerenBreakdown ? "▲ הסתר פירוט" : "▼ הצג פירוט לפי חודש ואברך"}
+          </button>
+          {showKerenBreakdown && (
+            <div style={{marginTop:8,display:"flex",flexDirection:"column",gap:5}}>
+              {kerenAdvancesPending.map(r=>{
+                const [y,m] = r.monthKey.split("-");
+                return (
+                  <div key={r.av.id+"-"+r.monthKey} style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#fff",border:"1px solid #ddd6fe",borderRadius:8,padding:"6px 10px",fontSize:12}}>
+                    <div>
+                      <span style={{fontWeight:700}}>{r.av.name}</span>
+                      <span style={{color:"#94a3b8",marginRight:6}}>{mkMonthLabel(Number(y),Number(m)-1)}</span>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{fontWeight:800,color:"#6d28d9"}}>{fmt(r.amount)} ₪</span>
+                      <label style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer",fontSize:11,fontWeight:700,color:"#92400e"}}>
+                        <input type="checkbox" checked={false}
+                          onChange={()=>setAvMonthField(r.monthKey,r.av.id,"kerenMeReimbursed","1")}
+                          style={{width:13,height:13,cursor:"pointer"}}/>
+                        הוחזר
+                      </label>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
