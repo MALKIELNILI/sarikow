@@ -1084,6 +1084,22 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
     });
   };
 
+  // הסכום האחרון שבאמת הוזן לקבוצת קרן ב"קרן התורה" בראשי (לא 0) — לשימוש כהערכה לחודשים
+  // שבהם קרן טרם הוזן בפועל (בדיוק המצב שבו קרן מתעכב). אותה שיטה בדיוק כמו "מצטבר לפי אברך" בלשונית חשבון.
+  const recentKerenLookup = (()=>{
+    const sampleAv = avrechim.find(a=>a.active && (a.incomeGroup||(a.track==="keren"?"keren":"datot"))==="keren");
+    const lookup = {};
+    if(!sampleAv) return lookup;
+    let lastKnown = 0;
+    [...(allMonthKeys||[])].sort().forEach(key=>{
+      const pk = getPrevMonthKey ? getPrevMonthKey(key) : null;
+      const c = calcAvrechMonth(sampleAv,key,pk);
+      if(c.autoKeren>0) lastKnown = c.autoKeren;
+      lookup[key] = lastKnown;
+    });
+    return lookup;
+  })();
+
   // קרן ששולמה לאברך "ממני" אישית — נבדק על פני *כל* החודשים, לא רק הנוכחי. קרן לפעמים נכנס
   // רטרו (מרוכז לכמה חודשים ביחד), אז ההחזר עלול להגיע כמה חודשים אחרי שכבר שילמת מהכיס.
   // בלי בדיקה חוצת-חודשים, סכום פתוח מחודש קודם "נעלם" מהעין ברגע שעוברים לצפות בחודש אחר.
@@ -1093,10 +1109,12 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
       const pk = getPrevMonthKey ? getPrevMonthKey(mk) : null;
       avrechim.filter(a=>a.active && (a.incomeGroup||(a.track==="keren"?"keren":"datot"))==="keren").forEach(av=>{
         if(getAV(mk,av.id,"kerenPaidByMe")!=="1") return;
-        // הסכום ששולם אישית הוא מה שבאמת מגיע לאברך באותו חודש (monthly) — לא רק חלק הקרן החיצוני,
-        // כי כשקרן מתעכב הגבאי בפועל משלם לאברך את מלוא הסכום שהוא זכאי לו מהקופה, לא רק פלח קטן ממנו.
+        // הסכום ששולם אישית הוא חלק הקרן החיצוני בלבד (מקביל לדתות) — לא כל המלגה מהקופה.
+        // אם קרן כבר הוזן בפועל לאותו חודש (c.keren>0) — משתמשים בו; אחרת (קרן עוד לא נכנס,
+        // בדיוק המצב הזה) — משתמשים בהערכה מהסכום האחרון שכן הוזן לאותה קבוצה.
         const c = calcAvrechMonth(av,mk,pk);
-        rows.push({ av, monthKey:mk, amount:c.monthly, reimbursed: getAV(mk,av.id,"kerenMeReimbursed")==="1" });
+        const amount = c.keren>0 ? c.keren : Number(recentKerenLookup[mk]||0);
+        rows.push({ av, monthKey:mk, amount, reimbursed: getAV(mk,av.id,"kerenMeReimbursed")==="1" });
       });
     });
     return rows;
