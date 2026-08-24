@@ -1106,11 +1106,19 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
       }
     });
   };
-  // מבטל את מה ש"החל על כולם" מילא — מחזיר את הסכום, העקיפה, וסימון "הוחזר לי" לריק אצל כל
-  // אברכי הקרן הפעילים החודש. לא נוגע בבחירת "מקרן/ממני" עצמה (זו החלטה נפרדת). שימושי אם
-  // מולאו נתונים לא נכונים בטעות (למשל סומן "הוחזר לי" בטעות לפני שקרן באמת נכנס בפועל).
+  // מאפס רק את סימון "הוחזר לי" — בלי לגעת בסכום ("נתת ₪"/עקיפת קרן) שכבר הוזן. זה המקרה
+  // הנפוץ: סומן "הוחזר" בטעות (למשל בזמן מילוי מרוכז) לפני שקרן באמת נכנס בפועל, אבל הסכום
+  // עצמו נכון ואין סיבה לאבד אותו.
+  const resetKerenReimbursedOnly = () => {
+    if(!window.confirm('לאפס לכולם רק את סימון "הוחזר לי" (חוזר ל"טרם הוחזר")? הסכום שהוזן ("נתת ₪"/עקיפת קרן) יישאר כמו שהוא. להמשיך?')) return;
+    avrechim.filter(a=>a.active && avGroup(a)==="keren").forEach(av=>{
+      setAvMonthField(selKey,av.id,"kerenMeReimbursed","");
+    });
+  };
+  // איפוס מלא — גם מוחק את הסכום שהוזן, לא רק את סימון ההחזר. שימושי רק אם באמת רוצים למחוק
+  // גם את הסכום ("נתת ₪"/עקיפת קרן), למשל למילוי מחדש מאפס. לא נוגע בבחירת "מקרן/ממני" עצמה.
   const resetKerenBulk = () => {
-    if(!window.confirm('לאפס לכולם: הסכום שהוזן ("נתת ₪" / עקיפת קרן) וסימון "הוחזר לי"? הבחירה "מקרן/ממני" עצמה לא תשתנה. להמשיך?')) return;
+    if(!window.confirm('לאפס לכולם גם את הסכום ("נתת ₪"/עקיפת קרן) וגם את סימון "הוחזר לי"? הבחירה "מקרן/ממני" עצמה לא תשתנה. פעולה זו תמחק את הסכומים שכבר הוזנו!')) return;
     avrechim.filter(a=>a.active && avGroup(a)==="keren").forEach(av=>{
       setAvMonthField(selKey,av.id,"kerenPaidByMeAmount","");
       setAvMonthField(selKey,av.id,"kerenMeReimbursed","");
@@ -1266,9 +1274,13 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
             onClick={()=>{ if(window.confirm('זה ימלא את הסכום שהוזן לכל אברכי הקרן הפעילים החודש — למי שמסומן "מקרן" ייכנס ישירות כסכום הקרן, ולמי שמסומן "ממני" ייכנס בשדה "נתת ₪". להמשיך?')) applyKerenAmountToAll(); }}>
             🔄 החל על כולם (מושהי קרן)
           </button>
-          <button style={{...smallBtn,background:"#fff",color:"#dc2626",border:"1px solid #fecaca"}}
+          <button style={{...smallBtn,background:"#fff",color:"#16a34a",border:"1px solid #bbf7d0"}}
+            onClick={resetKerenReimbursedOnly}>
+            ↺ אפס "הוחזר לי" בלבד
+          </button>
+          <button style={{...smallBtn,background:"#fff",color:"#dc2626",border:"1px solid #fecaca",fontSize:10}}
             onClick={resetKerenBulk}>
-            ↺ אפס הכל (מושהי קרן)
+            ↺ אפס גם סכום (מוחק לגמרי)
           </button>
         </div>
       )}
