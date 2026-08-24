@@ -1151,29 +1151,29 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
       const pk = getPrevMonthKey ? getPrevMonthKey(mk) : null;
       avrechim.filter(a=>a.active && (a.incomeGroup||(a.track==="keren"?"keren":"datot"))==="keren").forEach(av=>{
         if(getAV(mk,av.id,"kerenPaidByMe")!=="1") return;
-        // הסכום הקובע הוא מה שהוזן ידנית ("נתת ₪") — כי זה בדיוק מה שבאמת ניתן ביד, ואין דרך
-        // אמינה לנחש את זה אוטומטית (מספר האברכים בקבוצה משתנה, אז חלוקה לפי הסכום האחרון שנכנס
-        // חלקי הכמות הנוכחית לא תמיד משקפת את מה שבאמת סוכם/ניתן). אם עדיין לא הוזן ידנית —
-        // נופלים להערכה (קרן שהוזן בפועל לחודש הזה, או הסכום האחרון שכן הוזן לקבוצה) רק כברירת מחדל זמנית.
+        // הסכום הקובע הוא *רק* מה שהוזן ידנית ("נתת ₪") — כי זה בדיוק מה שבאמת ניתן ביד.
+        // בכוונה אין כאן הערכה/ניחוש אוטומטי: ניסיון קודם לנחש (חלוקת הסכום האחרון שנכנס לקרן
+        // במספר האברכים הנוכחי) הניב מספר שגוי (506 במקום 675, כי מספר האברכים בקבוצה השתנה),
+        // ונראה כאילו "איפוס" לא עבד — כי אחרי איפוס האמת (השדה הריק) הוחלפה בניחוש שגוי אחר.
+        // אם עדיין לא הוזן ידנית — משאירים needsAmount=true ולא מנחשים שום מספר.
         const manualRaw = getAV(mk,av.id,"kerenPaidByMeAmount");
-        let amount;
-        if(manualRaw!==""){
-          amount = Number(manualRaw);
-        } else {
-          const c = calcAvrechMonth(av,mk,pk);
-          amount = c.keren>0 ? c.keren : Number(recentKerenLookup[mk]||0);
-        }
-        rows.push({ av, monthKey:mk, amount, reimbursed: getAV(mk,av.id,"kerenMeReimbursed")==="1" });
+        const needsAmount = manualRaw==="";
+        const amount = needsAmount ? 0 : Number(manualRaw);
+        rows.push({ av, monthKey:mk, amount, needsAmount, reimbursed: getAV(mk,av.id,"kerenMeReimbursed")==="1" });
       });
     });
     return rows;
   })();
   const kerenAdvancesPending = kerenAdvancesAllMonths.filter(r=>!r.reimbursed).sort((a,b)=>a.monthKey.localeCompare(b.monthKey));
-  const kerenAdvancesPendingTotal = kerenAdvancesPending.reduce((s,r)=>s+r.amount,0);
+  const kerenAdvancesPendingTotal = kerenAdvancesPending.filter(r=>!r.needsAmount).reduce((s,r)=>s+r.amount,0);
+  const kerenAdvancesMissingCount = kerenAdvancesPending.filter(r=>r.needsAmount).length;
   // כשקרן נכנס בבת אחת לכולם (המקרה הרגיל) — עדיף לסמן הכל כהוחזר בלחיצה אחת, במקום שורה-שורה.
+  // שורות בלי סכום שהוזן (needsAmount) לא נכללות — אין טעם לסמן "הוחזר" על סכום שעדיין לא ידוע.
   const markAllKerenReimbursed = () => {
-    if(!window.confirm(`לסמן ${kerenAdvancesPending.length} שורות (סה״כ ${fmt(kerenAdvancesPendingTotal)} ₪) כהוחזרו?`)) return;
-    kerenAdvancesPending.forEach(r=>setAvMonthField(r.monthKey,r.av.id,"kerenMeReimbursed","1"));
+    const eligible = kerenAdvancesPending.filter(r=>!r.needsAmount);
+    if(!eligible.length){ alert('אין שורות עם סכום שהוזן לסמן כהוחזרו. קודם יש להזין "נתת ₪" לכל אברך.'); return; }
+    if(!window.confirm(`לסמן ${eligible.length} שורות (סה״כ ${fmt(eligible.reduce((s,r)=>s+r.amount,0))} ₪) כהוחזרו?`)) return;
+    eligible.forEach(r=>setAvMonthField(r.monthKey,r.av.id,"kerenMeReimbursed","1"));
   };
 
   return (
@@ -1196,10 +1196,15 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
               <div style={{fontSize:10,color:"#94a3b8"}}>עדיין לא הוחזר</div>
             </div>
           </div>
+          {kerenAdvancesMissingCount>0 && (
+            <div style={{marginTop:6,fontSize:11,color:"#dc2626",fontWeight:700,background:"#fef2f2",border:"1px solid #fecaca",borderRadius:8,padding:"5px 9px"}}>
+              ⚠️ ל-{kerenAdvancesMissingCount} שורות עדיין אין סכום — הן לא נכללות בסה״כ למעלה עד שתמלא "נתת ₪" (ראה פירוט).
+            </div>
+          )}
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:8}}>
             <button type="button" style={{...smallBtn,background:"#16a34a",color:"#fff",fontWeight:700}}
               onClick={markAllKerenReimbursed}>
-              ✓ סמן הכל כהוחזר ({kerenAdvancesPending.length})
+              ✓ סמן הכל כהוחזר ({kerenAdvancesPending.length-kerenAdvancesMissingCount})
             </button>
             <button type="button" style={{...smallBtn,background:"#fff",color:"#6d28d9",border:"1px solid #ddd6fe"}}
               onClick={()=>setShowKerenBreakdown(v=>!v)}>
@@ -1211,20 +1216,24 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
               {kerenAdvancesPending.map(r=>{
                 const [y,m] = r.monthKey.split("-");
                 return (
-                  <div key={r.av.id+"-"+r.monthKey} style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#fff",border:"1px solid #ddd6fe",borderRadius:8,padding:"6px 10px",fontSize:12}}>
+                  <div key={r.av.id+"-"+r.monthKey} style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:r.needsAmount?"#fef2f2":"#fff",border:`1px solid ${r.needsAmount?"#fecaca":"#ddd6fe"}`,borderRadius:8,padding:"6px 10px",fontSize:12}}>
                     <div>
                       <span style={{fontWeight:700}}>{r.av.name}</span>
                       <span style={{color:"#94a3b8",marginRight:6}}>{mkMonthLabel(Number(y),Number(m)-1)}</span>
                     </div>
-                    <div style={{display:"flex",alignItems:"center",gap:8}}>
-                      <span style={{fontWeight:800,color:"#6d28d9"}}>{fmt(r.amount)} ₪</span>
-                      <label style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer",fontSize:11,fontWeight:700,color:"#92400e"}}>
-                        <input type="checkbox" checked={false}
-                          onChange={()=>setAvMonthField(r.monthKey,r.av.id,"kerenMeReimbursed","1")}
-                          style={{width:13,height:13,cursor:"pointer"}}/>
-                        הוחזר
-                      </label>
-                    </div>
+                    {r.needsAmount ? (
+                      <span style={{fontWeight:700,color:"#dc2626",fontSize:11}}>⚠️ טרם הוזן סכום</span>
+                    ) : (
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <span style={{fontWeight:800,color:"#6d28d9"}}>{fmt(r.amount)} ₪</span>
+                        <label style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer",fontSize:11,fontWeight:700,color:"#92400e"}}>
+                          <input type="checkbox" checked={false}
+                            onChange={()=>setAvMonthField(r.monthKey,r.av.id,"kerenMeReimbursed","1")}
+                            style={{width:13,height:13,cursor:"pointer"}}/>
+                          הוחזר
+                        </label>
+                      </div>
+                    )}
                   </div>
                 );
               })}
