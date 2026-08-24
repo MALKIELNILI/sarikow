@@ -1037,9 +1037,15 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
   const [showKerenBreakdown,setShowKerenBreakdown]=useState(false);
   const [newAv,setNewAv]=useState({name:"",track:"1000",maxStipend:1600,incomeGroup:"datot"});
   const [search,setSearch]=useState("");
+  const [kerenBulkAmount,setKerenBulkAmount]=useState("");
+  const [kerenBulkAlsoReimbursed,setKerenBulkAlsoReimbursed]=useState(false);
   const updAv=(id,k,v)=>setAvrechim(p=>p.map(a=>a.id===id?{...a,[k]:v}:a));
   const avNames = avrechim.map(a=>a.name).filter(Boolean);
-  const filteredAvrechim = avrechim.filter(a=>a.active && a.name.includes(search));
+  const avGroup = a => a.incomeGroup||(a.track==="keren"?"keren":"datot");
+  // מרוכזים ברצף לפי קבוצה (כל זכאי דתות ביחד, אחריהם כל מושהי קרן ביחד) — כדי שיהיה קל לעבור
+  // על קבוצה שלמה אחת אחרי השנייה, במקום שהם מפוזרים לפי סדר ההוספה המקורי.
+  const filteredAvrechim = avrechim.filter(a=>a.active && a.name.includes(search))
+    .sort((a,b)=> avGroup(a)===avGroup(b) ? 0 : (avGroup(a)==="datot"?-1:1));
 
   // תענית דיבור — תקופת השכר של JB: מ-15 בחודש הקודם עד 14 בחודש הנבחר (לא חודש קלנדרי!)
   const taanitPrevM = selMonth===0 ? 11 : selMonth-1;
@@ -1081,6 +1087,23 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
     if(amt==null) return;
     avrechim.filter(a=>a.active && (a.incomeGroup||(a.track==="keren"?"keren":"datot"))==="datot").forEach(av=>{
       setAvMonthField(selKey,av.id,"sarikowGiven",amt);
+    });
+  };
+
+  const hasKerenGroup = avrechim.some(a=>a.active && avGroup(a)==="keren");
+  // ממלא בבת אחת את אותו סכום קרן לכל אברכי הקרן הפעילים החודש — בלי קשר אם הם מסומנים
+  // "מקרן" (נכנס ישירות לשדה "קרן" כעקיפה) או "ממני" (נכנס ל"נתת ₪"), כי ברוב החודשים
+  // כולם מקבלים אותו סכום קבוע. אם רוצים לסמן גם שכבר הוחזר — הצ'קבוקס עושה זאת יחד עם המילוי.
+  const applyKerenAmountToAll = () => {
+    const amt = Number(kerenBulkAmount);
+    if(!amt || amt<=0) return;
+    avrechim.filter(a=>a.active && avGroup(a)==="keren").forEach(av=>{
+      if(getAV(selKey,av.id,"kerenPaidByMe")==="1"){
+        setAvMonthField(selKey,av.id,"kerenPaidByMeAmount",amt);
+        if(kerenBulkAlsoReimbursed) setAvMonthField(selKey,av.id,"kerenMeReimbursed","1");
+      } else {
+        setAvMonthField(selKey,av.id,"keren",amt);
+      }
     });
   };
 
@@ -1216,6 +1239,21 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
           <button style={{...smallBtn,background:"#7c3aed",color:"#fff",fontWeight:700}}
             onClick={()=>{ if(window.confirm("זה ימלא את שדה \"הכניס סריקוב\" לזכאי דתות בלבד (לא למושהי קרן) לפי הסכומים שהוזנו בראשי. אפשר עדיין לשנות ידנית לאברך ספציפי אחרי כן. להמשיך?")) applySarikowGivenToAll(); }}>
             🔄 החל על כולם (זכאי דתות)
+          </button>
+        </div>
+      )}
+
+      {hasKerenGroup && (
+        <div style={{background:"#f5f3ff",border:"1.5px solid #c4b5fd",borderRadius:10,padding:"9px 12px",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+          <span style={{fontSize:11,color:"#5b21b6",fontWeight:700,whiteSpace:"nowrap"}}>💰 סכום קרן לאברך אחד (מושהי קרן):</span>
+          <input type="number" style={{...inp,width:90}} value={kerenBulkAmount} onChange={e=>setKerenBulkAmount(e.target.value)} placeholder="675"/>
+          <label style={{display:"flex",alignItems:"center",gap:4,fontSize:11,color:"#5b21b6",cursor:"pointer",whiteSpace:"nowrap"}}>
+            <input type="checkbox" checked={kerenBulkAlsoReimbursed} onChange={e=>setKerenBulkAlsoReimbursed(e.target.checked)} style={{cursor:"pointer"}}/>
+            וסמן גם "הוחזר לי" (למי שסומן ממני)
+          </label>
+          <button style={{...smallBtn,background:"#7c3aed",color:"#fff",fontWeight:700}}
+            onClick={()=>{ if(window.confirm('זה ימלא את הסכום שהוזן לכל אברכי הקרן הפעילים החודש — למי שמסומן "מקרן" ייכנס ישירות כסכום הקרן, ולמי שמסומן "ממני" ייכנס בשדה "נתת ₪". להמשיך?')) applyKerenAmountToAll(); }}>
+            🔄 החל על כולם (מושהי קרן)
           </button>
         </div>
       )}
