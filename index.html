@@ -1109,11 +1109,18 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
       const pk = getPrevMonthKey ? getPrevMonthKey(mk) : null;
       avrechim.filter(a=>a.active && (a.incomeGroup||(a.track==="keren"?"keren":"datot"))==="keren").forEach(av=>{
         if(getAV(mk,av.id,"kerenPaidByMe")!=="1") return;
-        // הסכום ששולם אישית הוא חלק הקרן החיצוני בלבד (מקביל לדתות) — לא כל המלגה מהקופה.
-        // אם קרן כבר הוזן בפועל לאותו חודש (c.keren>0) — משתמשים בו; אחרת (קרן עוד לא נכנס,
-        // בדיוק המצב הזה) — משתמשים בהערכה מהסכום האחרון שכן הוזן לאותה קבוצה.
-        const c = calcAvrechMonth(av,mk,pk);
-        const amount = c.keren>0 ? c.keren : Number(recentKerenLookup[mk]||0);
+        // הסכום הקובע הוא מה שהוזן ידנית ("נתת ₪") — כי זה בדיוק מה שבאמת ניתן ביד, ואין דרך
+        // אמינה לנחש את זה אוטומטית (מספר האברכים בקבוצה משתנה, אז חלוקה לפי הסכום האחרון שנכנס
+        // חלקי הכמות הנוכחית לא תמיד משקפת את מה שבאמת סוכם/ניתן). אם עדיין לא הוזן ידנית —
+        // נופלים להערכה (קרן שהוזן בפועל לחודש הזה, או הסכום האחרון שכן הוזן לקבוצה) רק כברירת מחדל זמנית.
+        const manualRaw = getAV(mk,av.id,"kerenPaidByMeAmount");
+        let amount;
+        if(manualRaw!==""){
+          amount = Number(manualRaw);
+        } else {
+          const c = calcAvrechMonth(av,mk,pk);
+          amount = c.keren>0 ? c.keren : Number(recentKerenLookup[mk]||0);
+        }
         rows.push({ av, monthKey:mk, amount, reimbursed: getAV(mk,av.id,"kerenMeReimbursed")==="1" });
       });
     });
@@ -1394,13 +1401,22 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
                           color:getAV(selKey,av.id,"kerenPaidByMe")==="1"?"#fff":"#6d28d9"}}>👤 ממני</button>
                     </div>
                     {getAV(selKey,av.id,"kerenPaidByMe")==="1" && (
-                      <label style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer",fontSize:10,fontWeight:700,
-                        color:getAV(selKey,av.id,"kerenMeReimbursed")==="1"?"#16a34a":"#92400e"}}>
-                        <input type="checkbox" checked={getAV(selKey,av.id,"kerenMeReimbursed")==="1"}
-                          onChange={e=>setAvMonthField(selKey,av.id,"kerenMeReimbursed",e.target.checked?"1":"")}
-                          style={{width:13,height:13,cursor:"pointer"}}/>
-                        {getAV(selKey,av.id,"kerenMeReimbursed")==="1" ? "✓ הוחזר לי" : "טרם הוחזר"}
-                      </label>
+                      <>
+                        <div style={{display:"flex",alignItems:"center",gap:3}}>
+                          <span style={{fontSize:10,color:"#5b21b6"}}>נתת ₪</span>
+                          <input type="number" value={getAV(selKey,av.id,"kerenPaidByMeAmount")}
+                            placeholder={String(Math.round(c.keren>0?c.keren:Number(recentKerenLookup[selKey]||0)))}
+                            onChange={e=>setAvMonthField(selKey,av.id,"kerenPaidByMeAmount",e.target.value)}
+                            style={{width:60,border:"1.5px solid #ddd6fe",borderRadius:6,padding:"3px 6px",fontSize:11,textAlign:"left"}}/>
+                        </div>
+                        <label style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer",fontSize:10,fontWeight:700,
+                          color:getAV(selKey,av.id,"kerenMeReimbursed")==="1"?"#16a34a":"#92400e"}}>
+                          <input type="checkbox" checked={getAV(selKey,av.id,"kerenMeReimbursed")==="1"}
+                            onChange={e=>setAvMonthField(selKey,av.id,"kerenMeReimbursed",e.target.checked?"1":"")}
+                            style={{width:13,height:13,cursor:"pointer"}}/>
+                          {getAV(selKey,av.id,"kerenMeReimbursed")==="1" ? "✓ הוחזר לי" : "טרם הוחזר"}
+                        </label>
+                      </>
                     )}
                   </div>
                 </div>
