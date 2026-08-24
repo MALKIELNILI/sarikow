@@ -1106,6 +1106,17 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
       }
     });
   };
+  // מבטל את מה ש"החל על כולם" מילא — מחזיר את הסכום, העקיפה, וסימון "הוחזר לי" לריק אצל כל
+  // אברכי הקרן הפעילים החודש. לא נוגע בבחירת "מקרן/ממני" עצמה (זו החלטה נפרדת). שימושי אם
+  // מולאו נתונים לא נכונים בטעות (למשל סומן "הוחזר לי" בטעות לפני שקרן באמת נכנס בפועל).
+  const resetKerenBulk = () => {
+    if(!window.confirm('לאפס לכולם: הסכום שהוזן ("נתת ₪" / עקיפת קרן) וסימון "הוחזר לי"? הבחירה "מקרן/ממני" עצמה לא תשתנה. להמשיך?')) return;
+    avrechim.filter(a=>a.active && avGroup(a)==="keren").forEach(av=>{
+      setAvMonthField(selKey,av.id,"kerenPaidByMeAmount","");
+      setAvMonthField(selKey,av.id,"kerenMeReimbursed","");
+      setAvMonthField(selKey,av.id,"keren","");
+    });
+  };
 
   // הסכום האחרון שבאמת הוזן לקבוצת קרן ב"קרן התורה" בראשי (לא 0) — לשימוש כהערכה לחודשים
   // שבהם קרן טרם הוזן בפועל (בדיוק המצב שבו קרן מתעכב). אותה שיטה בדיוק כמו "מצטבר לפי אברך" בלשונית חשבון.
@@ -1247,13 +1258,17 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
         <div style={{background:"#f5f3ff",border:"1.5px solid #c4b5fd",borderRadius:10,padding:"9px 12px",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
           <span style={{fontSize:11,color:"#5b21b6",fontWeight:700,whiteSpace:"nowrap"}}>💰 סכום קרן לאברך אחד (מושהי קרן):</span>
           <input type="number" style={{...inp,width:90}} value={kerenBulkAmount} onChange={e=>setKerenBulkAmount(e.target.value)} placeholder="675"/>
-          <label style={{display:"flex",alignItems:"center",gap:4,fontSize:11,color:"#5b21b6",cursor:"pointer",whiteSpace:"nowrap"}}>
+          <label style={{display:"flex",alignItems:"center",gap:4,fontSize:11,color:"#dc2626",fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
             <input type="checkbox" checked={kerenBulkAlsoReimbursed} onChange={e=>setKerenBulkAlsoReimbursed(e.target.checked)} style={{cursor:"pointer"}}/>
-            וסמן גם "הוחזר לי" (למי שסומן ממני)
+            ⚠️ וגם סמן שכבר קיבלתי בחזרה (רק אם קרן כבר נכנס בפועל!)
           </label>
           <button style={{...smallBtn,background:"#7c3aed",color:"#fff",fontWeight:700}}
             onClick={()=>{ if(window.confirm('זה ימלא את הסכום שהוזן לכל אברכי הקרן הפעילים החודש — למי שמסומן "מקרן" ייכנס ישירות כסכום הקרן, ולמי שמסומן "ממני" ייכנס בשדה "נתת ₪". להמשיך?')) applyKerenAmountToAll(); }}>
             🔄 החל על כולם (מושהי קרן)
+          </button>
+          <button style={{...smallBtn,background:"#fff",color:"#dc2626",border:"1px solid #fecaca"}}
+            onClick={resetKerenBulk}>
+            ↺ אפס הכל (מושהי קרן)
           </button>
         </div>
       )}
