@@ -3330,16 +3330,32 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
 
   // ── העברות בין אברכים (למי שקיבל יותר ממה שמגיע לו — מעביר ישירות לאברך אחר, בד״כ מי שלא קיבל ישירות מסריקוב) ──
   const monthTransfers = getMD(selKey,"transfers",[])||[];
-  // לתצוגה בלבד (לא משנה את המערך המאוחסן): מקבצים ברצף את כל ההעברות שיוצאות מאותו אברך,
-  // כדי שמי שצריך לתת לכמה אנשים יראה את כל השורות שלו אחת אחרי השנייה.
+  // לתצוגה בלבד (לא משנה את המערך המאוחסן): מקבצים יחד "רכיבים מחוברים" — כל ההעברות שקשורות
+  // לאותו אברך, בין אם כנותן ובין אם כמקבל (ואפילו שרשראות: א׳→ב׳→ג׳) — כדי שגם מי שנותן
+  // לכמה אנשים וגם מי שמקבל מכמה אנשים יראה את כל השורות שלו ברצף אחת אחרי השנייה.
   const displayTransfers = (() => {
-    const grouped = []; const seenFrom = new Set();
-    monthTransfers.forEach(t=>{
-      if(seenFrom.has(t.fromAvId)) return;
-      seenFrom.add(t.fromAvId);
-      monthTransfers.filter(x=>x.fromAvId===t.fromAvId).forEach(x=>grouped.push(x));
-    });
-    return grouped;
+    const remaining = [...monthTransfers];
+    const result = [];
+    while(remaining.length){
+      const involvedIds = new Set();
+      const first = remaining.shift();
+      result.push(first);
+      involvedIds.add(first.fromAvId); involvedIds.add(first.toAvId);
+      let addedMore = true;
+      while(addedMore){
+        addedMore = false;
+        for(let i=remaining.length-1;i>=0;i--){
+          const t = remaining[i];
+          if(involvedIds.has(t.fromAvId) || involvedIds.has(t.toAvId)){
+            result.push(t);
+            involvedIds.add(t.fromAvId); involvedIds.add(t.toAvId);
+            remaining.splice(i,1);
+            addedMore = true;
+          }
+        }
+      }
+    }
+    return result;
   })();
   const avById = id => avrechim.find(a=>String(a.id)===String(id));
   const calcOf = id => id==="self" ? null : (rows.find(r=>String(r.av.id)===String(id))||{}).c;
