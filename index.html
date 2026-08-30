@@ -2987,14 +2987,32 @@ const printTransfers = (rows, monthLabel, title) => {
     area.id = "printTransferArea";
     document.body.appendChild(area);
   }
+  const breakdownHtml = (c) => {
+    if(!c) return "";
+    const parts=[];
+    if(c.monthly>0) parts.push(`נוכחות ${fmt(c.monthly)}`);
+    if(c.datot>0) parts.push(`דתות ${fmt(c.datot)}`);
+    if(c.keren>0) parts.push(`קרן ${fmt(c.keren)}`);
+    if(c.exams>0) parts.push(`מבחנים ${fmt(c.exams)}`);
+    if(c.taanitOwed>0) parts.push(`תענית דיבור ${fmt(c.taanitOwed)}`);
+    if(c.prevSettlementCarryover) parts.push(`פ׳קודם ${fmtSigned(c.prevSettlementCarryover)}`);
+    const detail = parts.length ? ` (${parts.join(" + ")})` : "";
+    return `<div style="font-size:10.5px;color:#64748b;margin-top:2px;">מגיע לו סה״כ: ${fmt(c.totalOwedToAv)} ₪${detail}</div>`;
+  };
   const rowsHtml = rows.map((r,i)=>`
     <tr>
-      <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:center;">${i+1}</td>
-      <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;font-weight:700;">${r.fromName}</td>
-      <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:center;">←</td>
-      <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;font-weight:700;">${r.toName}</td>
-      <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:left;font-weight:800;">${fmt(r.amount)} ₪</td>
-      <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:center;">${r.done===true?"✓":"☐"}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:center;vertical-align:top;">${i+1}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;">
+        <div style="font-weight:700;">${r.fromName}</div>
+        ${breakdownHtml(r.fromCalc)}
+      </td>
+      <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:center;vertical-align:top;">←</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;">
+        <div style="font-weight:700;">${r.toName}</div>
+        ${breakdownHtml(r.toCalc)}
+      </td>
+      <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:left;font-weight:800;vertical-align:top;">${fmt(r.amount)} ₪</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:center;vertical-align:top;">${r.done===true?"✓":"☐"}</td>
     </tr>`).join("");
   const total = rows.reduce((s,r)=>s+Number(r.amount||0),0);
   area.innerHTML = `
@@ -3008,7 +3026,7 @@ const printTransfers = (rows, monthLabel, title) => {
             <th style="padding:8px 10px;text-align:right;">מ (נותן)</th>
             <th></th>
             <th style="padding:8px 10px;text-align:right;">ל (מקבל)</th>
-            <th style="padding:8px 10px;text-align:left;">סכום</th>
+            <th style="padding:8px 10px;text-align:left;">סכום מועבר</th>
             <th style="padding:8px 10px;text-align:center;">בוצע</th>
           </tr>
         </thead>
@@ -3624,6 +3642,8 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
                   displayTransfers.map(t=>({
                     fromName: t.fromAvId==="self"?"אני":((avById(t.fromAvId)||{}).name||"?"),
                     toName: t.toAvId==="self"?"אני":((avById(t.toAvId)||{}).name||"?"),
+                    fromCalc: t.fromAvId==="self"?null:(rows.find(r=>String(r.av.id)===String(t.fromAvId))||{}).c,
+                    toCalc: t.toAvId==="self"?null:(rows.find(r=>String(r.av.id)===String(t.toAvId))||{}).c,
                     amount: Number(t.amount||0),
                     done: !!t.done
                   })),
