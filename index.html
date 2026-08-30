@@ -2998,8 +2998,11 @@ const printTransfers = (rows, monthLabel, title) => {
     if(!c) return "";
     const remShort = remainingAfter===undefined ? "" :
       ` · <b>אחרי העברה זו: ${remainingAfter<=0?"מאוזן":fmt(remainingAfter)+"₪"}</b>`;
+    const datotBal = Number(c.datot||0) - Number(c.totalOwedToAv||0);
+    const datotBalShort = datotBal===0 ? "מאוזן" : (datotBal>0 ? `+${fmt(datotBal)}₪` : `-${fmt(Math.abs(datotBal))}₪`);
     return `<div style="font-size:10.5px;color:#64748b;margin-top:2px;">
       מסריקוב ${fmt(c.sarikowGiven)}₪ (${fmt(c.datot)}₪ דתות+${fmt(c.kupaPortion)}₪ קופה) · מגיע ${fmt(c.totalOwedToAv)}₪ (נוכחות ${fmt(c.monthly)}/מבחן ${fmt(c.exams)}/תענית ${fmt(c.taanitOwed)})${c.prevSettlementCarryover?` · פ׳קודם ${fmtSigned(c.prevSettlementCarryover)}₪`:""}${remShort}
+      · יתרה (דתות−מגיע): ${datotBalShort}
     </div>`;
   };
   const rowsHtml = rows.map((r,i)=>`
@@ -3697,6 +3700,8 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
             const sideBlock = (side,id,c,remainingAfter)=>{
               if(!c) return null;
               const remShort = remainingAfter<=0 ? "מאוזן" : `נשאר ${side==="from"?"להעביר":"לקבל"} ${fmt(remainingAfter)}₪`;
+              const datotBal = Number(c.datot||0) - Number(c.totalOwedToAv||0);
+              const datotBalShort = datotBal===0 ? "מאוזן" : (datotBal>0 ? `+${fmt(datotBal)}₪` : `-${fmt(Math.abs(datotBal))}₪`);
               return (
                 <div style={{flex:1,minWidth:170,background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:7,padding:"5px 8px",fontSize:10.5,color:"#64748b",lineHeight:1.5}}>
                   <div style={{fontWeight:700,color:"#334155",marginBottom:2}}>{side==="from"?"מ (נותן)":"ל (מקבל)"}: {(avById(id)||{}).name}</div>
@@ -3704,6 +3709,7 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
                     מסריקוב {fmt(c.sarikowGiven)}₪ ({fmt(c.datot)}₪ דתות+{fmt(c.kupaPortion)}₪ קופה) · מגיע {fmt(c.totalOwedToAv)}₪ (נוכחות {fmt(c.monthly)}/מבחן {fmt(c.exams)}/תענית {fmt(c.taanitOwed)})
                     {c.prevSettlementCarryover!==0 && <> · פ׳קודם {fmtSigned(c.prevSettlementCarryover)}₪</>}
                     {" · "}<b style={{color:remainingAfter<=0?"#16a34a":"#dc2626"}}>אחרי העברה זו: {remShort}</b>
+                    {" · "}יתרה (דתות−מגיע): {datotBalShort}
                   </div>
                 </div>
               );
