@@ -3340,15 +3340,15 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
       const involvedIds = new Set();
       const first = remaining.shift();
       result.push(first);
-      involvedIds.add(first.fromAvId); involvedIds.add(first.toAvId);
+      involvedIds.add(String(first.fromAvId)); involvedIds.add(String(first.toAvId));
       let addedMore = true;
       while(addedMore){
         addedMore = false;
         for(let i=remaining.length-1;i>=0;i--){
           const t = remaining[i];
-          if(involvedIds.has(t.fromAvId) || involvedIds.has(t.toAvId)){
+          if(involvedIds.has(String(t.fromAvId)) || involvedIds.has(String(t.toAvId))){
             result.push(t);
-            involvedIds.add(t.fromAvId); involvedIds.add(t.toAvId);
+            involvedIds.add(String(t.fromAvId)); involvedIds.add(String(t.toAvId));
             remaining.splice(i,1);
             addedMore = true;
           }
