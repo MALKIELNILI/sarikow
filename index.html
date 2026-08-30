@@ -2836,13 +2836,15 @@ function ARow({av,c,paid,selKey,getAV,setAvMonthField,myTransfers}){
             <div style={{fontWeight:700,fontSize:14}}>{av.name}</div>
             <button type="button" onClick={()=>copyPhone(av)} title="הצג/העתק טלפון" style={{border:"none",background:"transparent",cursor:"pointer",fontSize:13,padding:0,lineHeight:1}}>📞</button>
           </div>
-          <div style={{fontSize:11,color:"#64748b",marginTop:2}}>
-            מגיע לו סה״כ: <b>{fmt(c.totalOwedToAv)} ₪</b>
-            {(c.exams>0||c.taanitOwed>0)&&` (${fmt(c.monthly)}${c.exams>0?`+${fmt(c.exams)} בחינות`:""}${c.taanitOwed>0?`+${fmt(c.taanitOwed)} תענית דיבור`:""})`}
-            &nbsp;|&nbsp;
-            חיצוני (דתות/קרן, נפרד): {fmt(c.externalPerAvrech)} ₪ &nbsp;|&nbsp;
-            מהקופה: {fmt(c.kupaPortion)} ₪
-            {c.prevSettlementCarryover!==0&&<span style={{color:c.prevSettlementCarryover>0?"#d97706":"#dc2626",fontWeight:700}}>&nbsp;|&nbsp;פ׳קודם: {fmtSigned(c.prevSettlementCarryover)} ₪</span>}
+          <div style={{fontSize:11,color:"#64748b",marginTop:2,display:"flex",flexWrap:"wrap",gap:"3px 8px"}}>
+            <span>מגיע לו סה״כ: <b>{fmt(c.totalOwedToAv)} ₪</b></span>
+            {c.monthly>0 && <span>· <span style={{color:"#1e3a5f",fontWeight:600}}>נוכחות:</span> {fmt(c.monthly)} ₪</span>}
+            {c.datot>0 && <span>· <span style={{color:"#b45309",fontWeight:600}}>דתות:</span> {fmt(c.datot)} ₪</span>}
+            {c.keren>0 && <span>· <span style={{color:"#059669",fontWeight:600}}>קרן:</span> {fmt(c.keren)} ₪</span>}
+            {c.exams>0 && <span>· <span style={{color:"#7c3aed",fontWeight:600}}>מבחנים:</span> {fmt(c.exams)} ₪</span>}
+            {c.taanitOwed>0 && <span>· <span style={{color:"#0369a1",fontWeight:600}}>תענית דיבור:</span> {fmt(c.taanitOwed)} ₪</span>}
+            <span>· מהקופה: {fmt(c.kupaPortion)} ₪</span>
+            {c.prevSettlementCarryover!==0&&<span style={{color:c.prevSettlementCarryover>0?"#d97706":"#dc2626",fontWeight:700}}>· פ׳קודם: {fmtSigned(c.prevSettlementCarryover)} ₪</span>}
           </div>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
@@ -3015,6 +3017,67 @@ const printTransfers = (rows, monthLabel, title) => {
           <tr>
             <td colspan="4" style="padding:10px;text-align:left;font-weight:800;">סה״כ:</td>
             <td style="padding:10px;font-weight:800;">${fmt(total)} ₪</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>`;
+  setTimeout(()=>window.print(), 50);
+};
+
+// מדפיס מסמך נקי "פירוט חשבון" לכל אברך — נוכחות/דתות/קרן/מבחנים/תענית דיבור וסה״כ מגיע, כולל יתרה.
+// אותו printTransferArea (מוסתר במסך, מוצג רק בהדפסה) כמו printTransfers — לא מציגים את שניהם יחד.
+const printAccountBreakdown = (rows, monthLabel) => {
+  if(!rows || rows.length===0){ alert("אין נתונים להדפסה."); return; }
+  let area = document.getElementById("printTransferArea");
+  if(!area){
+    area = document.createElement("div");
+    area.id = "printTransferArea";
+    document.body.appendChild(area);
+  }
+  const cell = (v)=>v>0?`${fmt(v)} ₪`:"—";
+  const rowsHtml = rows.map((r,i)=>{
+    const c = r.c;
+    const bal = c.settlementBalance;
+    const status = bal===0 ? "מאוזן" : (bal>0 ? `סריקוב חייב ${fmt(bal)} ₪` : `אברך חייב ${fmt(Math.abs(bal))} ₪`);
+    const statusColor = bal===0 ? "#16a34a" : (bal>0 ? "#d97706" : "#dc2626");
+    return `
+    <tr>
+      <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:center;">${i+1}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;font-weight:700;">${r.av.name}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:center;">${cell(c.monthly)}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:center;">${cell(c.datot)}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:center;">${cell(c.keren)}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:center;">${cell(c.exams)}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:center;">${cell(c.taanitOwed)}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:800;">${fmt(c.totalOwedToAv)} ₪</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:700;color:${statusColor};">${status}</td>
+    </tr>`;
+  }).join("");
+  const totalOwed = rows.reduce((s,r)=>s+r.c.totalOwedToAv,0);
+  area.innerHTML = `
+    <div style="font-family:'Segoe UI',Arial,sans-serif;direction:rtl;">
+      <h2 style="margin-bottom:4px;">🖨️ היסטוריית חשבון אברכים — פירוט מלא</h2>
+      <div style="color:#64748b;margin-bottom:16px;">${monthLabel} · הודפס ב-${new Date().toLocaleDateString("he-IL")}</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
+        <thead>
+          <tr style="background:#f1f5f9;">
+            <th style="padding:6px 8px;text-align:center;">#</th>
+            <th style="padding:6px 8px;text-align:right;">שם</th>
+            <th style="padding:6px 8px;text-align:center;">נוכחות</th>
+            <th style="padding:6px 8px;text-align:center;">דתות</th>
+            <th style="padding:6px 8px;text-align:center;">קרן</th>
+            <th style="padding:6px 8px;text-align:center;">מבחנים</th>
+            <th style="padding:6px 8px;text-align:center;">תענית דיבור</th>
+            <th style="padding:6px 8px;text-align:center;">סה״כ מגיע</th>
+            <th style="padding:6px 8px;text-align:center;">מצב חשבון</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+        <tfoot>
+          <tr>
+            <td colspan="7" style="padding:10px;text-align:left;font-weight:800;">סה״כ מגיע לכולם:</td>
+            <td style="padding:10px;font-weight:800;">${fmt(totalOwed)} ₪</td>
             <td></td>
           </tr>
         </tfoot>
@@ -3504,6 +3567,14 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
           <div style={{fontSize:28,fontWeight:800}}>{fmt(totalOwedMe)} ₪</div>
           <div style={{fontSize:11,opacity:.7,marginTop:2}}>הוחזר: {fmt(paidOwedMe)} ₪</div>
         </div>
+      </div>
+
+      <div style={{display:"flex",justifyContent:"flex-end"}}>
+        <button style={{...smallBtn,background:"#f5f3ff",color:"#6d28d9",border:"1px solid #ddd6fe",fontWeight:700}}
+          onClick={()=>printAccountBreakdown(
+            rows.filter(r=>r.c.totalOwedToAv>0||r.c.prevSettlementCarryover!==0),
+            mkMonthLabel(selYear,selMonth)
+          )}>🖨️ הדפס היסטוריית חשבון — פירוט מלא לכל אברך</button>
       </div>
 
       {/* הוספה מהירה — שורה קומפקטית בלבד, קבועה (sticky) בגלילה מתחת ל-header, כדי לא
