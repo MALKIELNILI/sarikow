@@ -2997,10 +2997,13 @@ const printTransfers = (rows, monthLabel, title) => {
   const breakdownHtml = (c) => {
     if(!c) return "";
     const received = Number(c.totalReceived||0);
+    const bal = Number(c.settlementBalance||0);
+    const balLabel = bal===0 ? "מאוזן" : (bal>0 ? `סריקוב חייב לו עוד ${fmt(bal)} ₪` : `נשאר עודף אצלו ${fmt(Math.abs(bal))} ₪`);
     return `<div style="font-size:10.5px;color:#64748b;margin-top:2px;line-height:1.5;">
       קיבל מסריקוב (דתות/קרן+השלמה): <b>${fmt(received)} ₪</b><br/>
       מגיע לו — נוכחות: ${fmt(c.monthly)} ₪ · תענית דיבור: ${fmt(c.taanitOwed)} ₪ · מבחנים: ${fmt(c.exams)} ₪ (סה״כ מגיע: <b>${fmt(c.totalOwedToAv)} ₪</b>)
       ${c.prevSettlementCarryover?`<br/>פ׳קודם: ${fmtSigned(c.prevSettlementCarryover)} ₪`:""}
+      <br/><b>קיבל ${fmt(received)} ₪ − מגיע לו ${fmt(c.totalOwedToAv)} ₪${c.prevSettlementCarryover?` ${c.prevSettlementCarryover>0?"−":"+"} ${fmt(Math.abs(c.prevSettlementCarryover))} ₪ (פ׳קודם)`:""} = יתרה ${fmtSigned(-bal)} ₪ (${balLabel})</b>
     </div>`;
   };
   const rowsHtml = rows.map((r,i)=>`
