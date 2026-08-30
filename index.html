@@ -3346,8 +3346,7 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
     return grouped;
   })();
   const avById = id => avrechim.find(a=>String(a.id)===String(id));
-
-  // יתרות לתפריטי "העברה מהירה": כמה עודף/חוסר נשאר לכל אברך, בניכוי העברות שכבר תוכננו
+  const calcOf = id => id==="self" ? null : (rows.find(r=>String(r.av.id)===String(id))||{}).c;
   // החודש (גם אם עדיין לא סומנו "בוצע") — כדי שאפשר יהיה למזג מיד את מה שנשאר עם אברך נוסף,
   // בלי לחכות שההעברה תסומן כבוצעה בפועל.
   const qTransferBalances = avrechim.filter(a=>a.active).map(av=>{
@@ -3663,7 +3662,24 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
         </div>
         {monthTransfers.length===0
           ? <div style={{fontSize:12,color:"#94a3b8"}}>אין העברות החודש — לדוגמה: אברך שקיבל יותר ממה שמגיע לו מעביר את העודף ישירות לאברך אחר (בד״כ מי שלא קיבל ישירות מסריקוב)</div>
-          : displayTransfers.map(t=>(
+          : displayTransfers.map(t=>{
+            const fromC = calcOf(t.fromAvId), toC = calcOf(t.toAvId);
+            const sideBlock = (side,id,c)=>{
+              if(!c) return null;
+              const bal = c.settlementBalance;
+              const balColor = bal===0?"#16a34a":(bal>0?"#d97706":"#dc2626");
+              const balLabel = bal===0?"מאוזן":(bal>0?"סריקוב חייב לו עוד":"נשאר עודף אצלו");
+              return (
+                <div style={{flex:1,minWidth:170,background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:7,padding:"5px 8px",fontSize:10.5,color:"#64748b",lineHeight:1.5}}>
+                  <div style={{fontWeight:700,color:"#334155",marginBottom:2}}>{side==="from"?"מ (נותן)":"ל (מקבל)"}: {(avById(id)||{}).name}</div>
+                  <div>קיבל מסריקוב: <b>{fmt(c.totalReceived)} ₪</b></div>
+                  <div>מגיע לו — נוכחות {fmt(c.monthly)} · תענית דיבור {fmt(c.taanitOwed)} · מבחנים {fmt(c.exams)} (סה״כ {fmt(c.totalOwedToAv)} ₪)</div>
+                  {c.prevSettlementCarryover!==0 && <div>פ׳קודם: {fmtSigned(c.prevSettlementCarryover)} ₪</div>}
+                  <div style={{fontWeight:700,color:balColor}}>יתרה: {fmtSigned(-bal)} ₪ ({balLabel})</div>
+                </div>
+              );
+            };
+            return (
             <div key={t.id} style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",padding:"6px 0",borderBottom:"1px solid #f1f5f9"}}>
               <span style={{fontSize:11,color:"#64748b"}}>מ:</span>
               <select style={{...inp,width:"auto",flex:1,minWidth:100}} value={t.fromAvId} onChange={e=>updateTransferField(t.id,"fromAvId",e.target.value)}>
@@ -3689,8 +3705,15 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
                 {t.done?"✓ בוצע":"סמן בוצע"}
               </button>
               <button style={delBtn} onClick={()=>removeTransfer(t.id)}>✕</button>
+              {(fromC||toC) && (
+                <div style={{width:"100%",display:"flex",gap:8,flexWrap:"wrap",marginTop:2}}>
+                  {sideBlock("from",t.fromAvId,fromC)}
+                  {sideBlock("to",t.toAvId,toC)}
+                </div>
+              )}
             </div>
-          ))
+            );
+          })
         }
       </div>
 
