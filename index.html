@@ -2994,12 +2994,12 @@ const printTransfers = (rows, monthLabel, title) => {
     area.id = "printTransferArea";
     document.body.appendChild(area);
   }
-  const breakdownHtml = (c) => {
+  const breakdownHtml = (c, remainingAfter) => {
     if(!c) return "";
-    const bal = Number(c.settlementBalance||0);
-    const balShort = bal===0 ? "מאוזן" : (bal>0 ? `סריקוב חייב עוד ${fmt(bal)}₪` : `מחזיר ${fmt(Math.abs(bal))}₪`);
+    const remShort = remainingAfter===undefined ? "" :
+      ` · <b>אחרי העברה זו: ${remainingAfter<=0?"מאוזן":fmt(remainingAfter)+"₪"}</b>`;
     return `<div style="font-size:10.5px;color:#64748b;margin-top:2px;">
-      מסריקוב ${fmt(c.sarikowGiven)}₪ (${fmt(c.datot)}₪ דתות+${fmt(c.kupaPortion)}₪ קופה) · צריך ${fmt(c.totalOwedToAv)}₪ (נוכחות ${fmt(c.monthly)}/מבחן ${fmt(c.exams)}/תענית ${fmt(c.taanitOwed)})${c.prevSettlementCarryover?` · פ׳קודם ${fmtSigned(c.prevSettlementCarryover)}₪`:""} · <b>יתרה ${balShort}</b>
+      מסריקוב ${fmt(c.sarikowGiven)}₪ (${fmt(c.datot)}₪ דתות+${fmt(c.kupaPortion)}₪ קופה) · מגיע ${fmt(c.totalOwedToAv)}₪ (נוכחות ${fmt(c.monthly)}/מבחן ${fmt(c.exams)}/תענית ${fmt(c.taanitOwed)})${c.prevSettlementCarryover?` · פ׳קודם ${fmtSigned(c.prevSettlementCarryover)}₪`:""}${remShort}
     </div>`;
   };
   const rowsHtml = rows.map((r,i)=>`
@@ -3007,12 +3007,12 @@ const printTransfers = (rows, monthLabel, title) => {
       <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:center;vertical-align:top;">${i+1}</td>
       <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;">
         <div style="font-weight:700;">${r.fromName}</div>
-        ${breakdownHtml(r.fromCalc)}
+        ${breakdownHtml(r.fromCalc, r.fromRemainingAfter)}
       </td>
       <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:center;vertical-align:top;">←</td>
       <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;">
         <div style="font-weight:700;">${r.toName}</div>
-        ${breakdownHtml(r.toCalc)}
+        ${breakdownHtml(r.toCalc, r.toRemainingAfter)}
       </td>
       <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:left;font-weight:800;vertical-align:top;">${fmt(r.amount)} ₪</td>
       <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:center;vertical-align:top;">${r.done===true?"✓":"☐"}</td>
@@ -3634,6 +3634,24 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
       )}
 
       {/* היסטוריית ההעברות — לא קבועה (רק שורת ההוספה המהירה למעלה קבועה), כדי לא לחסום את הרשימות מתחת */}
+      {(() => {
+        // יתרה רצה: לכל אברך שמופיע כמה פעמים כ"נותן"/"מקבל" ברשימה, עוקבים כמה כבר הועבר
+        // עד כה ומחשבים כמה נשאר לו אחרי כל העברה בתור (ולא רק היתרה הכוללת הסטטית לחודש).
+        const runningOut = {}, runningIn = {};
+        const enrichedTransfers = displayTransfers.map(t=>{
+          const fromC = calcOf(t.fromAvId), toC = calcOf(t.toAvId);
+          const amt = Number(t.amount||0);
+          const fromTotalSurplus = fromC ? Math.max(0,-fromC.settlementBalance) : 0;
+          const fromRemainingBefore = fromTotalSurplus - (runningOut[t.fromAvId]||0);
+          runningOut[t.fromAvId] = (runningOut[t.fromAvId]||0) + amt;
+          const fromRemainingAfter = fromTotalSurplus - runningOut[t.fromAvId];
+          const toTotalDeficit = toC ? Math.max(0,toC.settlementBalance) : 0;
+          const toRemainingBefore = toTotalDeficit - (runningIn[t.toAvId]||0);
+          runningIn[t.toAvId] = (runningIn[t.toAvId]||0) + amt;
+          const toRemainingAfter = toTotalDeficit - runningIn[t.toAvId];
+          return { ...t, fromC, toC, fromRemainingBefore, fromRemainingAfter, toRemainingBefore, toRemainingAfter };
+        });
+        return (
       <div style={card}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,flexWrap:"wrap",gap:6}}>
           <div style={{fontWeight:700,fontSize:14,color:"#6d28d9"}}>📋 היסטוריית העברות {monthTransfers.length>0&&`(${monthTransfers.length})`}</div>
@@ -3641,11 +3659,11 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
             {monthTransfers.length>0 && (
               <button style={{...smallBtn,background:"#f1f5f9",color:"#334155",border:"1px solid #cbd5e1"}}
                 onClick={()=>printTransfers(
-                  displayTransfers.map(t=>({
+                  enrichedTransfers.map(t=>({
                     fromName: t.fromAvId==="self"?"אני":((avById(t.fromAvId)||{}).name||"?"),
                     toName: t.toAvId==="self"?"אני":((avById(t.toAvId)||{}).name||"?"),
-                    fromCalc: t.fromAvId==="self"?null:(rows.find(r=>String(r.av.id)===String(t.fromAvId))||{}).c,
-                    toCalc: t.toAvId==="self"?null:(rows.find(r=>String(r.av.id)===String(t.toAvId))||{}).c,
+                    fromCalc: t.fromC, toCalc: t.toC,
+                    fromRemainingAfter: t.fromRemainingAfter, toRemainingAfter: t.toRemainingAfter,
                     amount: Number(t.amount||0),
                     done: !!t.done
                   })),
@@ -3658,20 +3676,18 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
         </div>
         {monthTransfers.length===0
           ? <div style={{fontSize:12,color:"#94a3b8"}}>אין העברות החודש — לדוגמה: אברך שקיבל יותר ממה שמגיע לו מעביר את העודף ישירות לאברך אחר (בד״כ מי שלא קיבל ישירות מסריקוב)</div>
-          : displayTransfers.map(t=>{
-            const fromC = calcOf(t.fromAvId), toC = calcOf(t.toAvId);
-            const sideBlock = (side,id,c)=>{
+          : enrichedTransfers.map(t=>{
+            const { fromC, toC, fromRemainingAfter, toRemainingAfter } = t;
+            const sideBlock = (side,id,c,remainingAfter)=>{
               if(!c) return null;
-              const bal = c.settlementBalance;
-              const balColor = bal===0?"#16a34a":(bal>0?"#d97706":"#dc2626");
-              const balShort = bal===0?"מאוזן":(bal>0?`סריקוב חייב עוד ${fmt(bal)}₪`:`מחזיר ${fmt(Math.abs(bal))}₪`);
+              const remShort = remainingAfter<=0 ? "מאוזן" : `נשאר ${side==="from"?"להעביר":"לקבל"} ${fmt(remainingAfter)}₪`;
               return (
                 <div style={{flex:1,minWidth:170,background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:7,padding:"5px 8px",fontSize:10.5,color:"#64748b",lineHeight:1.5}}>
                   <div style={{fontWeight:700,color:"#334155",marginBottom:2}}>{side==="from"?"מ (נותן)":"ל (מקבל)"}: {(avById(id)||{}).name}</div>
                   <div>
-                    מסריקוב {fmt(c.sarikowGiven)}₪ ({fmt(c.datot)}₪ דתות+{fmt(c.kupaPortion)}₪ קופה) · צריך {fmt(c.totalOwedToAv)}₪ (נוכחות {fmt(c.monthly)}/מבחן {fmt(c.exams)}/תענית {fmt(c.taanitOwed)})
+                    מסריקוב {fmt(c.sarikowGiven)}₪ ({fmt(c.datot)}₪ דתות+{fmt(c.kupaPortion)}₪ קופה) · מגיע {fmt(c.totalOwedToAv)}₪ (נוכחות {fmt(c.monthly)}/מבחן {fmt(c.exams)}/תענית {fmt(c.taanitOwed)})
                     {c.prevSettlementCarryover!==0 && <> · פ׳קודם {fmtSigned(c.prevSettlementCarryover)}₪</>}
-                    {" · "}<b style={{color:balColor}}>יתרה {balShort}</b>
+                    {" · "}<b style={{color:remainingAfter<=0?"#16a34a":"#dc2626"}}>אחרי העברה זו: {remShort}</b>
                   </div>
                 </div>
               );
@@ -3704,8 +3720,8 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
               <button style={delBtn} onClick={()=>removeTransfer(t.id)}>✕</button>
               {(fromC||toC) && (
                 <div style={{width:"100%",display:"flex",gap:8,flexWrap:"wrap",marginTop:2}}>
-                  {sideBlock("from",t.fromAvId,fromC)}
-                  {sideBlock("to",t.toAvId,toC)}
+                  {sideBlock("from",t.fromAvId,fromC,fromRemainingAfter)}
+                  {sideBlock("to",t.toAvId,toC,toRemainingAfter)}
                 </div>
               )}
             </div>
@@ -3713,6 +3729,8 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
           })
         }
       </div>
+        );
+      })()}
 
       {/* רשימה: אני חייב (פתוחים בלבד — הושלמו עברו לקטע בתחתית) */}
       {iOweOpen.length>0&&(
