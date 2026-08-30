@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { fmt } from "../helpers.js";
 import { col, card, inp, primaryBtn, smallBtn } from "../styles.js";
+import { mkMonthLabel } from "../constants.js";
 
 export default function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, selMonth, getAV, setAvMonthField, supplementSettings, setSupplementSettings }){
   const [editSupp,setEditSupp] = useState(false);
@@ -24,6 +25,27 @@ export default function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMon
   const paidIOwe    = iOweRows.filter(({paid})=>paid).reduce((s,{c})=>s+c.settlementBalance,0);
   const paidOwedMe  = theyOweRows.filter(({paid})=>paid).reduce((s,{c})=>s+Math.abs(c.settlementBalance),0);
 
+  // פירוט "איך הגיע הסכום" — נוכחות / דתות / קרן / מבחנים / תענית דיבור
+  const Breakdown = ({c})=>{
+    const parts=[];
+    if(c.monthly>0) parts.push({label:"נוכחות",val:c.monthly,color:"#1e3a5f"});
+    if(c.datot>0)   parts.push({label:"דתות",val:c.datot,color:"#b45309"});
+    if(c.keren>0)   parts.push({label:"קרן",val:c.keren,color:"#059669"});
+    if(c.exams>0)   parts.push({label:"מבחנים",val:c.exams,color:"#7c3aed"});
+    if(c.taanitAmount>0) parts.push({label:"תענית דיבור",val:c.taanitAmount,color:"#0369a1"});
+    if(parts.length===0) return null;
+    return (
+      <div className="breakdown-line" style={{display:"flex",flexWrap:"wrap",gap:"4px 10px",fontSize:11,color:"#64748b",marginTop:3}}>
+        {parts.map((p,i)=>(
+          <span key={i}>
+            <span style={{color:p.color,fontWeight:600}}>{p.label}:</span> {fmt(p.val)} ₪
+            {i<parts.length-1&&<span style={{color:"#cbd5e1"}}> · </span>}
+          </span>
+        ))}
+      </div>
+    );
+  };
+
   const ARow = ({av,c,paid})=>{
     const bal = c.settlementBalance;
     const absBal = Math.abs(bal);
@@ -41,8 +63,9 @@ export default function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMon
             חיצוני: {fmt(c.externalPerAvrech)} ₪ &nbsp;|&nbsp;
             השלמה: {fmt(c.suppAmt)} ₪
           </div>
+          <Breakdown c={c}/>
         </div>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}} className="no-print">
           <div style={{textAlign:"center"}}>
             <div style={{fontSize:16,fontWeight:800,color:iOwe?"#d97706":"#dc2626"}}>
               {iOwe?"▲":"▼"} {fmt(absBal)} ₪
@@ -60,14 +83,39 @@ export default function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMon
             {paid?"✓ בוצע":"סמן"}
           </label>
         </div>
+        <div className="print-only" style={{textAlign:"left",fontWeight:800,fontSize:15}}>
+          {iOwe?"▲":"▼"} {fmt(absBal)} ₪ <span style={{fontSize:10,fontWeight:400}}>({iOwe?"סריקוב חייב":"אברך חייב"})</span>
+        </div>
       </div>
     );
   };
 
   return (
     <div style={col}>
+      <style>{`
+        @media print {
+          .no-print { display:none !important; }
+          .print-only { display:block !important; }
+          body { background:#fff !important; }
+        }
+        .print-only { display:none; }
+        .print-header { display:none; }
+        @media print {
+          .print-header { display:block !important; text-align:center; margin-bottom:16px; }
+        }
+      `}</style>
+
+      <div className="print-header">
+        <div style={{fontWeight:800,fontSize:20}}>היסטוריית העברות — סריקוב</div>
+        <div style={{fontSize:13,color:"#64748b"}}>{mkMonthLabel(selYear,selMonth)}</div>
+      </div>
+
+      <div className="no-print" style={{display:"flex",justifyContent:"flex-end"}}>
+        <button style={{...smallBtn,fontWeight:700}} onClick={()=>window.print()}>🖨️ הדפס היסטוריית העברות</button>
+      </div>
+
       {/* כרטיס הגדרות השלמה */}
-      <div style={{...card,borderRight:"4px solid #7c3aed"}}>
+      <div style={{...card,borderRight:"4px solid #7c3aed"}} className="no-print">
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:editSupp?10:0}}>
           <div style={{fontWeight:700,fontSize:14,color:"#7c3aed"}}>⚙️ הגדרות השלמה חודשית (₪ לאברך)</div>
           <button style={{...smallBtn,color:"#7c3aed",borderColor:"#c4b5fd"}}
@@ -137,16 +185,19 @@ export default function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMon
         <div style={card}>
           <div style={{fontWeight:700,fontSize:13,color:"#16a34a",marginBottom:6}}>✅ מאוזן ({evenRows.length})</div>
           {evenRows.map(({av,c})=>(
-            <div key={av.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 8px",borderRadius:7,background:"#f0fdf4",marginBottom:4}}>
-              <span style={{fontWeight:600,fontSize:13}}>{av.name}</span>
-              <span style={{fontSize:12,color:"#16a34a",fontWeight:700}}>✓ מאוזן — {fmt(c.monthly)} ₪</span>
+            <div key={av.id} style={{padding:"6px 8px",borderRadius:7,background:"#f0fdf4",marginBottom:4}}>
+              <div style={{display:"flex",justifyContent:"space-between"}}>
+                <span style={{fontWeight:600,fontSize:13}}>{av.name}</span>
+                <span style={{fontSize:12,color:"#16a34a",fontWeight:700}}>✓ מאוזן — {fmt(c.monthly)} ₪</span>
+              </div>
+              <Breakdown c={c}/>
             </div>
           ))}
         </div>
       )}
 
       {noDataRows.length>0&&(
-        <div style={{...card,opacity:0.6}}>
+        <div style={{...card,opacity:0.6}} className="no-print">
           <div style={{fontWeight:600,fontSize:12,color:"#94a3b8",marginBottom:5}}>⬜ ללא נתוני מגיע ({noDataRows.length})</div>
           <div style={{fontSize:12,color:"#94a3b8"}}>{noDataRows.map(({av})=>av.name).join(" | ")}</div>
         </div>
