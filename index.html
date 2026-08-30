@@ -2996,14 +2996,10 @@ const printTransfers = (rows, monthLabel, title) => {
   }
   const breakdownHtml = (c) => {
     if(!c) return "";
-    const received = Number(c.totalReceived||0);
     const bal = Number(c.settlementBalance||0);
-    const balLabel = bal===0 ? "מאוזן" : (bal>0 ? `סריקוב חייב לו עוד ${fmt(bal)} ₪` : `נשאר עודף אצלו ${fmt(Math.abs(bal))} ₪`);
-    return `<div style="font-size:10.5px;color:#64748b;margin-top:2px;line-height:1.5;">
-      קיבל מסריקוב (דתות/קרן+השלמה): <b>${fmt(received)} ₪</b><br/>
-      מגיע לו — נוכחות: ${fmt(c.monthly)} ₪ · תענית דיבור: ${fmt(c.taanitOwed)} ₪ · מבחנים: ${fmt(c.exams)} ₪ (סה״כ מגיע: <b>${fmt(c.totalOwedToAv)} ₪</b>)
-      ${c.prevSettlementCarryover?`<br/>פ׳קודם: ${fmtSigned(c.prevSettlementCarryover)} ₪`:""}
-      <br/><b>קיבל ${fmt(received)} ₪ − מגיע לו ${fmt(c.totalOwedToAv)} ₪${c.prevSettlementCarryover?` ${c.prevSettlementCarryover>0?"−":"+"} ${fmt(Math.abs(c.prevSettlementCarryover))} ₪ (פ׳קודם)`:""} = יתרה ${fmtSigned(-bal)} ₪ (${balLabel})</b>
+    const balShort = bal===0 ? "מאוזן" : (bal>0 ? `סריקוב חייב עוד ${fmt(bal)}₪` : `מחזיר ${fmt(Math.abs(bal))}₪`);
+    return `<div style="font-size:10.5px;color:#64748b;margin-top:2px;">
+      מסריקוב ${fmt(c.sarikowGiven)}₪ (${fmt(c.datot)}₪ דתות+${fmt(c.kupaPortion)}₪ קופה) · צריך ${fmt(c.totalOwedToAv)}₪ (נוכחות ${fmt(c.monthly)}/מבחן ${fmt(c.exams)}/תענית ${fmt(c.taanitOwed)})${c.prevSettlementCarryover?` · פ׳קודם ${fmtSigned(c.prevSettlementCarryover)}₪`:""} · <b>יתרה ${balShort}</b>
     </div>`;
   };
   const rowsHtml = rows.map((r,i)=>`
@@ -3668,14 +3664,15 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
               if(!c) return null;
               const bal = c.settlementBalance;
               const balColor = bal===0?"#16a34a":(bal>0?"#d97706":"#dc2626");
-              const balLabel = bal===0?"מאוזן":(bal>0?"סריקוב חייב לו עוד":"נשאר עודף אצלו");
+              const balShort = bal===0?"מאוזן":(bal>0?`סריקוב חייב עוד ${fmt(bal)}₪`:`מחזיר ${fmt(Math.abs(bal))}₪`);
               return (
                 <div style={{flex:1,minWidth:170,background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:7,padding:"5px 8px",fontSize:10.5,color:"#64748b",lineHeight:1.5}}>
                   <div style={{fontWeight:700,color:"#334155",marginBottom:2}}>{side==="from"?"מ (נותן)":"ל (מקבל)"}: {(avById(id)||{}).name}</div>
-                  <div>קיבל מסריקוב: <b>{fmt(c.totalReceived)} ₪</b></div>
-                  <div>מגיע לו — נוכחות {fmt(c.monthly)} · תענית דיבור {fmt(c.taanitOwed)} · מבחנים {fmt(c.exams)} (סה״כ {fmt(c.totalOwedToAv)} ₪)</div>
-                  {c.prevSettlementCarryover!==0 && <div>פ׳קודם: {fmtSigned(c.prevSettlementCarryover)} ₪</div>}
-                  <div style={{fontWeight:700,color:balColor}}>יתרה: {fmtSigned(-bal)} ₪ ({balLabel})</div>
+                  <div>
+                    מסריקוב {fmt(c.sarikowGiven)}₪ ({fmt(c.datot)}₪ דתות+{fmt(c.kupaPortion)}₪ קופה) · צריך {fmt(c.totalOwedToAv)}₪ (נוכחות {fmt(c.monthly)}/מבחן {fmt(c.exams)}/תענית {fmt(c.taanitOwed)})
+                    {c.prevSettlementCarryover!==0 && <> · פ׳קודם {fmtSigned(c.prevSettlementCarryover)}₪</>}
+                    {" · "}<b style={{color:balColor}}>יתרה {balShort}</b>
+                  </div>
                 </div>
               );
             };
