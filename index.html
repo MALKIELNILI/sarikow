@@ -2860,7 +2860,14 @@ function ARow({av,c,paid,selKey,getAV,setAvMonthField,myTransfers}){
             color:paid?"#fff":"#64748b",transition:"all .2s",userSelect:"none"}}>
             <input type="checkbox"
               checked={paid}
-              onChange={e=>setAvMonthField(selKey,av.id,"settlementPaid",e.target.checked?"1":"")}
+              onChange={e=>{
+                const isChecked = e.target.checked;
+                setAvMonthField(selKey,av.id,"settlementPaid",isChecked?"1":"");
+                // אם מסמנים "בוצע" בלי שהוזן סכום בפועל — מניחים תשלום מלא, אחרת היתרה לא תתעדכן לחודש הבא
+                if(isChecked && actual===null){
+                  onActualChange(String(Math.max(0,absBal-transferAmt)));
+                }
+              }}
               style={{width:15,height:15,cursor:"pointer",accentColor:"#16a34a"}}/>
             {paid?"✓ בוצע":"סמן"}
           </label>
@@ -2989,15 +2996,12 @@ const printTransfers = (rows, monthLabel, title) => {
   }
   const breakdownHtml = (c) => {
     if(!c) return "";
-    const parts=[];
-    if(c.monthly>0) parts.push(`נוכחות ${fmt(c.monthly)}`);
-    if(c.datot>0) parts.push(`דתות ${fmt(c.datot)}`);
-    if(c.keren>0) parts.push(`קרן ${fmt(c.keren)}`);
-    if(c.exams>0) parts.push(`מבחנים ${fmt(c.exams)}`);
-    if(c.taanitOwed>0) parts.push(`תענית דיבור ${fmt(c.taanitOwed)}`);
-    if(c.prevSettlementCarryover) parts.push(`פ׳קודם ${fmtSigned(c.prevSettlementCarryover)}`);
-    const detail = parts.length ? ` (${parts.join(" + ")})` : "";
-    return `<div style="font-size:10.5px;color:#64748b;margin-top:2px;">מגיע לו סה״כ: ${fmt(c.totalOwedToAv)} ₪${detail}</div>`;
+    const received = Number(c.totalReceived||0);
+    return `<div style="font-size:10.5px;color:#64748b;margin-top:2px;line-height:1.5;">
+      קיבל מסריקוב (דתות/קרן+השלמה): <b>${fmt(received)} ₪</b><br/>
+      מגיע לו — נוכחות: ${fmt(c.monthly)} ₪ · תענית דיבור: ${fmt(c.taanitOwed)} ₪ · מבחנים: ${fmt(c.exams)} ₪ (סה״כ מגיע: <b>${fmt(c.totalOwedToAv)} ₪</b>)
+      ${c.prevSettlementCarryover?`<br/>פ׳קודם: ${fmtSigned(c.prevSettlementCarryover)} ₪`:""}
+    </div>`;
   };
   const rowsHtml = rows.map((r,i)=>`
     <tr>
