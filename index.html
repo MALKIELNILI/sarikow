@@ -1687,12 +1687,87 @@ function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, 
     setPendingInput(p=>({...p,[key+"|"+field]:""}));
   };
 
+  // ── בדיקת התאמה מול סריקוב — מקלידים רשימת תנועות (כמו במחשבון), האפליקציה משווה מול היתרה האמיתית שלה ──
+  const [showRecon,setShowRecon]=useState(false);
+  const [reconStart,setReconStart]=useState(String(baseBalance.amount||0));
+  const [reconRows,setReconRows]=useState([{id:1,desc:"",amount:"",sign:1}]);
+  const [reconCompareKey,setReconCompareKey]=useState(allMonthKeys[allMonthKeys.length-1]||selKey);
+
+  const addReconRow = () => setReconRows(r=>[...r,{id:Date.now(),desc:"",amount:"",sign:1}]);
+  const removeReconRow = (id) => setReconRows(r=>r.filter(x=>x.id!==id));
+  const updateReconRow = (id,field,val) => setReconRows(r=>r.map(x=>x.id===id?{...x,[field]:val}:x));
+
+  const reconExpected = reconRows.reduce((s,r)=>s+(Number(r.amount)||0)*r.sign, Number(reconStart)||0);
+  const reconActual = calcCumBalance(reconCompareKey);
+  const reconDiff = reconExpected - reconActual;
+
   return (
     <div style={col}>
       <div style={{background:"linear-gradient(135deg,#0f2044,#1d4ed8)",borderRadius:12,padding:"14px 16px",color:"#fff"}}>
         <div style={{fontSize:13,opacity:.75}}>יתרה חיה מצטברת</div>
         <div style={{fontSize:32,fontWeight:800}}>{fmt(liveBalance)} ₪</div>
         <div style={{fontSize:12,opacity:.7,marginTop:4}}>בסיס {fmt(baseBalance.amount)} ₪ (נכון ל-{baseBalance.date}) + סיכום כל החודשים</div>
+      </div>
+
+      {/* בדיקת התאמה מול סריקוב */}
+      <div style={{...card,border:"1.5px solid #7c3aed"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{fontWeight:700,fontSize:14,color:"#7c3aed"}}>🔍 בדיקת התאמה מול סריקוב</div>
+          <button style={{...smallBtn,color:"#7c3aed",borderColor:"#c4b5fd"}} onClick={()=>setShowRecon(!showRecon)}>
+            {showRecon?"סגור":"פתח"}
+          </button>
+        </div>
+        {showRecon && (
+          <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:8}}>
+            <div>
+              <label style={{fontSize:12,color:"#64748b",display:"block",marginBottom:3}}>יתרת פתיחה (₪)</label>
+              <input type="number" style={inp} value={reconStart} onChange={e=>setReconStart(e.target.value)}/>
+            </div>
+
+            {reconRows.map(r=>(
+              <div key={r.id} style={{display:"flex",gap:6,alignItems:"center"}}>
+                <button type="button" onClick={()=>updateReconRow(r.id,"sign",r.sign*-1)}
+                  style={{...smallBtn,width:36,fontWeight:800,color:r.sign>0?"#16a34a":"#dc2626",
+                    borderColor:r.sign>0?"#86efac":"#fecaca",background:r.sign>0?"#f0fdf4":"#fef2f2"}}>
+                  {r.sign>0?"+":"−"}
+                </button>
+                <input type="text" placeholder="תיאור (למשל: קרן 19.8)" style={{...inp,flex:2}}
+                  value={r.desc} onChange={e=>updateReconRow(r.id,"desc",e.target.value)}/>
+                <input type="number" placeholder="סכום" style={{...inp,flex:1,textAlign:"left"}}
+                  value={r.amount} onChange={e=>updateReconRow(r.id,"amount",e.target.value)}/>
+                <button style={delBtn} onClick={()=>removeReconRow(r.id)}>✕</button>
+              </div>
+            ))}
+            <button style={{...smallBtn,alignSelf:"flex-start",color:"#7c3aed",borderColor:"#c4b5fd"}} onClick={addReconRow}>+ שורה</button>
+
+            <div>
+              <label style={{fontSize:12,color:"#64748b",display:"block",marginBottom:3}}>להשוות מול יתרת האפליקציה בסוף חודש:</label>
+              <select style={inp} value={reconCompareKey} onChange={e=>setReconCompareKey(e.target.value)}>
+                {allMonthKeys.map(k=><option key={k} value={k}>{k}</option>)}
+              </select>
+            </div>
+
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:6}}>
+              <div style={{background:"#f5f3ff",borderRadius:8,padding:10,textAlign:"center"}}>
+                <div style={{fontSize:11,color:"#7c3aed"}}>יתרה צפויה (לפי הרשימה שלך)</div>
+                <div style={{fontSize:18,fontWeight:800,color:"#7c3aed"}}>{fmt(reconExpected)} ₪</div>
+              </div>
+              <div style={{background:"#eff6ff",borderRadius:8,padding:10,textAlign:"center"}}>
+                <div style={{fontSize:11,color:"#1d4ed8"}}>יתרה בפועל באפליקציה</div>
+                <div style={{fontSize:18,fontWeight:800,color:"#1d4ed8"}}>{fmt(reconActual)} ₪</div>
+              </div>
+            </div>
+
+            <div style={{textAlign:"center",padding:10,borderRadius:8,marginTop:4,
+              background:Math.abs(reconDiff)<1?"#f0fdf4":"#fef2f2",
+              border:`1.5px solid ${Math.abs(reconDiff)<1?"#86efac":"#fecaca"}`}}>
+              {Math.abs(reconDiff)<1
+                ? <div style={{color:"#16a34a",fontWeight:800}}>✓ תואם במדויק!</div>
+                : <div style={{color:"#dc2626",fontWeight:800}}>⚠️ פער של {fmt(Math.abs(reconDiff))} ₪ {reconDiff>0?"(הרשימה שלך גבוהה יותר)":"(האפליקציה גבוהה יותר)"}</div>
+              }
+            </div>
+          </div>
+        )}
       </div>
 
       {pendingRows.length>0 && (
