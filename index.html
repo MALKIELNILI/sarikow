@@ -615,7 +615,7 @@ function App(){
         {tab==="main"       && <MainTab selKey={selKey} selYear={selYear} selMonth={selMonth} baseBalance={baseBalance} setBaseBalance={setBaseBalance} liveBalance={liveBalance} curTotals={curTotals} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} syncing={syncing} allDonorNames={allDonorNames} donorHistory={donorHistory} avrechim={avrechim} />}
         {tab==="avrechim"   && <AvrechimTab avrechim={avrechim} setAvrechim={setAvrechim} selKey={selKey} prevKey={prevKey} selYear={selYear} selMonth={selMonth} getAV={getAV} getMD={getMD} setAvMonthField={setAvMonthField} calcAvrechMonth={calcAvrechMonth} totalOwed={totalOwed} attendance={attendance} customVacations={customVacations} beinHazmanims={beinHazmanims} hiddenHols={hiddenHols} allMonthKeys={allMonthKeys()} getPrevMonthKey={getPrevMonthKey} />}
         {tab==="attendance" && <AttendanceTab avrechim={avrechim} selKey={selKey} selYear={selYear} selMonth={selMonth} attendance={attendance} setAttendanceDay={setAttendanceDay} fillMonthBatch={fillMonthBatch} customVacations={customVacations} setCustomVacation={setCustomVacation} removeCustomVacation={removeCustomVacation} beinHazmanims={beinHazmanims} addBeinHazmanim={addBeinHazmanim} removeBeinHazmanim={removeBeinHazmanim} updateBeinHazmanim={updateBeinHazmanim} hiddenHols={hiddenHols} toggleHolidayHidden={toggleHolidayHidden} />}
-        {tab==="summary"    && <SummaryTab avrechim={avrechim} allMonthKeys={allMonthKeys()} calcMonthTotals={calcMonthTotals} calcAvrechMonth={calcAvrechMonth} getPrevMonthKey={getPrevMonthKey} baseBalance={baseBalance} liveBalance={liveBalance} selKey={selKey} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} reconSessions={reconSessions} />}
+        {tab==="summary"    && <SummaryTab avrechim={avrechim} allMonthKeys={allMonthKeys()} calcMonthTotals={calcMonthTotals} calcAvrechMonth={calcAvrechMonth} getPrevMonthKey={getPrevMonthKey} baseBalance={baseBalance} liveBalance={liveBalance} selKey={selKey} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} reconSessions={reconSessions} allDonorNames={allDonorNames} donorHistory={donorHistory} />}
         {tab==="bank"       && <BankTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} />}
         {tab==="settlement" && <SettlementTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} getMD={getMD} setMonthField={setMonthField} allMonthKeys={allMonthKeys()} getPrevMonthKey={getPrevMonthKey} headerHeight={headerHeight} />}
         {tab==="ravpinchas" && <RavPinchasTab rpAvrechim={rpAvrechim} setRpAvrechim={setRpAvrechim} rpMonths={rpMonths} setRpMonthField={setRpMonthField} rpBaseBalance={rpBaseBalance} setRpBaseBalance={setRpBaseBalance} rpContact={rpContact} setRpContact={setRpContact} selKey={selKey} selYear={selYear} selMonth={selMonth} allDonorNames={allDonorNames} donorHistory={donorHistory} syncing={syncing} sarikowLiveBalance={liveBalance} />}
@@ -1657,7 +1657,7 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
 }
 
 // ── SUMMARY TAB ──────────────────────────────────────────────
-function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, getPrevMonthKey, baseBalance, liveBalance, selKey, allMonths, getMD, setMonthField, reconSessions }){
+function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, getPrevMonthKey, baseBalance, liveBalance, selKey, allMonths, getMD, setMonthField, reconSessions, allDonorNames, donorHistory }){
   const [openMonth,setOpenMonth]=useState(selKey);
   const [pendingInput,setPendingInput]=useState({}); // { "monthKey|datot": "1234", ... }
   const baseMonthKey = baseBalance.monthKey || "0000-00";
@@ -1696,6 +1696,7 @@ function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, 
   const [reconRows,setReconRows]=useState([{id:1,category:"תורמים",desc:"",amount:"",sign:1}]);
   const [reconCompareKey,setReconCompareKey]=useState(allMonthKeys[allMonthKeys.length-1]||selKey);
   const [reconSessionName,setReconSessionName]=useState("");
+  const [applyTargetKey,setApplyTargetKey]=useState(allMonthKeys[allMonthKeys.length-1]||selKey);
 
   const CATEGORY_SIGN = {"תורמים":1,"דתות":1,"קרן":1,"העברה של סריקוב":-1,"אחר":1};
 
@@ -1717,6 +1718,27 @@ function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, 
   const reconExpected = runningBal;
   const reconActual = calcCumBalance(reconCompareKey);
   const reconDiff = reconExpected - reconActual;
+
+  // מחיל שורה בודדת על המסך הראשי — רק לחודש שנבחר במפורש למעלה, אף פעם לא אוטומטית/בניחוש.
+  // תורמים/דתות/קרן בלבד (יש להם שדה יעד חד-משמעי); "העברה של סריקוב"/"אחר" נשארים ידניים בכוונה.
+  const applyRowToMain = (r) => {
+    const amt = Number(r.amount)||0;
+    if(amt<=0) return alert("יש להזין סכום לפני ההחלה");
+    if(r.category==="תורמים"){
+      const existing = allMonths[applyTargetKey]?.donors || [];
+      setMonthField(applyTargetKey,"donors",[...existing,{name:r.desc||"תורם",amount:amt}]);
+    } else if(r.category==="דתות"){
+      setMonthField(applyTargetKey,"datot",amt);
+      setMonthField(applyTargetKey,"datotConfirmed",amt);
+    } else if(r.category==="קרן"){
+      setMonthField(applyTargetKey,"keren",amt);
+      setMonthField(applyTargetKey,"kerenConfirmed",amt);
+    } else {
+      return alert(`"${r.category}" אין לו שדה יעד ברור במסך הראשי — יש להזין ידנית (בבנק/התאמה).`);
+    }
+    alert(`✓ הוחל על חודש ${applyTargetKey}`);
+  };
+
 
   const saveReconSession = () => {
     if(!reconSessionName.trim()) return alert("יש לתת שם/תאריך לרשימה (למשל: ישיבה עם סריקוב 8.9.26)");
@@ -1765,6 +1787,16 @@ function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, 
         </div>
         {showRecon && (
           <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:8}}>
+            <datalist id="donor-names-list-recon">
+              {allDonorNames.map((n,i)=><option key={i} value={n}/>)}
+            </datalist>
+
+            <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:8,padding:8}}>
+              <label style={{fontSize:12,color:"#1d4ed8",fontWeight:700,display:"block",marginBottom:3}}>לאיזה חודש להחיל בלחיצת "✅ החל במסך הראשי"?</label>
+              <select style={inp} value={applyTargetKey} onChange={e=>setApplyTargetKey(e.target.value)}>
+                {allMonthKeys.map(k=><option key={k} value={k}>{k}</option>)}
+              </select>
+            </div>
 
             {Object.keys(reconSessions).length>0 && (
               <div style={{background:"#f8fafc",borderRadius:8,padding:8}}>
@@ -1806,7 +1838,14 @@ function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, 
                     <option value="אחר">אחר</option>
                   </select>
                   <input type="text" placeholder="פירוט (למשל: יעקב, חודש 8)" style={{...inp,flex:1.4}}
-                    value={r.desc} onChange={e=>updateReconRow(r.id,"desc",e.target.value)}/>
+                    list={r.category==="תורמים" ? "donor-names-list-recon" : undefined}
+                    value={r.desc} onChange={e=>{
+                      const val=e.target.value;
+                      updateReconRow(r.id,"desc",val);
+                      if(r.category==="תורמים" && donorHistory[val]!==undefined){
+                        updateReconRow(r.id,"amount",String(donorHistory[val]));
+                      }
+                    }}/>
                   <button type="button" onClick={()=>updateReconRow(r.id,"sign",r.sign*-1)}
                     style={{...smallBtn,width:32,fontWeight:800,color:r.sign>0?"#16a34a":"#dc2626",
                       borderColor:r.sign>0?"#86efac":"#fecaca",background:r.sign>0?"#f0fdf4":"#fef2f2"}}>
@@ -1816,11 +1855,16 @@ function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, 
                     value={r.amount} onChange={e=>updateReconRow(r.id,"amount",e.target.value)}/>
                   <button style={delBtn} onClick={()=>removeReconRow(r.id)}>✕</button>
                 </div>
-                {Number(r.amount)>0 && (
-                  <div style={{fontSize:11,color:"#94a3b8",padding:"2px 6px",textAlign:"left"}}>
-                    ← יתרה מצטברת: <b style={{color:"#475569"}}>{fmt(r.runningBal)} ₪</b>
-                  </div>
-                )}
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"2px 6px"}}>
+                  {Number(r.amount)>0
+                    ? <div style={{fontSize:11,color:"#94a3b8"}}>← יתרה מצטברת: <b style={{color:"#475569"}}>{fmt(r.runningBal)} ₪</b></div>
+                    : <span/>
+                  }
+                  {["תורמים","דתות","קרן"].includes(r.category) && Number(r.amount)>0 && (
+                    <button style={{...smallBtn,fontSize:10,padding:"2px 8px",background:"#eff6ff",color:"#1d4ed8",border:"1px solid #bfdbfe"}}
+                      onClick={()=>applyRowToMain(r)}>✅ החל במסך הראשי ({applyTargetKey})</button>
+                  )}
+                </div>
               </div>
             ))}
             <button style={{...smallBtn,alignSelf:"flex-start",color:"#7c3aed",borderColor:"#c4b5fd"}} onClick={addReconRow}>+ שורה</button>
