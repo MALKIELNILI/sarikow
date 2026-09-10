@@ -509,10 +509,20 @@ function App(){
     const sentDatot = sentPerDatot>0
       ? sentPerDatot*datotCountNow
       : Number(getMD(monthKey,"sent2000"))*2000+Number(getMD(monthKey,"sent1000"))*1000;
-    const sent = sentDatot + Number(getMD(monthKey,"sentKeren"))*1000;
+    const sentLegacy = sentDatot + Number(getMD(monthKey,"sentKeren"))*1000;
+    // "נשלח בפועל" מדויק — סכום סריקוב שהוזן בפועל לכל אברך (לא הערכה גסה של מספר×סכום קבוע).
+    // משמש רק לחודשים שבהם באמת הוזן sarikowGiven לפחות לאברך אחד; אחרת שומרים על ההערכה הישנה
+    // כדי לא לשנות רטרואקטיבית חודשים סגורים שמעולם לא הוזן בהם הנתון המדויק הזה.
+    const activeAvs = avrechim.filter(a=>a.active);
+    const anyRealSarikowGiven = activeAvs.some(av=>getAV(monthKey,av.id,"sarikowGiven")!=="");
+    const sentReal = activeAvs.reduce((s,av)=>{
+      const raw = getAV(monthKey,av.id,"sarikowGiven");
+      return raw!==""?s+Number(raw):s;
+    },0);
+    const sent = anyRealSarikowGiven ? sentReal : sentLegacy;
     const adjustment = Number(getMD(monthKey,"adjustment"))||0;
     const net = income - sent + adjustment;
-    return { donors, datot, keren, datotDraft, kerenDraft, income, totalRounding, sent, adjustment, net };
+    return { donors, datot, keren, datotDraft, kerenDraft, income, totalRounding, sent, adjustment, net, usedRealSent: anyRealSarikowGiven };
   };
 
   const baseMonthKey = baseBalance.monthKey || "0000-00";
@@ -766,6 +776,15 @@ function MainTab({ selKey, selYear, selMonth, baseBalance, setBaseBalance, liveB
       {/* SENT */}
       <div style={card}>
         <div style={{fontWeight:700,fontSize:14,marginBottom:10}}>📤 נשלח לאברכים (מתקזז מהקופה)</div>
+        {curTotals.usedRealSent ? (
+          <div style={{background:"#f0fdf4",border:"1px solid #86efac",borderRadius:8,padding:"6px 10px",fontSize:12,color:"#16a34a",fontWeight:600,marginBottom:10}}>
+            ✓ מחושב מהסכום המדויק שהוזן לכל אברך בפועל (לא מהערכה) — {fmt(curTotals.sent)} ₪
+          </div>
+        ) : (
+          <div style={{background:"#fffbeb",border:"1px solid #fde68a",borderRadius:8,padding:"6px 10px",fontSize:12,color:"#b45309",fontWeight:600,marginBottom:10}}>
+            ⚠️ מחושב מהערכה גסה (מספר×סכום קבוע) — אם תמלא "מה שסריקוב הכניס בפועל" לכל אברך בלשונית אברכים, זה יעבור לחישוב מדויק אוטומטית
+          </div>
+        )}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
           <div>
             <IField label="💰 סכום לכל זכאי דתות (₪)" value={getMD(selKey,"sentPerDatot")} onChange={v=>setMonthField(selKey,"sentPerDatot",Number(v)||0)} />
