@@ -265,6 +265,7 @@ function App(){
   const [attendance,setAttendanceS]  = useState({});
   const [customVacations,setCustomVacS] = useState({});
   const [beinHazmanims,setBeinHazmanims] = useState(BEIN_HAZMANIM);
+  const [reconSessions,setReconSessions] = useState({});
   const [hiddenHols,   setHiddenHols]   = useState([]);
   // current selected month
   const [selYear,setSelYear]     = useState(now.getFullYear());
@@ -302,11 +303,12 @@ function App(){
       loaded.bh=true;check();
     });
     const u8=fbListen("hiddenHols",v=>{ const d=v||[]; setHiddenHols(d);local.current.hiddenHols=d; loaded.hh=true;check(); });
+    const u8b=fbListen("reconSessions",v=>{ setReconSessions(v||{}); });
     const urp1=fbListen("ravPinchas/avrechim",v=>{ const d=v&&Array.isArray(v)?v:[]; setRpAvrechimS(d);local.current.rpAvrechim=d; loaded.rpav=true;check(); });
     const urp2=fbListen("ravPinchas/months",v=>{ const d=v||{}; setRpMonthsS(d);local.current.rpMonths=d; loaded.rpmonths=true;check(); });
     const urp3=fbListen("ravPinchas/baseBalance",v=>{ if(v){setRpBaseBS(v);local.current.rpBaseBalance=v;} loaded.rpbase=true;check(); });
     const urp4=fbListen("ravPinchas/contact",v=>{ if(v){setRpContactS(v);local.current.rpContact=v;} loaded.rpcontact=true;check(); });
-    return()=>{ u1();u2();u3();u4();u5();u6();u7();u8();urp1();urp2();urp3();urp4(); };
+    return()=>{ u1();u2();u3();u4();u5();u6();u7();u8();u8b();urp1();urp2();urp3();urp4(); };
   },[]);
 
   const sync = fn => { setSyncing(true); fn(); setTimeout(()=>setSyncing(false),1200); };
@@ -613,7 +615,7 @@ function App(){
         {tab==="main"       && <MainTab selKey={selKey} selYear={selYear} selMonth={selMonth} baseBalance={baseBalance} setBaseBalance={setBaseBalance} liveBalance={liveBalance} curTotals={curTotals} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} syncing={syncing} allDonorNames={allDonorNames} donorHistory={donorHistory} avrechim={avrechim} />}
         {tab==="avrechim"   && <AvrechimTab avrechim={avrechim} setAvrechim={setAvrechim} selKey={selKey} prevKey={prevKey} selYear={selYear} selMonth={selMonth} getAV={getAV} getMD={getMD} setAvMonthField={setAvMonthField} calcAvrechMonth={calcAvrechMonth} totalOwed={totalOwed} attendance={attendance} customVacations={customVacations} beinHazmanims={beinHazmanims} hiddenHols={hiddenHols} allMonthKeys={allMonthKeys()} getPrevMonthKey={getPrevMonthKey} />}
         {tab==="attendance" && <AttendanceTab avrechim={avrechim} selKey={selKey} selYear={selYear} selMonth={selMonth} attendance={attendance} setAttendanceDay={setAttendanceDay} fillMonthBatch={fillMonthBatch} customVacations={customVacations} setCustomVacation={setCustomVacation} removeCustomVacation={removeCustomVacation} beinHazmanims={beinHazmanims} addBeinHazmanim={addBeinHazmanim} removeBeinHazmanim={removeBeinHazmanim} updateBeinHazmanim={updateBeinHazmanim} hiddenHols={hiddenHols} toggleHolidayHidden={toggleHolidayHidden} />}
-        {tab==="summary"    && <SummaryTab avrechim={avrechim} allMonthKeys={allMonthKeys()} calcMonthTotals={calcMonthTotals} calcAvrechMonth={calcAvrechMonth} getPrevMonthKey={getPrevMonthKey} baseBalance={baseBalance} liveBalance={liveBalance} selKey={selKey} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} />}
+        {tab==="summary"    && <SummaryTab avrechim={avrechim} allMonthKeys={allMonthKeys()} calcMonthTotals={calcMonthTotals} calcAvrechMonth={calcAvrechMonth} getPrevMonthKey={getPrevMonthKey} baseBalance={baseBalance} liveBalance={liveBalance} selKey={selKey} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} reconSessions={reconSessions} />}
         {tab==="bank"       && <BankTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} />}
         {tab==="settlement" && <SettlementTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} getMD={getMD} setMonthField={setMonthField} allMonthKeys={allMonthKeys()} getPrevMonthKey={getPrevMonthKey} headerHeight={headerHeight} />}
         {tab==="ravpinchas" && <RavPinchasTab rpAvrechim={rpAvrechim} setRpAvrechim={setRpAvrechim} rpMonths={rpMonths} setRpMonthField={setRpMonthField} rpBaseBalance={rpBaseBalance} setRpBaseBalance={setRpBaseBalance} rpContact={rpContact} setRpContact={setRpContact} selKey={selKey} selYear={selYear} selMonth={selMonth} allDonorNames={allDonorNames} donorHistory={donorHistory} syncing={syncing} sarikowLiveBalance={liveBalance} />}
@@ -1655,7 +1657,7 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
 }
 
 // ── SUMMARY TAB ──────────────────────────────────────────────
-function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, getPrevMonthKey, baseBalance, liveBalance, selKey, allMonths, getMD, setMonthField }){
+function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, getPrevMonthKey, baseBalance, liveBalance, selKey, allMonths, getMD, setMonthField, reconSessions }){
   const [openMonth,setOpenMonth]=useState(selKey);
   const [pendingInput,setPendingInput]=useState({}); // { "monthKey|datot": "1234", ... }
   const baseMonthKey = baseBalance.monthKey || "0000-00";
@@ -1690,16 +1692,50 @@ function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, 
   // ── בדיקת התאמה מול סריקוב — מקלידים רשימת תנועות (כמו במחשבון), האפליקציה משווה מול היתרה האמיתית שלה ──
   const [showRecon,setShowRecon]=useState(false);
   const [reconStart,setReconStart]=useState(String(baseBalance.amount||0));
-  const [reconRows,setReconRows]=useState([{id:1,desc:"",amount:"",sign:1}]);
+  const [reconStartLabel,setReconStartLabel]=useState("");
+  const [reconRows,setReconRows]=useState([{id:1,category:"תורמים",desc:"",amount:"",sign:1}]);
   const [reconCompareKey,setReconCompareKey]=useState(allMonthKeys[allMonthKeys.length-1]||selKey);
+  const [reconSessionName,setReconSessionName]=useState("");
 
-  const addReconRow = () => setReconRows(r=>[...r,{id:Date.now(),desc:"",amount:"",sign:1}]);
+  const CATEGORY_SIGN = {"תורמים":1,"דתות":1,"קרן":1,"העברה של סריקוב":-1,"אחר":1};
+
+  const addReconRow = () => setReconRows(r=>[...r,{id:Date.now(),category:"תורמים",desc:"",amount:"",sign:1}]);
   const removeReconRow = (id) => setReconRows(r=>r.filter(x=>x.id!==id));
-  const updateReconRow = (id,field,val) => setReconRows(r=>r.map(x=>x.id===id?{...x,[field]:val}:x));
+  const updateReconRow = (id,field,val) => setReconRows(r=>r.map(x=>{
+    if(x.id!==id) return x;
+    const next = {...x,[field]:val};
+    if(field==="category") next.sign = CATEGORY_SIGN[val] ?? 1;
+    return next;
+  }));
 
-  const reconExpected = reconRows.reduce((s,r)=>s+(Number(r.amount)||0)*r.sign, Number(reconStart)||0);
+  // יתרה מצטברת אחרי כל שורה — בדיוק כמו הקווים המודגשים "+" במחשבון
+  let runningBal = Number(reconStart)||0;
+  const reconRowsWithRunning = reconRows.map(r=>{
+    runningBal += (Number(r.amount)||0)*r.sign;
+    return {...r, runningBal};
+  });
+  const reconExpected = runningBal;
   const reconActual = calcCumBalance(reconCompareKey);
   const reconDiff = reconExpected - reconActual;
+
+  const saveReconSession = () => {
+    if(!reconSessionName.trim()) return alert("יש לתת שם/תאריך לרשימה (למשל: ישיבה עם סריקוב 8.9.26)");
+    const sessions = {...reconSessions, [Date.now()]: {
+      name: reconSessionName.trim(), start: reconStart, startLabel: reconStartLabel,
+      rows: reconRows, compareKey: reconCompareKey, savedAt: new Date().toISOString().slice(0,10)
+    }};
+    sync(()=>fbSet("reconSessions", sessions));
+    setReconSessionName("");
+  };
+  const loadReconSession = (id) => {
+    const s = reconSessions[id];
+    if(!s) return;
+    setReconStart(s.start); setReconStartLabel(s.startLabel||""); setReconRows(s.rows); setReconCompareKey(s.compareKey);
+  };
+  const deleteReconSession = (id) => {
+    const sessions = {...reconSessions}; delete sessions[id];
+    sync(()=>fbSet("reconSessions", sessions));
+  };
 
   return (
     <div style={col}>
@@ -1719,23 +1755,62 @@ function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, 
         </div>
         {showRecon && (
           <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:8}}>
-            <div>
-              <label style={{fontSize:12,color:"#64748b",display:"block",marginBottom:3}}>יתרת פתיחה (₪)</label>
-              <input type="number" style={inp} value={reconStart} onChange={e=>setReconStart(e.target.value)}/>
+
+            {Object.keys(reconSessions).length>0 && (
+              <div style={{background:"#f8fafc",borderRadius:8,padding:8}}>
+                <div style={{fontSize:11,color:"#64748b",marginBottom:5,fontWeight:700}}>📂 רשימות שמורות:</div>
+                {Object.entries(reconSessions).sort((a,b)=>b[0]-a[0]).map(([id,s])=>(
+                  <div key={id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 0",fontSize:12.5}}>
+                    <span>{s.name} <span style={{color:"#94a3b8"}}>({s.savedAt})</span></span>
+                    <div style={{display:"flex",gap:4}}>
+                      <button style={{...smallBtn,padding:"2px 8px",fontSize:11}} onClick={()=>loadReconSession(id)}>טען</button>
+                      <button style={{...delBtn,padding:"2px 8px",fontSize:11}} onClick={()=>deleteReconSession(id)}>מחק</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{display:"flex",gap:6}}>
+              <div style={{flex:1}}>
+                <label style={{fontSize:12,color:"#64748b",display:"block",marginBottom:3}}>יתרת פתיחה (₪)</label>
+                <input type="number" style={inp} value={reconStart} onChange={e=>setReconStart(e.target.value)}/>
+              </div>
+              <div style={{flex:1}}>
+                <label style={{fontSize:12,color:"#64748b",display:"block",marginBottom:3}}>תאריך/תיאור יתרת הפתיחה</label>
+                <input type="text" placeholder="למשל: 31.5.26" style={inp} value={reconStartLabel} onChange={e=>setReconStartLabel(e.target.value)}/>
+              </div>
+            </div>
+            <div style={{background:"#f5f3ff",borderRadius:7,padding:"6px 10px",fontSize:13,fontWeight:700,color:"#7c3aed"}}>
+              + {fmt(Number(reconStart)||0)} ₪ {reconStartLabel&&`(${reconStartLabel})`}
             </div>
 
-            {reconRows.map(r=>(
-              <div key={r.id} style={{display:"flex",gap:6,alignItems:"center"}}>
-                <button type="button" onClick={()=>updateReconRow(r.id,"sign",r.sign*-1)}
-                  style={{...smallBtn,width:36,fontWeight:800,color:r.sign>0?"#16a34a":"#dc2626",
-                    borderColor:r.sign>0?"#86efac":"#fecaca",background:r.sign>0?"#f0fdf4":"#fef2f2"}}>
-                  {r.sign>0?"+":"−"}
-                </button>
-                <input type="text" placeholder="תיאור (למשל: קרן 19.8)" style={{...inp,flex:2}}
-                  value={r.desc} onChange={e=>updateReconRow(r.id,"desc",e.target.value)}/>
-                <input type="number" placeholder="סכום" style={{...inp,flex:1,textAlign:"left"}}
-                  value={r.amount} onChange={e=>updateReconRow(r.id,"amount",e.target.value)}/>
-                <button style={delBtn} onClick={()=>removeReconRow(r.id)}>✕</button>
+            {reconRowsWithRunning.map(r=>(
+              <div key={r.id}>
+                <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                  <select style={{...inp,flex:1.3}} value={r.category} onChange={e=>updateReconRow(r.id,"category",e.target.value)}>
+                    <option value="תורמים">תורמים</option>
+                    <option value="דתות">דתות</option>
+                    <option value="קרן">קרן</option>
+                    <option value="העברה של סריקוב">העברה של סריקוב</option>
+                    <option value="אחר">אחר</option>
+                  </select>
+                  <input type="text" placeholder="פירוט (למשל: יעקב, חודש 8)" style={{...inp,flex:1.4}}
+                    value={r.desc} onChange={e=>updateReconRow(r.id,"desc",e.target.value)}/>
+                  <button type="button" onClick={()=>updateReconRow(r.id,"sign",r.sign*-1)}
+                    style={{...smallBtn,width:32,fontWeight:800,color:r.sign>0?"#16a34a":"#dc2626",
+                      borderColor:r.sign>0?"#86efac":"#fecaca",background:r.sign>0?"#f0fdf4":"#fef2f2"}}>
+                    {r.sign>0?"+":"−"}
+                  </button>
+                  <input type="number" placeholder="סכום" style={{...inp,flex:1,textAlign:"left"}}
+                    value={r.amount} onChange={e=>updateReconRow(r.id,"amount",e.target.value)}/>
+                  <button style={delBtn} onClick={()=>removeReconRow(r.id)}>✕</button>
+                </div>
+                {Number(r.amount)>0 && (
+                  <div style={{fontSize:11,color:"#94a3b8",padding:"2px 6px",textAlign:"left"}}>
+                    ← יתרה מצטברת: <b style={{color:"#475569"}}>{fmt(r.runningBal)} ₪</b>
+                  </div>
+                )}
               </div>
             ))}
             <button style={{...smallBtn,alignSelf:"flex-start",color:"#7c3aed",borderColor:"#c4b5fd"}} onClick={addReconRow}>+ שורה</button>
@@ -1765,6 +1840,12 @@ function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, 
                 ? <div style={{color:"#16a34a",fontWeight:800}}>✓ תואם במדויק!</div>
                 : <div style={{color:"#dc2626",fontWeight:800}}>⚠️ פער של {fmt(Math.abs(reconDiff))} ₪ {reconDiff>0?"(הרשימה שלך גבוהה יותר)":"(האפליקציה גבוהה יותר)"}</div>
               }
+            </div>
+
+            <div style={{display:"flex",gap:6,marginTop:4}}>
+              <input type="text" placeholder="שם לשמירה (למשל: ישיבה עם סריקוב 8.9.26)" style={{...inp,flex:1}}
+                value={reconSessionName} onChange={e=>setReconSessionName(e.target.value)}/>
+              <button style={{...smallBtn,background:"#7c3aed",color:"#fff",fontWeight:700}} onClick={saveReconSession}>💾 שמור</button>
             </div>
           </div>
         )}
