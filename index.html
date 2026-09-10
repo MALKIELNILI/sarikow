@@ -1731,10 +1731,20 @@ function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, 
     const s = reconSessions[id];
     if(!s) return;
     setReconStart(s.start); setReconStartLabel(s.startLabel||""); setReconRows(s.rows); setReconCompareKey(s.compareKey);
+    const today = new Date().toLocaleDateString("he-IL");
+    setReconSessionName(`${s.name} → ${today}`);
   };
   const deleteReconSession = (id) => {
     const sessions = {...reconSessions}; delete sessions[id];
     sync(()=>fbSet("reconSessions", sessions));
+  };
+  // מתחיל דף חלק: היתרה הסופית הנוכחית הופכת ליתרת פתיחה חדשה, השורות מתנקות.
+  // הרשימה המלאה שכבר שמורה (אם שמרת) נשארת בארכיון בדיוק כמו שהייתה — לא נמחקת.
+  const startFreshFromHere = () => {
+    setReconStart(String(reconExpected));
+    setReconStartLabel(new Date().toLocaleDateString("he-IL"));
+    setReconRows([{id:Date.now(),category:"תורמים",desc:"",amount:"",sign:1}]);
+    setReconSessionName("");
   };
 
   return (
@@ -1841,6 +1851,12 @@ function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, 
                 : <div style={{color:"#dc2626",fontWeight:800}}>⚠️ פער של {fmt(Math.abs(reconDiff))} ₪ {reconDiff>0?"(הרשימה שלך גבוהה יותר)":"(האפליקציה גבוהה יותר)"}</div>
               }
             </div>
+
+            {Math.abs(reconDiff)<1 && (
+              <button style={{...smallBtn,background:"#0f2044",color:"#fff",fontWeight:700}} onClick={startFreshFromHere}>
+                🆕 התחל פגישה חדשה מכאן (היתרה הנוכחית תהיה נקודת הפתיחה הבאה)
+              </button>
+            )}
 
             <div style={{display:"flex",gap:6,marginTop:4}}>
               <input type="text" placeholder="שם לשמירה (למשל: ישיבה עם סריקוב 8.9.26)" style={{...inp,flex:1}}
