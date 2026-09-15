@@ -22,6 +22,7 @@ if('serviceWorker' in navigator){
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
+<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <style>
@@ -873,6 +874,29 @@ function ImportModal({ avrechim, selKey, setAvMonthField, onClose }){
   const [rows,setRows]=useState([]);
   const [importing,setImporting]=useState(false);
 
+  const processData = data => {
+    if(!data.workers) throw new Error('Invalid');
+    // Auto-match by name
+    const matched = data.workers.map(w=>{
+      let av = avrechim.find(a=>a.active && a.name===w.name);
+      if(!av){
+        const parts = w.name.trim().split(/\s+/);
+        // Try matching last name (first word in Hebrew is first name, last word is last name)
+        av = avrechim.find(a=>a.active && parts.some(p=>p.length>2 && a.name.includes(p)));
+      }
+      // אם יש סכום מדויק מ-JB (מקובץ XLS) — להשתמש בו ישירות
+      // אחרת — לחשב לפי ימים × מקסימום מלגה
+      const jbSalary = w.salary ? Math.round(w.salary) : null;
+      const maxS = av?Number(av.maxStipend||1600):0;
+      const calc = jbSalary !== null ? jbSalary
+                 : av ? Math.round(w.days/data.total_days*maxS) : 0;
+      return { jbName:w.name, jbId:w.jb_id, days:w.days, pct:w.pct,
+               jbSalary, avId:av?av.id:null, stipend:calc, skip:false };
+    });
+    setJbData(data);
+    setRows(matched);
+  };
+
   const loadFile = e => {
     const file = e.target.files[0];
     if(!file) return;
@@ -880,29 +904,42 @@ function ImportModal({ avrechim, selKey, setAvMonthField, onClose }){
     reader.onload = ev => {
       try{
         const data = JSON.parse(ev.target.result);
-        if(!data.workers) throw new Error('Invalid');
-        // Auto-match by name
-        const matched = data.workers.map(w=>{
-          let av = avrechim.find(a=>a.active && a.name===w.name);
-          if(!av){
-            const parts = w.name.trim().split(/\s+/);
-            // Try matching last name (first word in Hebrew is first name, last word is last name)
-            av = avrechim.find(a=>a.active && parts.some(p=>p.length>2 && a.name.includes(p)));
-          }
-          // אם יש סכום מדויק מ-JB (מקובץ XLS) — להשתמש בו ישירות
-          // אחרת — לחשב לפי ימים × מקסימום מלגה
-          const jbSalary = w.salary ? Math.round(w.salary) : null;
-          const maxS = av?Number(av.maxStipend||1600):0;
-          const calc = jbSalary !== null ? jbSalary
-                     : av ? Math.round(w.days/data.total_days*maxS) : 0;
-          return { jbName:w.name, jbId:w.jb_id, days:w.days, pct:w.pct,
-                   jbSalary, avId:av?av.id:null, stipend:calc, skip:false };
-        });
-        setJbData(data);
-        setRows(matched);
+        processData(data);
       }catch(e){ alert('שגיאה בקריאת הקובץ — ודא שהרצת jb_export.py'); }
     };
     reader.readAsText(file,'utf-8');
+  };
+
+  // טעינת קובץ "דוח מסכם חודשי" ישירות מ-Excel (XLS/XLSX) — בלי python/JSON כלל.
+  // מוצאים אוטומטית את שורת הכותרות ("שם עובד") ואת עמודת "שכר-ללא נסיעות/תוספת",
+  // וקוראים שורות עד שמגיעים לשורת "סיכום כולל" בסוף.
+  const loadExcelFile = e => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try{
+        const wb = XLSX.read(ev.target.result, {type:'array'});
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows2d = XLSX.utils.sheet_to_json(sheet, {header:1, defval:null});
+        const headerIdx = rows2d.findIndex(r=>r && r[0]==='שם עובד');
+        if(headerIdx===-1) throw new Error('no header row');
+        const headers = rows2d[headerIdx];
+        const salaryCol = headers.findIndex(h=>String(h||'').includes('שכר')&&String(h||'').includes('נסיעות'));
+        if(salaryCol===-1) throw new Error('no salary column');
+        const workers = [];
+        for(let i=headerIdx+1;i<rows2d.length;i++){
+          const row = rows2d[i];
+          if(!row || !row[0]) continue;
+          const name = String(row[0]).trim();
+          if(name.includes('סיכום')) break; // שורת סיכום בסוף — עוצרים כאן
+          workers.push({ name, salary:Number(row[salaryCol])||0 });
+        }
+        if(workers.length===0) throw new Error('no workers found');
+        processData({ workers, total_days:1 });
+      }catch(e){ alert('שגיאה בקריאת קובץ ה-Excel — ודא שזה "דוח מסכם חודשי" מהשעון (JBCLOCK)'); }
+    };
+    reader.readAsArrayBuffer(file);
   };
 
   const updRow=(i,patch)=>setRows(r=>r.map((x,j)=>j===i?{...x,...patch}:x));
@@ -945,8 +982,19 @@ function ImportModal({ avrechim, selKey, setAvMonthField, onClose }){
         {!jbData?(
           /* Step 1: Load file */
           <div style={{padding:24,display:"flex",flexDirection:"column",gap:16}}>
+            <div style={{background:"#f0fdf4",border:"1.5px solid #86efac",borderRadius:10,padding:14,fontSize:13,lineHeight:1.7}}>
+              <div style={{fontWeight:700,marginBottom:6,color:"#16a34a"}}>✅ הכי פשוט — קובץ Excel ישירות מהשעון</div>
+              <div style={{color:"#166534"}}>הורד/שמור מהשעון (JBCLOCK) את "דוח מסכם חודשי" כקובץ Excel, ותטען אותו כאן ישירות — בלי פייתון, בלי JSON.</div>
+            </div>
+            <label style={{...primaryBtn,textAlign:"center",cursor:"pointer",display:"block",background:"#16a34a"}}>
+              📊 טען קובץ Excel (דוח מסכם חודשי)
+              <input type="file" accept=".xls,.xlsx" style={{display:"none"}} onChange={loadExcelFile}/>
+            </label>
+
+            <div style={{textAlign:"center",fontSize:12,color:"#94a3b8"}}>— או —</div>
+
             <div style={{background:"#f0f9ff",borderRadius:10,padding:14,fontSize:13,lineHeight:1.7}}>
-              <div style={{fontWeight:700,marginBottom:6}}>הוראות:</div>
+              <div style={{fontWeight:700,marginBottom:6}}>דרך חלופה (טכנית יותר) — קובץ JSON דרך פייתון:</div>
               <div>1️⃣ פתח שורת פקודה (cmd) והרץ:</div>
               <div style={{fontFamily:"monospace",background:"#1e293b",color:"#7dd3fc",padding:"6px 10px",borderRadius:6,margin:"4px 0",fontSize:12}}>
                 python C:\JBCLOCK\jb_export.py 26 3
@@ -954,7 +1002,7 @@ function ImportModal({ avrechim, selKey, setAvMonthField, onClose }){
               <div style={{fontSize:11,color:"#64748b"}}>(שנה את 26 3 לשנה ולחודש הרצויים)</div>
               <div style={{marginTop:6}}>2️⃣ לאחר הרצה — לחץ "טען קובץ" ובחר <strong>C:\JBCLOCK\jb_data.json</strong></div>
             </div>
-            <label style={{...primaryBtn,textAlign:"center",cursor:"pointer",display:"block"}}>
+            <label style={{...primaryBtn,textAlign:"center",cursor:"pointer",display:"block",background:"#64748b"}}>
               📂 טען קובץ jb_data.json
               <input type="file" accept=".json" style={{display:"none"}} onChange={loadFile}/>
             </label>
