@@ -252,6 +252,19 @@ function App(){
     window.addEventListener("resize",measure);
     return ()=>{ ro.disconnect(); window.removeEventListener("resize",measure); };
   },[ready]);
+  // אותו מנגנון לשורת "חודש" עם החיצים — כדי שגם היא תהיה קבועה (sticky) מתחת לכותרת, ולא תיעלם בגלילה
+  const monthSelRef = useRef(null);
+  const [monthSelHeight,setMonthSelHeight] = useState(56);
+  useEffect(()=>{
+    if(!monthSelRef.current) return;
+    const measure = () => setMonthSelHeight(monthSelRef.current.getBoundingClientRect().height);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(monthSelRef.current);
+    window.addEventListener("resize",measure);
+    return ()=>{ ro.disconnect(); window.removeEventListener("resize",measure); };
+  },[ready]);
+  const stickyTop = headerHeight + monthSelHeight;
   const [syncing,setSyncing]     = useState(false);
   const [baseBalance,setBaseBS]  = useState({amount:191321,date:"29.1.26"});
   const [avrechim,setAvrechimS]  = useState(defaultAvrechim);
@@ -596,8 +609,8 @@ function App(){
         </div>
       </header>
 
-      {/* Month Selector */}
-      <div style={{maxWidth:720,margin:"0 auto",padding:"10px 14px 0"}}>
+      {/* Month Selector — קבוע (sticky) מתחת לכותרת, כדי שלא ייעלם בגלילה */}
+      <div ref={monthSelRef} style={{position:"sticky",top:headerHeight,zIndex:90,background:"#f8fafc",maxWidth:720,margin:"0 auto",padding:"10px 14px 0"}}>
         <div style={{background:"#fff",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",gap:10,boxShadow:"0 1px 4px rgba(0,0,0,0.07)",flexWrap:"wrap"}}>
           <span style={{fontWeight:700,fontSize:13,color:"#1e3a5f"}}>📅 חודש:</span>
           <button onClick={()=>{ let m=selMonth-1,y=selYear; if(m<0){m=11;y--;} setSelMonth(m);setSelYear(y); }}
@@ -618,8 +631,8 @@ function App(){
         {tab==="attendance" && <AttendanceTab avrechim={avrechim} selKey={selKey} selYear={selYear} selMonth={selMonth} attendance={attendance} setAttendanceDay={setAttendanceDay} fillMonthBatch={fillMonthBatch} customVacations={customVacations} setCustomVacation={setCustomVacation} removeCustomVacation={removeCustomVacation} beinHazmanims={beinHazmanims} addBeinHazmanim={addBeinHazmanim} removeBeinHazmanim={removeBeinHazmanim} updateBeinHazmanim={updateBeinHazmanim} hiddenHols={hiddenHols} toggleHolidayHidden={toggleHolidayHidden} />}
         {tab==="summary"    && <SummaryTab avrechim={avrechim} allMonthKeys={allMonthKeys()} calcMonthTotals={calcMonthTotals} calcAvrechMonth={calcAvrechMonth} getPrevMonthKey={getPrevMonthKey} baseBalance={baseBalance} liveBalance={liveBalance} selKey={selKey} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} reconSessions={reconSessions} allDonorNames={allDonorNames} donorHistory={donorHistory} />}
         {tab==="bank"       && <BankTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} />}
-        {tab==="settlement" && <SettlementTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} getMD={getMD} setMonthField={setMonthField} allMonthKeys={allMonthKeys()} getPrevMonthKey={getPrevMonthKey} headerHeight={headerHeight} />}
-        {tab==="ravpinchas" && <RavPinchasTab rpAvrechim={rpAvrechim} setRpAvrechim={setRpAvrechim} rpMonths={rpMonths} setRpMonthField={setRpMonthField} rpBaseBalance={rpBaseBalance} setRpBaseBalance={setRpBaseBalance} rpContact={rpContact} setRpContact={setRpContact} selKey={selKey} selYear={selYear} selMonth={selMonth} allDonorNames={allDonorNames} donorHistory={donorHistory} syncing={syncing} sarikowLiveBalance={liveBalance} headerHeight={headerHeight} />}
+        {tab==="settlement" && <SettlementTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} getMD={getMD} setMonthField={setMonthField} allMonthKeys={allMonthKeys()} getPrevMonthKey={getPrevMonthKey} headerHeight={stickyTop} />}
+        {tab==="ravpinchas" && <RavPinchasTab rpAvrechim={rpAvrechim} setRpAvrechim={setRpAvrechim} rpMonths={rpMonths} setRpMonthField={setRpMonthField} rpBaseBalance={rpBaseBalance} setRpBaseBalance={setRpBaseBalance} rpContact={rpContact} setRpContact={setRpContact} selKey={selKey} selYear={selYear} selMonth={selMonth} allDonorNames={allDonorNames} donorHistory={donorHistory} syncing={syncing} sarikowLiveBalance={liveBalance} headerHeight={stickyTop} />}
       </main>
     </div>
   );
