@@ -4138,19 +4138,32 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
     const ovr = md ? md.avAmounts?.[av.id] : avAmounts[av.id];
     return ovr !== undefined ? Number(ovr) : Number(av.amount||1000);
   };
-  // מי "שייך" לחודש נתון: מי שפעיל היום, בתוספת מי שכבר יש לו נתונים (סכום/שולם) לאותו חודש ספציפית —
-  // כדי שמחיקת אברך (סימון "לא פעיל") לא תמחק אותו רטרואקטיבית מחודשים ישנים שבהם כן הוא כן שולם.
-  const activeAvrechimForMonth = (md) => rpAvrechim.filter(a =>
-    a.active!==false || (md && (md.avAmounts?.[a.id]!==undefined || md.avPaid?.[a.id]!==undefined))
-  );
+  // מי "שייך" לחודש נתון — פר-חודש לגמרי, בלי שום השפעה בין חודשים:
+  // • חודש ש"נגעו" בו כבר (יש לו avAmounts/avPaid משלו) — מי ששייך אליו נקבע אך ורק לפי הנתונים שלו,
+  //   כדי שמחיקה/שחזור בחודש אחד לא ישפיעו בשום צורה על חודש אחר (עבר או עתיד).
+  // • חודש חדש/עתידי שעדיין לא נגעו בו בכלל — מתחיל כברירת מחדל מרשימת האברכים ה"פעילים" הכללית,
+  //   כדי שלא תצטרך להוסיף כל אברך מחדש כל חודש.
+  const activeAvrechimForMonth = (md) => {
+    const touched = md && (md.avAmounts || md.avPaid);
+    if (touched) return rpAvrechim.filter(a => md.avAmounts?.[a.id]!==undefined || md.avPaid?.[a.id]!==undefined);
+    return rpAvrechim.filter(a=>a.active!==false);
+  };
   const activeAvrechim = activeAvrechimForMonth(rpMonths[selKey]||{});
-  // הסרת אברך מהחודש הנוכחי בלבד (מוחק את הסכום/סימון-שולם שלו לחודש זה) — משמש כשמסמנים "לא פעיל" תוך כדי עריכת חודש,
-  // כדי שהוא ייעלם באמת מהחודש שרואים עכשיו, בלי לגעת בנתונים שלו בחודשים אחרים (עבר/עתיד).
+  // הסרת/הוספת אברך לחודש הנוכחי **בלבד** — לא נוגע בשום חודש אחר, ולא בדגל הגלובלי של האברך.
   const removeAvFromCurrentMonth = (avId) => {
-    const na = {...avAmounts}; delete na[avId];
+    // ממזגים תחילה את מי שמוצג כרגע בפועל (כולל ברירת מחדל, אם החודש עדיין לא "נגע") לרשומות מפורשות,
+    // כדי שמחיקת אחד לא תמחק בטעות גם את כל השאר שהוצגו רק דרך ברירת המחדל.
+    const na = {};
+    activeAvrechim.forEach(a => { if(a.id!==avId) na[a.id] = getAvAmt(a, rpMonths[selKey]||{}); });
     const np = {...avPaid}; delete np[avId];
     setRpMonthField(selKey,"avAmounts",na);
     setRpMonthField(selKey,"avPaid",np);
+  };
+  const addAvToCurrentMonth = (av) => {
+    const na = {};
+    activeAvrechim.forEach(a => { na[a.id] = getAvAmt(a, rpMonths[selKey]||{}); });
+    na[av.id] = Number(av.amount||1000);
+    setRpMonthField(selKey,"avAmounts",na);
   };
 
   const calcMonthTotals = (key) => {
@@ -4644,7 +4657,7 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
                     <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
                       <span style={{fontWeight:800,fontSize:16,color:paid?"#059669":"#1e3a5f"}}>{fmt(amt)} ₪</span>
                       <button style={smallBtn} onClick={()=>setEditAvId(isEdit?null:av.id)}>{isEdit?"✓":"✏️"}</button>
-                      <button style={{...smallBtn,background:"#fee2e2",color:"#dc2626"}} onClick={()=>{updAv(av.id,"active",false);removeAvFromCurrentMonth(av.id);}}>✕</button>
+                      <button style={{...smallBtn,background:"#fee2e2",color:"#dc2626"}} onClick={()=>removeAvFromCurrentMonth(av.id)}>✕</button>
                     </div>
                   </div>
 
@@ -4692,14 +4705,14 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
           </div>
         )}
 
-        {/* לא פעילים */}
-        {rpAvrechim.filter(a=>a.active===false).length>0&&(
+        {/* אברכים שברשימה הכללית אבל לא בחודש הנוכחי — "שחזר" כאן מוסיף אותם רק לחודש זה, בלי לגעת בשום חודש אחר */}
+        {rpAvrechim.filter(a=>!activeAvrechim.some(x=>x.id===a.id)).length>0&&(
           <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #e2e8f0"}}>
-            <div style={{fontWeight:600,color:"#94a3b8",marginBottom:4,fontSize:12}}>לא פעילים</div>
-            {rpAvrechim.filter(a=>a.active===false).map(av=>(
+            <div style={{fontWeight:600,color:"#94a3b8",marginBottom:4,fontSize:12}}>לא כלולים בחודש זה</div>
+            {rpAvrechim.filter(a=>!activeAvrechim.some(x=>x.id===a.id)).map(av=>(
               <div key={av.id} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",color:"#94a3b8",fontSize:12}}>
                 <span>{av.name}</span>
-                <button style={smallBtn} onClick={()=>updAv(av.id,"active",true)}>שחזר</button>
+                <button style={smallBtn} onClick={()=>addAvToCurrentMonth(av)}>שחזר</button>
               </div>
             ))}
           </div>
@@ -4755,7 +4768,12 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
           </FG>
           <button style={{...primaryBtn,background:"#059669"}} onClick={()=>{
             if(!newAv.name) return;
-            setRpAvrechim(p=>[...p,{id:Date.now(),name:newAv.name,amount:Number(newAv.amount)||1000,active:true}]);
+            const id = Date.now();
+            setRpAvrechim(p=>[...p,{id,name:newAv.name,amount:Number(newAv.amount)||1000,active:true}]);
+            const na = {};
+            activeAvrechim.forEach(a => { na[a.id] = getAvAmt(a, rpMonths[selKey]||{}); });
+            na[id] = Number(newAv.amount)||1000;
+            setRpMonthField(selKey,"avAmounts",na);
             setNewAv({name:"",amount:1000});
             setShowAddAv(false);
           }}>הוסף אברך</button>
