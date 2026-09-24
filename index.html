@@ -4144,6 +4144,14 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
     a.active!==false || (md && (md.avAmounts?.[a.id]!==undefined || md.avPaid?.[a.id]!==undefined))
   );
   const activeAvrechim = activeAvrechimForMonth(rpMonths[selKey]||{});
+  // הסרת אברך מהחודש הנוכחי בלבד (מוחק את הסכום/סימון-שולם שלו לחודש זה) — משמש כשמסמנים "לא פעיל" תוך כדי עריכת חודש,
+  // כדי שהוא ייעלם באמת מהחודש שרואים עכשיו, בלי לגעת בנתונים שלו בחודשים אחרים (עבר/עתיד).
+  const removeAvFromCurrentMonth = (avId) => {
+    const na = {...avAmounts}; delete na[avId];
+    const np = {...avPaid}; delete np[avId];
+    setRpMonthField(selKey,"avAmounts",na);
+    setRpMonthField(selKey,"avPaid",np);
+  };
 
   const calcMonthTotals = (key) => {
     const md = rpMonths[key] || {};
@@ -4636,7 +4644,7 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
                     <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
                       <span style={{fontWeight:800,fontSize:16,color:paid?"#059669":"#1e3a5f"}}>{fmt(amt)} ₪</span>
                       <button style={smallBtn} onClick={()=>setEditAvId(isEdit?null:av.id)}>{isEdit?"✓":"✏️"}</button>
-                      <button style={{...smallBtn,background:"#fee2e2",color:"#dc2626"}} onClick={()=>updAv(av.id,"active",false)}>✕</button>
+                      <button style={{...smallBtn,background:"#fee2e2",color:"#dc2626"}} onClick={()=>{updAv(av.id,"active",false);removeAvFromCurrentMonth(av.id);}}>✕</button>
                     </div>
                   </div>
 
