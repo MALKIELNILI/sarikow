@@ -214,6 +214,7 @@ tr:hover td{background:rgba(255,255,255,0.02);}
     <button class="tab" data-page="loans" onclick="showPage('loans',this);renderLoans()">💳 הלוואות</button>
     <button class="tab" data-page="yearly" onclick="showPage('yearly',this)">📆 שנתי</button>
     <button class="tab" data-page="kupa" onclick="showPage('kupa',this);renderKupa()">📈 מאזן קופה</button>
+    <button class="tab" data-page="structure" onclick="showPage('structure',this)">🏗️ חוב מבנה</button>
     <button class="tab" data-page="search" onclick="showPage('search',this);renderGlobalSearch()">🔍 חיפוש</button>
     <button class="tab" data-page="settings" onclick="showPage('settings',this)">⚙️ הגדרות</button>
   </div>
@@ -242,8 +243,8 @@ tr:hover td{background:rgba(255,255,255,0.02);}
         <div class="section-header"><h2>💰 הוספת הכנסה</h2></div>
         <div class="section-body">
           <div class="form-row">
-            <div class="form-group"><label>חודש</label><select id="inc-month"></select></div>
-            <div class="form-group"><label>שנה</label><select id="inc-year"></select></div>
+            <div class="form-group"><label>חודש</label><select id="inc-month" onchange="incTypeChange()"></select></div>
+            <div class="form-group"><label>שנה</label><select id="inc-year" onchange="incTypeChange()"></select></div>
             <div class="form-group">
               <label>סוג</label>
               <select id="inc-type" onchange="incTypeChange()">
@@ -263,6 +264,7 @@ tr:hover td{background:rgba(255,255,255,0.02);}
                 <button id="inc-half-btn" onclick="setIncHalf('half')">כבר חצי</button>
               </div>
             </div>
+            <div class="form-group"><label>מחזור</label><select id="inc-cycle" onchange="this.dataset.userSet='1'"></select></div>
             <div class="form-group"><label>הערה</label><input type="text" id="inc-note" placeholder="הערה"></div>
           </div>
           <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
@@ -278,6 +280,7 @@ tr:hover td{background:rgba(255,255,255,0.02);}
             <button class="btn btn-ghost btn-sm" onclick="navMonth('inc-filter-month','inc-filter-year',-1,renderIncomes)" style="padding:5px 9px">◀</button>
             <select id="inc-filter-month" onchange="renderIncomes()"></select>
             <select id="inc-filter-year" onchange="renderIncomes()"></select>
+            <select id="inc-filter-cycle" onchange="renderIncomes()"></select>
             <button class="btn btn-ghost btn-sm" onclick="navMonth('inc-filter-month','inc-filter-year',1,renderIncomes)" style="padding:5px 9px">▶</button>
           </div>
         </div>
@@ -300,8 +303,8 @@ tr:hover td{background:rgba(255,255,255,0.02);}
         <div class="section-header"><h2>📋 הוספת הוצאה</h2></div>
         <div class="section-body">
           <div class="form-row">
-            <div class="form-group"><label>חודש</label><select id="exp-month"></select></div>
-            <div class="form-group"><label>שנה</label><select id="exp-year"></select></div>
+            <div class="form-group"><label>חודש</label><select id="exp-month" onchange="expDateChange()"></select></div>
+            <div class="form-group"><label>שנה</label><select id="exp-year" onchange="expDateChange()"></select></div>
             <div class="form-group"><label>תיאור</label><input type="text" id="exp-desc" placeholder="שכר מורים, שכירות..."></div>
             <div class="form-group"><label>סכום (₪)</label><input type="number" id="exp-amount" min="0" placeholder="0"></div>
             <div class="form-group">
@@ -330,6 +333,7 @@ tr:hover td{background:rgba(255,255,255,0.02);}
                 <option value="other">אחר</option>
               </select>
             </div>
+            <div class="form-group"><label>מחזור</label><select id="exp-cycle" onchange="this.dataset.userSet='1'"></select></div>
             <div class="form-group"><label>הערה</label><input type="text" id="exp-note" placeholder="הערה"></div>
           </div>
           <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
@@ -345,6 +349,7 @@ tr:hover td{background:rgba(255,255,255,0.02);}
             <button class="btn btn-ghost btn-sm" onclick="navMonth('exp-filter-month','exp-filter-year',-1,renderExpenses)" style="padding:5px 9px">◀</button>
             <select id="exp-filter-month" onchange="renderExpenses()"></select>
             <select id="exp-filter-year" onchange="renderExpenses()"></select>
+            <select id="exp-filter-cycle" onchange="renderExpenses()"></select>
             <button class="btn btn-ghost btn-sm" onclick="navMonth('exp-filter-month','exp-filter-year',1,renderExpenses)" style="padding:5px 9px">▶</button>
           </div>
         </div>
@@ -486,6 +491,72 @@ tr:hover td{background:rgba(255,255,255,0.02);}
       </div>
     </div>
 
+    <!-- STRUCTURE DEBT -->
+    <div id="page-structure" class="page">
+
+      <div class="alert alert-info" style="margin-bottom:14px;">
+        🏗️ לשונית נפרדת לחוב על המבנה — לא משפיעה ולא נשלפת מהכנסות/הוצאות/חובות הרגילים.
+      </div>
+
+      <div id="structure-summary"></div>
+
+      <div class="section">
+        <div class="section-header"><h2>⚙️ חוב פתיחה</h2></div>
+        <div class="section-body">
+          <div class="form-row">
+            <div class="form-group"><label>סכום שאני חייב לו בהתחלה (₪)</label><input type="number" id="struct-initial" min="0"></div>
+            <div class="form-group"><label>הערה</label><input type="text" id="struct-initial-note" placeholder="לדוגמה: מבנה 80,000 — הוא שילם הכל, 40,000 חלקו + 40,000 חלקי"></div>
+          </div>
+          <div style="margin-top:12px;">
+            <button class="btn btn-primary" onclick="saveStructureInitial()">💾 שמור חוב פתיחה</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header"><h2>➕ הוצאה משותפת ששילמתי במלואה (מקזז חלקו מהחוב)</h2></div>
+        <div class="section-body">
+          <div class="form-row">
+            <div class="form-group"><label>תאריך</label><input type="date" id="struct-off-date"></div>
+            <div class="form-group"><label>תיאור</label><input type="text" id="struct-off-desc" placeholder="למה זה"></div>
+            <div class="form-group"><label>סכום (₪)</label><input type="number" id="struct-off-amount" min="0" placeholder="0" oninput="structOffPreview()"></div>
+            <div class="form-group">
+              <label>הסכום שהוזן הוא</label>
+              <div class="half-full">
+                <button id="struct-off-full-btn" class="active" onclick="setStructOffMode('full')">סכום מלא, לחלק ב-2</button>
+                <button id="struct-off-his-btn" onclick="setStructOffMode('his')">תשלום מלא, כבר החלק שלו</button>
+              </div>
+            </div>
+            <div class="form-group"><label>הערה</label><input type="text" id="struct-off-note" placeholder="הערה"></div>
+          </div>
+          <div id="struct-off-preview" style="font-size:12px;color:var(--muted);margin-top:6px;"></div>
+          <div style="margin-top:12px;">
+            <button class="btn btn-success" onclick="addStructureOffset()">➕ הוסף וקזז מהחוב</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header"><h2>💸 תשלום ישיר על חשבון החוב</h2></div>
+        <div class="section-body">
+          <div class="form-row">
+            <div class="form-group"><label>תאריך</label><input type="date" id="struct-pay-date"></div>
+            <div class="form-group"><label>סכום (₪)</label><input type="number" id="struct-pay-amount" min="0" placeholder="0"></div>
+            <div class="form-group"><label>הערה</label><input type="text" id="struct-pay-note" placeholder="הערה"></div>
+          </div>
+          <div style="margin-top:12px;">
+            <button class="btn btn-success" onclick="addStructureDirectPayment()">💸 הוסף תשלום</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header"><h2>📋 היסטוריה</h2></div>
+        <div style="padding:0;"><div id="structure-history"></div></div>
+      </div>
+
+    </div>
+
     <!-- SETTINGS -->
     <div id="page-settings" class="page">
       <div class="section">
@@ -537,6 +608,26 @@ tr:hover td{background:rgba(255,255,255,0.02);}
           <div class="settings-row">
             <div><div class="slabel">שם השותף (שותף 2)</div></div>
             <div class="inline-edit"><input type="text" id="set-name2" style="width:140px;"><button class="btn btn-ghost btn-sm" onclick="saveSetting('name2')">שמור</button></div>
+          </div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-header"><h2>🔄 מחזורי לימוד</h2></div>
+        <div class="section-body">
+          <div class="alert alert-info" style="margin-bottom:12px;font-size:12px;">
+            כל מחזור (שנת לימודים) יכול לקבל מספר תלמידים / תשלום לתלמיד / יעד משלו — לפי חודש ההתחלה שלו. חודש שאין לו מחזור מוגדר ממשיך להשתמש בברירת המחדל שמעל. אפשר להוסיף מחזור רק עם שם וחודש התחלה, ולמלא את המספרים כשיהיו זמינים.
+          </div>
+          <div id="cycles-list"></div>
+          <div class="form-row" style="margin-top:14px;">
+            <div class="form-group"><label>שם המחזור</label><input type="text" id="cyc-name" placeholder="תשפ״ז 2026-2027"></div>
+            <div class="form-group"><label>חודש התחלה</label><select id="cyc-start-month"></select></div>
+            <div class="form-group"><label>שנת התחלה</label><select id="cyc-start-year"></select></div>
+            <div class="form-group"><label>תלמידים (אופציונלי)</label><input type="number" id="cyc-students" min="0"></div>
+            <div class="form-group"><label>לתלמיד (אופציונלי)</label><input type="number" id="cyc-rate" min="0"></div>
+            <div class="form-group"><label>יעד (אופציונלי)</label><input type="number" id="cyc-target" min="0"></div>
+          </div>
+          <div style="margin-top:12px;">
+            <button class="btn btn-primary" onclick="addCycle()">➕ הוסף מחזור</button>
           </div>
         </div>
       </div>
@@ -745,7 +836,8 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 const HEB=['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
-let D={settings:{students:112,tuition:250,muni:0,nistanim_students:49,nistanim_rate:150,name1:'מלכיאל',name2:'השותף',password:''},incomes:[],expenses:[],debts:[],transfers:[],loans:[],loanRepayments:[]};
+let D={settings:{students:112,tuition:250,muni:0,nistanim_students:49,nistanim_rate:150,name1:'מלכיאל',name2:'השותף',password:'',cycles:[]},incomes:[],expenses:[],debts:[],transfers:[],loans:[],loanRepayments:[],
+  structureDebt:{initial:0,initialNote:'',offsets:[],payments:[]}};
 let loggedIn=false;
 const $=id=>document.getElementById(id);
 const fmt=n=>Math.round(n||0).toLocaleString('he-IL');
@@ -776,6 +868,10 @@ async function fbLoad(){
       D.transfers=v.transfers?Object.values(v.transfers):[];
       D.loans=v.loans?Object.values(v.loans):[];
       D.loanRepayments=v.loanRepayments?Object.values(v.loanRepayments):[];
+      D.settings.cycles=Array.isArray(D.settings.cycles)?D.settings.cycles:(D.settings.cycles?Object.values(D.settings.cycles):[]);
+      const sd=v.structureDebt||{};
+      D.structureDebt={initial:sd.initial||0,initialNote:sd.initialNote||'',
+        offsets:sd.offsets?Object.values(sd.offsets):[],payments:sd.payments?Object.values(sd.payments):[]};
     }
     syncStatus('ok');
   }catch(e){syncStatus('error');toast('שגיאת טעינה','error');console.error(e);}
@@ -794,6 +890,10 @@ function listenRealtime(){
       D.transfers=v.transfers?Object.values(v.transfers):[];
       D.loans=v.loans?Object.values(v.loans):[];
       D.loanRepayments=v.loanRepayments?Object.values(v.loanRepayments):[];
+      D.settings.cycles=Array.isArray(D.settings.cycles)?D.settings.cycles:(D.settings.cycles?Object.values(D.settings.cycles):[]);
+      const sd=v.structureDebt||{};
+      D.structureDebt={initial:sd.initial||0,initialNote:sd.initialNote||'',
+        offsets:sd.offsets?Object.values(sd.offsets):[],payments:sd.payments?Object.values(sd.payments):[]};
     }
     refreshCurrent();syncStatus('ok');
   });
@@ -807,6 +907,7 @@ function refreshCurrent(){
   else if(pg==='yearly')renderYearly();
   else if(pg==='loans')renderLoans();
   else if(pg==='settings')loadSettings();
+  else if(pg==='structure')renderStructure();
 }
 
 // ── LOGIN ─────────────────────────────────────────────────
@@ -830,7 +931,7 @@ function enterApp(){
   loggedIn=true;
   $('login-screen').style.display='none';
   $('main-app').style.display='block';
-  populateSelects();incTypeChange();loadSettings();renderDashboard();listenRealtime();
+  populateSelects();incTypeChange();expDateChange();loadSettings();renderDashboard();listenRealtime();
 }
 window.doLogout=function(){
   loggedIn=false;
@@ -852,7 +953,84 @@ function populateSelects(){
   const fromEl=$('yearly-from-date');if(fromEl)fromEl.value=`${schoolYear}-09-01`;
   const toEl=$('yearly-to-date');if(toEl)toEl.value=now.toISOString().split('T')[0];
   const payDateEl=$('pay-date');if(payDateEl)payDateEl.value=now.toISOString().split('T')[0];
+  const soDateEl=$('struct-off-date');if(soDateEl)soDateEl.value=now.toISOString().split('T')[0];
+  const spDateEl=$('struct-pay-date');if(spDateEl)spDateEl.value=now.toISOString().split('T')[0];
+  const cycMonthEl=$('cyc-start-month');if(cycMonthEl)cycMonthEl.innerHTML=mH;
+  const cycYearEl=$('cyc-start-year');if(cycYearEl)cycYearEl.innerHTML=yH;
+  populateCycleSelects();
 }
+
+// ── CYCLES (מחזורי לימוד) ──────────────────────────────────
+function getCycleFor(y,m){
+  const key=y*12+m;
+  const cycles=(D.settings.cycles||[]).filter(c=>(c.startYear*12+c.startMonth)<=key);
+  if(!cycles.length)return null;
+  return cycles.reduce((a,b)=>(a.startYear*12+a.startMonth)>(b.startYear*12+b.startMonth)?a:b);
+}
+function getEffectiveSettingsFor(y,m){
+  const cyc=getCycleFor(y,m);
+  return{
+    students:(cyc&&cyc.students!=null)?cyc.students:D.settings.students,
+    rate:(cyc&&cyc.rate!=null)?cyc.rate:D.settings.tuition,
+    target:(cyc&&cyc.target!=null)?cyc.target:(D.settings.target||22000),
+    cycleName:cyc?cyc.name:null
+  };
+}
+function populateCycleSelects(){
+  const cycles=(D.settings.cycles||[]).slice().sort((a,b)=>(a.startYear*12+a.startMonth)-(b.startYear*12+b.startMonth));
+  const opts='<option value="">אוטומטי (לפי חודש)</option>'+cycles.map(c=>`<option value="${c.name}">${c.name}</option>`).join('');
+  const filterOpts='<option value="">הכל</option>'+cycles.map(c=>`<option value="${c.name}">${c.name}</option>`).join('');
+  ['inc-cycle','exp-cycle'].forEach(id=>{const el=$(id);if(el){const v=el.value;el.innerHTML=opts;if(v)el.value=v;}});
+  ['inc-filter-cycle','exp-filter-cycle'].forEach(id=>{const el=$(id);if(el){const v=el.value;el.innerHTML=filterOpts;if(v)el.value=v;}});
+}
+function renderCyclesList(){
+  const cycles=(D.settings.cycles||[]).slice().sort((a,b)=>(a.startYear*12+a.startMonth)-(b.startYear*12+b.startMonth));
+  const el=$('cycles-list');if(!el)return;
+  if(!cycles.length){el.innerHTML='<div class="empty-state">אין מחזורים מוגדרים — כל החודשים משתמשים בברירת המחדל למעלה</div>';return;}
+  el.innerHTML=`<table><thead><tr><th>שם</th><th>מתחיל</th><th>תלמידים</th><th>לתלמיד</th><th>יעד</th><th></th></tr></thead><tbody>
+  ${cycles.map(c=>`<tr>
+    <td style="font-weight:600">${c.name}</td>
+    <td class="text-muted">${HEB[c.startMonth-1]} ${c.startYear}</td>
+    <td><input type="number" min="0" value="${c.students!=null?c.students:''}" style="width:75px" id="cyc-e-students-${c.id}"></td>
+    <td><input type="number" min="0" value="${c.rate!=null?c.rate:''}" style="width:75px" id="cyc-e-rate-${c.id}"></td>
+    <td><input type="number" min="0" value="${c.target!=null?c.target:''}" style="width:85px" id="cyc-e-target-${c.id}"></td>
+    <td>
+      <div style="display:flex;gap:4px;">
+        <button class="btn btn-ghost btn-sm" onclick="saveCycleNumbers(${c.id})">💾</button>
+        <button class="btn btn-ghost btn-sm" onclick="deleteCycle(${c.id})">🗑️</button>
+      </div>
+    </td>
+  </tr>`).join('')}
+  </tbody></table>`;
+}
+window.addCycle=async function(){
+  const name=$('cyc-name').value.trim();
+  if(!name){toast('הכנס שם למחזור','error');return;}
+  const id=Date.now();
+  const item={id,name,startMonth:parseInt($('cyc-start-month').value),startYear:parseInt($('cyc-start-year').value),
+    students:parseFloat($('cyc-students').value)||null,rate:parseFloat($('cyc-rate').value)||null,target:parseFloat($('cyc-target').value)||null};
+  if(!D.settings.cycles)D.settings.cycles=[];
+  D.settings.cycles.push(item);
+  await fbSet('tt/settings',D.settings);
+  $('cyc-name').value='';$('cyc-students').value='';$('cyc-rate').value='';$('cyc-target').value='';
+  renderCyclesList();populateCycleSelects();toast('מחזור נוסף ✓');
+};
+window.saveCycleNumbers=async function(id){
+  const c=(D.settings.cycles||[]).find(x=>x.id===id);if(!c)return;
+  c.students=parseFloat($('cyc-e-students-'+id).value)||null;
+  c.rate=parseFloat($('cyc-e-rate-'+id).value)||null;
+  c.target=parseFloat($('cyc-e-target-'+id).value)||null;
+  await fbSet('tt/settings',D.settings);
+  toast('נשמר ✓');refreshCurrent();
+};
+window.deleteCycle=async function(id){
+  confirmAction('מחיקת מחזור','האם למחוק את המחזור? (רשומות שכבר תויגו בשמו ישארו עם השם הישן)',async()=>{
+    D.settings.cycles=(D.settings.cycles||[]).filter(c=>c.id!==id);
+    await fbSet('tt/settings',D.settings);
+    renderCyclesList();populateCycleSelects();toast('נמחק');
+  });
+};
+
 
 // ── SETTINGS ─────────────────────────────────────────────
 function loadSettings(){
@@ -867,6 +1045,7 @@ function loadSettings(){
   const qp=$('qa-payer');if(qp){qp.options[0].text=s.name1||'מלכיאל';qp.options[1].text=s.name2||'השותף';}
   const um=$('upd-nistanim-month');if(um)um.value=11;
   const uy=$('upd-nistanim-year');if(uy)uy.value=2025;
+  renderCyclesList();populateCycleSelects();
 }
 window.saveSetting=async function(key){
   const map={students:'set-students',tuition:'set-tuition',muni:'set-muni',target:'set-target',
@@ -1020,9 +1199,12 @@ window.addNistanimHistory=async function(){
 
 window.incTypeChange=function(){
   const t=$('inc-type').value;
+  const y=parseInt($('inc-year').value)||new Date().getFullYear(),m=parseInt($('inc-month').value)||(new Date().getMonth()+1);
+  const eff=getEffectiveSettingsFor(y,m);
+  const cycEl=$('inc-cycle');if(cycEl&&!cycEl.dataset.userSet)cycEl.value=eff.cycleName||'';
   $('inc-students-wrap').style.display=(t==='tuition'||t==='nistanim')?'':'none';
   $('inc-rate-wrap').style.display=(t==='tuition'||t==='nistanim')?'':'none';
-  if(t==='tuition'){$('inc-students').value=D.settings.students;$('inc-rate').value=D.settings.tuition;calcTuition();}
+  if(t==='tuition'){$('inc-students').value=eff.students;$('inc-rate').value=eff.rate;calcTuition();}
   else if(t==='nistanim'){$('inc-students').value=D.settings.nistanim_students||49;$('inc-rate').value=D.settings.nistanim_rate||150;calcTuition();}
   else if(t==='municipality'){$('inc-amount').value=D.settings.muni||'';}
   else{$('inc-amount').value='';}
@@ -1035,7 +1217,7 @@ window.addIncome=async function(){
   if(incHalf==='full')amount=amount/2;
   const id=Date.now();
   const item={id,month:parseInt($('inc-month').value),year:parseInt($('inc-year').value),
-    type:$('inc-type').value,amount,note:$('inc-note').value.trim(),
+    type:$('inc-type').value,amount,note:$('inc-note').value.trim(),cycle:$('inc-cycle').value||null,
     students:parseInt($('inc-students').value)||null,rate:parseFloat($('inc-rate').value)||null};
   D.incomes.push(item);await fbSet('tt/incomes/'+id,item);
   $('inc-note').value='';incTypeChange();renderIncomes();toast('הכנסה נוספה ✓ — ₪'+fmt(amount));
@@ -1079,7 +1261,9 @@ window.saveEditIncome=async function(){
 function renderIncomes(){
   const m=parseInt($('inc-filter-month').value),y=parseInt($('inc-filter-year').value);
   const search=($('inc-search').value||'').toLowerCase();
+  const cyc=$('inc-filter-cycle')?$('inc-filter-cycle').value:'';
   let items=D.incomes.filter(i=>i.month===m&&i.year===y);
+  if(cyc)items=items.filter(i=>(i.cycle||'')===cyc);
   if(search)items=items.filter(i=>(i.note||'').toLowerCase().includes(search)||(i.type||'').toLowerCase().includes(search));
   items.sort((a,b)=>b.id-a.id);
   const el=$('income-table');
@@ -1090,6 +1274,7 @@ function renderIncomes(){
     <th>סוג</th>
     <th class="col-hide-mobile">פירוט</th>
     <th>סכום</th>
+    <th class="col-hide-mobile">מחזור</th>
     <th class="col-hide-mobile">הערה</th>
     <th></th>
   </tr></thead><tbody>
@@ -1097,6 +1282,7 @@ function renderIncomes(){
     <td><span class="badge ${tb[i.type]}">${tl[i.type]}</span>${i.isLoan?' <span class="badge badge-purple">🏦 הלוואה</span>':''}</td>
     <td class="col-hide-mobile text-muted">${(i.type==='tuition'||i.type==='nistanim')&&i.students?`${i.students}×₪${i.rate}`:'-'}</td>
     <td class="text-green" style="font-weight:700">₪${fmt(i.amount)}</td>
+    <td class="col-hide-mobile text-muted">${i.cycle||'-'}</td>
     <td class="col-hide-mobile text-muted">${i.note||'-'}</td>
     <td>
       <div style="display:flex;gap:4px;">
@@ -1108,7 +1294,7 @@ function renderIncomes(){
   </tbody><tfoot><tr>
     <td colspan="2" style="font-weight:600;padding:10px 11px;">סה"כ</td>
     <td style="font-weight:800;color:var(--green);font-size:14px;padding:10px 11px;">₪${fmt(items.reduce((s,i)=>s+i.amount,0))}</td>
-    <td colspan="2"></td>
+    <td colspan="3"></td>
   </tr></tfoot></table>`;
 }
 
@@ -1117,6 +1303,11 @@ window.onExpPayerChange=function(){
   const p=$('exp-payer').value;
   const halfWrap=$('exp-full-btn')?.closest('.half-full');
   if(halfWrap)halfWrap.style.opacity=p==='me-both'?'0.4':'1';
+};
+window.expDateChange=function(){
+  const y=parseInt($('exp-year').value)||new Date().getFullYear(),m=parseInt($('exp-month').value)||(new Date().getMonth()+1);
+  const eff=getEffectiveSettingsFor(y,m);
+  const cycEl=$('exp-cycle');if(cycEl&&!cycEl.dataset.userSet)cycEl.value=eff.cycleName||'';
 };
 window.onQAPayerChange=function(){
   const p=$('qa-payer').value;
@@ -1132,7 +1323,7 @@ window.addExpense=async function(){
   if(expHalf==='full')amount=amount/2;
   const id=Date.now();
   const item={id,month:parseInt($('exp-month').value),year:parseInt($('exp-year').value),
-    desc,amount,payer,cat:$('exp-cat').value,note:$('exp-note').value.trim()};
+    desc,amount,payer,cat:$('exp-cat').value,note:$('exp-note').value.trim(),cycle:$('exp-cycle').value||null};
   D.expenses.push(item);await fbSet('tt/expenses/'+id,item);
   $('exp-desc').value='';$('exp-amount').value='';$('exp-note').value='';
   renderExpenses();toast('הוצאה נוספה ✓ — ₪'+fmt(amount));
@@ -1193,7 +1384,9 @@ function renderExpenses(){
   const m=parseInt($('exp-filter-month').value),y=parseInt($('exp-filter-year').value);
   const search=($('exp-search').value||'').toLowerCase();
   const n1=D.settings.name1||'מלכיאל',n2=D.settings.name2||'השותף';
+  const cyc=$('exp-filter-cycle')?$('exp-filter-cycle').value:'';
   let items=D.expenses.filter(e=>e.month===m&&e.year===y);
+  if(cyc)items=items.filter(e=>(e.cycle||'')===cyc);
   if(search)items=items.filter(e=>(e.desc||'').toLowerCase().includes(search)||(e.note||'').toLowerCase().includes(search));
   items.sort((a,b)=>b.id-a.id);
   const el=$('expense-table');
@@ -1205,6 +1398,7 @@ function renderExpenses(){
     <th>תיאור</th>
     <th class="col-hide-mobile">שילם</th>
     <th>סכום</th>
+    <th class="col-hide-mobile">מחזור</th>
     <th class="col-hide-mobile">הערה</th>
     <th></th>
   </tr></thead><tbody>
@@ -1216,6 +1410,7 @@ function renderExpenses(){
     </td>
     <td class="col-hide-mobile">${payerBadge(e.payer,n1,n2)}</td>
     <td class="text-red" style="font-weight:700">₪${fmt(e.amount)}</td>
+    <td class="col-hide-mobile text-muted">${e.cycle||'-'}</td>
     <td class="col-hide-mobile text-muted">${e.note||'-'}</td>
     <td>
       <div style="display:flex;gap:4px;">
@@ -1227,8 +1422,124 @@ function renderExpenses(){
   </tbody><tfoot><tr>
     <td colspan="3" style="font-weight:600;padding:10px 11px;">סה"כ</td>
     <td style="font-weight:800;color:var(--red);font-size:14px;padding:10px 11px;">₪${fmt(items.reduce((s,e)=>s+e.amount,0))}</td>
-    <td colspan="2"></td>
+    <td colspan="3"></td>
   </tr></tfoot></table>`;
+}
+
+// ── STRUCTURE DEBT (חוב מבנה — נפרד לגמרי מהחשבון הרגיל) ──
+let structOffMode='full';
+window.setStructOffMode=function(m){
+  structOffMode=m;
+  $('struct-off-full-btn').className=m==='full'?'active':'';
+  $('struct-off-his-btn').className=m==='his'?'active':'';
+  structOffPreview();
+};
+window.structOffPreview=function(){
+  const amount=parseFloat($('struct-off-amount').value)||0;
+  const credit=structOffMode==='his'?amount:amount/2;
+  const n2=D.settings.name2||'השותף';
+  $('struct-off-preview').textContent=amount?`יקוזז מהחוב של ${n2}: ₪${fmt(credit)}`:'';
+};
+function calcStructureBalance(){
+  const n2=D.settings.name2||'השותף';
+  const sd=D.structureDebt||{initial:0,offsets:[],payments:[]};
+  const totalOffsets=(sd.offsets||[]).reduce((s,o)=>s+(o.alreadyHis?o.amount:o.amount/2),0);
+  const totalPaid=(sd.payments||[]).reduce((s,p)=>s+p.amount,0);
+  const balance=(sd.initial||0)-totalOffsets-totalPaid;
+  return{initial:sd.initial||0,totalOffsets,totalPaid,balance,n2};
+}
+window.saveStructureInitial=async function(){
+  if(!D.structureDebt)D.structureDebt={initial:0,initialNote:'',offsets:[],payments:[]};
+  D.structureDebt.initial=parseFloat($('struct-initial').value)||0;
+  D.structureDebt.initialNote=$('struct-initial-note').value.trim();
+  await fbSet('tt/structureDebt/initial',D.structureDebt.initial);
+  await fbSet('tt/structureDebt/initialNote',D.structureDebt.initialNote);
+  renderStructure();toast('נשמר ✓');
+};
+window.addStructureOffset=async function(){
+  const desc=$('struct-off-desc').value.trim();
+  const amount=parseFloat($('struct-off-amount').value)||0;
+  if(!desc){toast('הכנס תיאור','error');return;}
+  if(!amount){toast('הכנס סכום','error');return;}
+  const id=Date.now();
+  const alreadyHis=structOffMode==='his';
+  const item={id,date:$('struct-off-date').value,desc,amount,alreadyHis,note:$('struct-off-note').value.trim()};
+  if(!D.structureDebt.offsets)D.structureDebt.offsets=[];
+  D.structureDebt.offsets.push(item);
+  await fbSet('tt/structureDebt/offsets/'+id,item);
+  $('struct-off-desc').value='';$('struct-off-amount').value='';$('struct-off-note').value='';
+  $('struct-off-preview').textContent='';
+  renderStructure();toast('נוסף וקוזז ✓ — ₪'+fmt(alreadyHis?amount:amount/2));
+};
+window.deleteStructureOffset=async function(id){
+  id=parseInt(id);
+  confirmAction('מחיקה','האם למחוק רשומה זו?',async()=>{
+    D.structureDebt.offsets=(D.structureDebt.offsets||[]).filter(o=>o.id!==id);
+    await db.ref('tt/structureDebt/offsets/'+id).remove();
+    renderStructure();toast('נמחק');
+  });
+};
+window.addStructureDirectPayment=async function(){
+  const amount=parseFloat($('struct-pay-amount').value)||0;
+  if(!amount){toast('הכנס סכום','error');return;}
+  const id=Date.now();
+  const item={id,date:$('struct-pay-date').value,amount,note:$('struct-pay-note').value.trim()};
+  if(!D.structureDebt.payments)D.structureDebt.payments=[];
+  D.structureDebt.payments.push(item);
+  await fbSet('tt/structureDebt/payments/'+id,item);
+  $('struct-pay-amount').value='';$('struct-pay-note').value='';
+  renderStructure();toast('תשלום נרשם ✓');
+};
+window.deleteStructureDirectPayment=async function(id){
+  id=parseInt(id);
+  confirmAction('מחיקה','האם למחוק תשלום זה?',async()=>{
+    D.structureDebt.payments=(D.structureDebt.payments||[]).filter(p=>p.id!==id);
+    await db.ref('tt/structureDebt/payments/'+id).remove();
+    renderStructure();toast('נמחק');
+  });
+};
+function renderStructure(){
+  const sd=D.structureDebt||{initial:0,initialNote:'',offsets:[],payments:[]};
+  $('struct-initial').value=sd.initial||'';
+  $('struct-initial-note').value=sd.initialNote||'';
+  const{initial,totalOffsets,totalPaid,balance,n2}=calcStructureBalance();
+  const n1=D.settings.name1||'מלכיאל';
+  const balColor=balance>0?'red':balance<0?'green':'blue';
+  const balMsg=balance>0?`${n1} חייב ל${n2}`:balance<0?`${n2} חייב ל${n1}`:'מאוזן';
+  $('structure-summary').innerHTML=`
+    <div class="cards" style="margin-bottom:14px;">
+      <div class="card blue"><div class="label">חוב פתיחה</div><div class="val">₪${fmt(initial)}</div></div>
+      <div class="card green"><div class="label">קוזז מהוצאות ששילמתי עבורו</div><div class="val">₪${fmt(totalOffsets)}</div></div>
+      <div class="card green"><div class="label">שולם ישירות</div><div class="val">₪${fmt(totalPaid)}</div></div>
+      <div class="card ${balColor}"><div class="label">יתרה נוכחית</div><div class="val">₪${fmt(Math.abs(balance))}</div><div class="sub-val">${balMsg}</div></div>
+    </div>
+    <div class="alert ${balance>0?'alert-warning':balance<0?'alert-success':'alert-info'}" style="font-size:14px;">
+      ${balance>0?`⚠️ <strong>${n1} חייב ל${n2}: ₪${fmt(balance)}</strong>`
+        :balance<0?`✅ <strong>${n2} חייב ל${n1}: ₪${fmt(Math.abs(balance))}</strong>`
+        :`✅ <strong>מאוזן לגמרי</strong>`}
+    </div>`;
+
+  const rows=[
+    ...(sd.offsets||[]).map(o=>({...o,kind:'offset'})),
+    ...(sd.payments||[]).map(p=>({...p,kind:'payment',desc:p.desc||'תשלום ישיר'}))
+  ].sort((a,b)=>b.id-a.id);
+  const hEl=$('structure-history');
+  if(!rows.length){hEl.innerHTML='<div class="empty-state">אין רשומות עדיין</div>';return;}
+  hEl.innerHTML=`<table><thead><tr><th>תאריך</th><th>תיאור</th><th>סוג</th><th>סכום</th><th>קוזז מהחוב</th><th class="col-hide-mobile">הערה</th><th></th></tr></thead><tbody>
+  ${rows.map(r=>{
+    const offsetAmt=r.kind==='offset'?(r.alreadyHis?r.amount:r.amount/2):r.amount;
+    const kindLabel=r.kind==='offset'?(r.alreadyHis?'הוצאה — כבר חלקו':'הוצאה משותפת (חצי)'):'תשלום ישיר';
+    return `<tr>
+      <td class="text-muted">${r.date||'-'}</td>
+      <td>${r.desc}</td>
+      <td><span class="badge ${r.kind==='offset'?'badge-blue':'badge-green'}">${kindLabel}</span></td>
+      <td>₪${fmt(r.amount)}</td>
+      <td class="text-green" style="font-weight:700">−₪${fmt(offsetAmt)}</td>
+      <td class="col-hide-mobile text-muted">${r.note||'-'}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="${r.kind==='offset'?'deleteStructureOffset':'deleteStructureDirectPayment'}(${r.id})">🗑️</button></td>
+    </tr>`;
+  }).join('')}
+  </tbody></table>`;
 }
 
 // ── DEBTS (חדש — חישוב אוטומטי) ─────────────────────────
@@ -1551,7 +1862,7 @@ function renderDashboard(){
   const iPaid=active.filter(x=>x.type==='i_paid_for_partner').reduce((s,x)=>s+x.amount,0);
   const netDebt=pPaid-iPaid;
   const myActual=half-netDebt;
-  const target=D.settings.target||22000;
+  const target=getEffectiveSettingsFor(y,m).target;
   const tuitionInc=inc.filter(i=>i.type==='tuition').reduce((s,i)=>s+i.amount,0);
   const autoCompleteInc=inc.filter(i=>i.autoComplete).reduce((s,i)=>s+i.amount,0);
   const nextM=m===12?1:m+1, nextY=m===12?y+1:y;
@@ -1691,7 +2002,6 @@ function renderDashboard(){
 
 // ── KUPA BALANCE ──────────────────────────────────────────
 function renderKupa(){
-  const target=D.settings.target||21600;
 
   // בנה רשימת כל החודשים שיש בהם נתונים, ממוינת
   const allKeys=new Set();
@@ -1713,9 +2023,10 @@ function renderKupa(){
     const kupaExp= D.expenses.filter(e=>e.month===m&&e.year===y&&(e.payer==='partner'||e.payer==='tuition')).reduce((s,e)=>s+e.amount,0);
     const profit = Math.max(0,inc-kupaExp);
     const deficit= Math.max(0,kupaExp-inc);
+    const target=getEffectiveSettingsFor(y,m).target;
     const vsTarget= isSchoolMonth?tuition-target:null;
     cumBalance  += (inc-kupaExp);
-    return{key,y,m,isSchoolMonth,label:`${HEB[m-1]} ${y}`,inc,tuition,kupaExp,profit,deficit,vsTarget,cumBalance};
+    return{key,y,m,isSchoolMonth,label:`${HEB[m-1]} ${y}`,inc,tuition,kupaExp,profit,deficit,vsTarget,cumBalance,target};
   });
 
   // כרטיסי סיכום
@@ -1725,7 +2036,7 @@ function renderKupa(){
   const totProfit=rows.reduce((s,r)=>s+r.profit,0);
   const totDeficit=rows.reduce((s,r)=>s+r.deficit,0);
   const schoolMonths=rows.filter(r=>r.isSchoolMonth).length;
-  const expectedTotal=schoolMonths*target;
+  const expectedTotal=rows.filter(r=>r.isSchoolMonth).reduce((s,r)=>s+r.target,0);
 
   $('kupa-cards').innerHTML=`
     <div class="card green">
@@ -1754,7 +2065,7 @@ function renderKupa(){
     <th>חודש</th>
     <th>הכנסות</th>
     <th>שכ"ל</th>
-    <th>יעד ₪${fmt(target)}</th>
+    <th>יעד</th>
     <th>פער מיעד</th>
     <th>הוצ' קופה</th>
     <th>רווח/גירעון</th>
@@ -1764,7 +2075,7 @@ function renderKupa(){
     <td style="font-weight:600;white-space:nowrap">${r.label}</td>
     <td class="text-green">₪${fmt(r.inc)}</td>
     <td class="text-green">₪${fmt(r.tuition)}</td>
-    <td class="text-muted">₪${fmt(target)}</td>
+    <td class="text-muted">₪${fmt(r.target)}</td>
     <td class="${r.vsTarget===null?'text-muted':r.vsTarget>=0?'text-green':'text-red'}" style="font-weight:700">${r.vsTarget===null?'—':r.vsTarget>=0?'+₪'+fmt(r.vsTarget):'-₪'+fmt(Math.abs(r.vsTarget))}</td>
     <td class="text-red">₪${fmt(r.kupaExp)}</td>
     <td class="${r.profit>0?'text-green':r.deficit>0?'text-red':'text-muted'}" style="font-weight:700">${r.profit>0?'+₪'+fmt(r.profit):r.deficit>0?'−₪'+fmt(r.deficit):'₪0'}</td>
@@ -1822,7 +2133,6 @@ function buildYearlyRange(){
 function renderYearly(){
   const {range,fromM,fromY,toM,toY}=buildYearlyRange();
   const n1=D.settings.name1||'מלכיאל';
-  const target=D.settings.target||22000;
   const fromDateVal=$('yearly-from-date').value,toDateVal=$('yearly-to-date').value;
   const fmtD=v=>v?new Date(v).toLocaleDateString('he-IL'):'';
   let totalInc=0,totalExp=0,totalTuitionInc=0;
@@ -1831,12 +2141,14 @@ function renderYearly(){
     const tuitionInc=D.incomes.filter(i=>i.month===m&&i.year===y&&i.type==='tuition').reduce((s,i)=>s+i.amount,0);
     const kupaExp=D.expenses.filter(e=>e.month===m&&e.year===y&&(e.payer==='partner'||e.payer==='tuition')).reduce((s,e)=>s+e.amount,0);
     const profit=inc-kupaExp;
+    const target=getEffectiveSettingsFor(y,m).target;
     totalInc+=inc;totalExp+=kupaExp;totalTuitionInc+=tuitionInc;
-    return{mName,inc,tuitionInc,exp:kupaExp,profit};
+    return{mName,inc,tuitionInc,exp:kupaExp,profit,target};
   });
   const totalProfit=totalInc-totalExp;
   const mc=range.length;
-  const totalTargetDiff=totalTuitionInc-(target*mc);
+  const totalTargetSum=rows.reduce((s,r)=>s+r.target,0);
+  const totalTargetDiff=totalTuitionInc-totalTargetSum;
   const rangeLabel=`${HEB[fromM-1]} ${fromY} – ${HEB[toM-1]} ${toY}`;
   const dateRangeLabel=`${fmtD(fromDateVal)} – ${fmtD(toDateVal)}`;
   const profitColor=totalProfit>=0?'var(--green)':'var(--red)';
@@ -1876,7 +2188,7 @@ function renderYearly(){
     <div class="card red"><div class="label">סה"כ הוצאות</div><div class="val">₪${fmt(totalExp)}</div></div>
     <div class="card ${totalProfit>=0?'green':'red'}"><div class="label">${totalProfit>=0?'רווח סה"כ':'הפסד סה"כ'}</div><div class="val">${totalProfit<0?'−':''}₪${fmt(Math.abs(totalProfit))}</div></div>
     <div class="card ${totalProfit>=0?'yellow':'red'}"><div class="label">חלקך (50%)</div><div class="val">${totalProfit<0?'−':''}₪${fmt(Math.abs(totalProfit/2))}</div></div>
-    <div class="card ${totalTargetDiff>=0?'green':'red'}"><div class="label">${totalTargetDiff>=0?'עודף':'חוסר'} שכ"ל</div><div class="val">${totalTargetDiff>=0?'+':''}₪${fmt(totalTargetDiff)}</div><div class="sub-val">יעד: ₪${fmt(target*mc)}</div></div>`;
+    <div class="card ${totalTargetDiff>=0?'green':'red'}"><div class="label">${totalTargetDiff>=0?'עודף':'חוסר'} שכ"ל</div><div class="val">${totalTargetDiff>=0?'+':''}₪${fmt(totalTargetDiff)}</div><div class="sub-val">יעד: ₪${fmt(totalTargetSum)}</div></div>`;
 
   $('yearly-table').innerHTML=`<div class="section">
     <div class="section-header" style="flex-direction:column;align-items:flex-start;gap:2px;">
@@ -1886,12 +2198,12 @@ function renderYearly(){
     <div style="padding:0;">
       <table><thead><tr><th>חודש</th><th>הכנסות</th><th>שכ"ל בפועל</th><th>יעד</th><th>פער</th><th>הוצאות</th><th>רווח/הפסד</th><th>חלקך</th></tr></thead><tbody>
       ${rows.map(r=>{
-        const diff=r.tuitionInc-target;
+        const diff=r.tuitionInc-r.target;
         return `<tr>
           <td style="font-weight:600;white-space:nowrap">${r.mName}</td>
           <td class="text-green">₪${fmt(r.inc)}</td>
           <td>₪${fmt(r.tuitionInc)}</td>
-          <td class="text-muted">₪${fmt(target)}</td>
+          <td class="text-muted">₪${fmt(r.target)}</td>
           <td style="font-weight:700;color:${diff>=0?'var(--green)':'var(--red)'};">${diff>=0?'+':''}₪${fmt(diff)}</td>
           <td class="text-red">₪${fmt(r.exp)}</td>
           <td class="${r.profit>=0?'text-green':'text-red'}" style="font-weight:700">${r.profit<0?'−':''}₪${fmt(Math.abs(r.profit))}</td>
@@ -1903,7 +2215,7 @@ function renderYearly(){
           <td>סה"כ</td>
           <td class="text-green" style="font-size:13px;">₪${fmt(totalInc)}</td>
           <td style="font-size:13px;">₪${fmt(totalTuitionInc)}</td>
-          <td class="text-muted" style="font-size:13px;">₪${fmt(target*mc)}</td>
+          <td class="text-muted" style="font-size:13px;">₪${fmt(totalTargetSum)}</td>
           <td style="font-weight:800;color:${totalTargetDiff>=0?'var(--green)':'var(--red)'};">${totalTargetDiff>=0?'+':''}₪${fmt(totalTargetDiff)}</td>
           <td class="text-red" style="font-size:13px;">₪${fmt(totalExp)}</td>
           <td class="${totalProfit>=0?'text-green':'text-red'}" style="font-size:13px;">${totalProfit<0?'−':''}₪${fmt(Math.abs(totalProfit))}</td>
@@ -1991,8 +2303,9 @@ window.showPage=function(id,btn){
   else if(id==='yearly')renderYearly();
   else if(id==='kupa')renderKupa();
   else if(id==='settings')loadSettings();
+  else if(id==='structure')renderStructure();
   // hide FAB on settings
-  $('fab-btn').style.display=id==='settings'?'none':'flex';
+  $('fab-btn').style.display=(id==='settings'||id==='structure')?'none':'flex';
 };
 
 // ── EXPORT PDF ────────────────────────────────────────────
@@ -2044,18 +2357,19 @@ window.exportYearlyPDF=function(){
   const fromDateVal=$('yearly-from-date').value,toDateVal=$('yearly-to-date').value;
   const fmtDate=v=>v?new Date(v).toLocaleDateString('he-IL'):'';
   const n1=D.settings.name1||'מלכיאל';
-  const target=D.settings.target||22000;
   let totalInc=0,totalExp=0,totalProfit=0,totalTuitionInc=0;
   const rows=range.map(({m,y,mName})=>{
     const inc=D.incomes.filter(i=>i.month===m&&i.year===y&&i.type!=='nistanim').reduce((s,i)=>s+i.amount,0);
     const tuitionInc=D.incomes.filter(i=>i.month===m&&i.year===y&&i.type==='tuition').reduce((s,i)=>s+i.amount,0);
     const kupaExp=D.expenses.filter(e=>e.month===m&&e.year===y&&(e.payer==='partner'||e.payer==='tuition')).reduce((s,e)=>s+e.amount,0);
     const profit=Math.max(0,inc-kupaExp);
+    const target=getEffectiveSettingsFor(y,m).target;
     totalInc+=inc;totalExp+=kupaExp;totalProfit+=profit;totalTuitionInc+=tuitionInc;
-    return{mName,inc,tuitionInc,exp:kupaExp,profit};
+    return{mName,inc,tuitionInc,exp:kupaExp,profit,target};
   });
   const mc=range.length;
-  const totalTargetDiff=totalTuitionInc-(target*mc);
+  const totalTargetSum=rows.reduce((s,r)=>s+r.target,0);
+  const totalTargetDiff=totalTuitionInc-totalTargetSum;
   const rangeLabel=`${fmtDate(fromDateVal)} – ${fmtDate(toDateVal)}`;
   const profitCol=totalProfit>=0?'#15803d':'#dc2626';
   const targetCol=totalTargetDiff>=0?'#15803d':'#dc2626';
@@ -2107,16 +2421,16 @@ window.exportYearlyPDF=function(){
   <div class="sec-title">📊 פירוט חודשי</div>
   <table>
     <thead><tr>
-      <th>חודש</th><th>הכנסות</th><th>שכ"ל בפועל</th><th>יעד ₪${fmt(target)}</th><th>פער</th><th>הוצאות</th><th>רווח</th><th>חלק ${n1}</th>
+      <th>חודש</th><th>הכנסות</th><th>שכ"ל בפועל</th><th>יעד</th><th>פער</th><th>הוצאות</th><th>רווח</th><th>חלק ${n1}</th>
     </tr></thead>
     <tbody>
     ${rows.map(r=>{
-      const diff=r.tuitionInc-target;
+      const diff=r.tuitionInc-r.target;
       return `<tr>
         <td style="font-weight:700;white-space:nowrap">${r.mName}</td>
         <td class="g">₪${fmt(r.inc)}</td>
         <td>₪${fmt(r.tuitionInc)}</td>
-        <td class="m">₪${fmt(target)}</td>
+        <td class="m">₪${fmt(r.target)}</td>
         <td style="font-weight:700;color:${diff>=0?'#15803d':'#dc2626'}">${diff>=0?'+':''}₪${fmt(diff)}</td>
         <td class="r">₪${fmt(r.exp)}</td>
         <td style="font-weight:700;color:${r.profit>0?'#15803d':'#dc2626'}">₪${fmt(r.profit)}</td>
@@ -2128,7 +2442,7 @@ window.exportYearlyPDF=function(){
       <td>סה"כ</td>
       <td>₪${fmt(totalInc)}</td>
       <td>₪${fmt(totalTuitionInc)}</td>
-      <td>₪${fmt(target*mc)}</td>
+      <td>₪${fmt(totalTargetSum)}</td>
       <td>${totalTargetDiff>=0?'+':''}₪${fmt(totalTargetDiff)}</td>
       <td>₪${fmt(totalExp)}</td>
       <td>₪${fmt(totalProfit)}</td>
