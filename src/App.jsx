@@ -7,6 +7,7 @@ import { fmt, getDayType } from "./helpers.js";
 import { smallBtn } from "./styles.js";
 import MainTab from "./components/MainTab.jsx";
 import AvrechimTab from "./components/AvrechimTab.jsx";
+import ExcelImportTab from "./components/ExcelImportTab.jsx";
 import AttendanceTab from "./components/AttendanceTab.jsx";
 import SummaryTab from "./components/SummaryTab.jsx";
 import BankTab from "./components/BankTab.jsx";
@@ -287,6 +288,7 @@ export default function App(){
           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
             <button onClick={()=>setTab("main")}       style={tabS("main")}>🏠 ראשי</button>
             <button onClick={()=>setTab("avrechim")}   style={tabS("avrechim")}>👨‍🎓 אברכים</button>
+            <button onClick={()=>setTab("excel")}      style={tabS("excel")}>📥 ייבוא Excel</button>
             <button onClick={()=>setTab("attendance")} style={tabS("attendance")}>📋 נוכחות</button>
             <button onClick={()=>setTab("summary")}    style={tabS("summary")}>📂 סיכומים</button>
             <button onClick={()=>setTab("bank")}       style={tabS("bank")}>🏦 בנק</button>
@@ -314,6 +316,7 @@ export default function App(){
       <main style={{maxWidth:720,margin:"0 auto",padding:"12px 14px"}}>
         {tab==="main"       && <MainTab selKey={selKey} selYear={selYear} selMonth={selMonth} baseBalance={baseBalance} setBaseBalance={setBaseBalance} liveBalance={liveBalance} curTotals={curTotals} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} syncing={syncing} allDonorNames={allDonorNames} donorHistory={donorHistory} avrechim={avrechim} />}
         {tab==="avrechim"   && <AvrechimTab avrechim={avrechim} setAvrechim={setAvrechim} selKey={selKey} prevKey={prevKey} getAV={getAV} setAvMonthField={setAvMonthField} calcAvrechMonth={calcAvrechMonth} totalOwed={totalOwed} />}
+        {tab==="excel"      && <ExcelImportTab avrechim={avrechim} onImport={(updated)=>setAvrechim(updated)} />}
         {tab==="attendance" && <AttendanceTab avrechim={avrechim} selKey={selKey} selYear={selYear} selMonth={selMonth} attendance={attendance} setAttendanceDay={setAttendanceDay} fillMonthBatch={fillMonthBatch} customVacations={customVacations} setCustomVacation={setCustomVacation} removeCustomVacation={removeCustomVacation} beinHazmanims={beinHazmanims} addBeinHazmanim={addBeinHazmanim} removeBeinHazmanim={removeBeinHazmanim} updateBeinHazmanim={updateBeinHazmanim} hiddenHols={hiddenHols} toggleHolidayHidden={toggleHolidayHidden} />}
         {tab==="summary"    && <SummaryTab avrechim={avrechim} allMonthKeys={allMonthKeys()} calcMonthTotals={calcMonthTotals} calcAvrechMonth={calcAvrechMonth} getPrevMonthKey={getPrevMonthKey} baseBalance={baseBalance} liveBalance={liveBalance} selKey={selKey} allMonths={allMonths} />}
         {tab==="bank"       && <BankTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} />}
