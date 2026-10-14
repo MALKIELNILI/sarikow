@@ -7,6 +7,7 @@ import { fmt, getDayType } from "./helpers.js";
 import { smallBtn } from "./styles.js";
 import MainTab from "./components/MainTab.jsx";
 import AvrechimTab from "./components/AvrechimTab.jsx";
+import ExcelImportTab from "./components/ExcelImportTab.jsx";
 import AttendanceTab from "./components/AttendanceTab.jsx";
 import SummaryTab from "./components/SummaryTab.jsx";
 import BankTab from "./components/BankTab.jsx";
