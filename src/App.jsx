@@ -170,9 +170,10 @@ export default function App(){
       : Number((local.current.supplementSettings||supplementSettings)?.datot||0);
     const externalPerAvrech = autoDatot + autoKeren;
     const totalReceived = externalPerAvrech + suppAmt;
-    const settlementBalance = monthly > 0 ? monthly - totalReceived : 0;
     const actualBankRaw = getAV(monthKey,av.id,"actualBank");
     const actualBank = actualBankRaw!==""?Number(actualBankRaw):null;
+    const bankReceivedAmount = actualBank || 0;
+    const settlementBalance = monthly > 0 ? monthly - totalReceived - bankReceivedAmount : 0;
     const holiday = Number(getAV(monthKey,av.id,"holiday"))||0;
     const depositRounding = Number(getAV(monthKey,av.id,"depositRounding"))||0;
     const totalToBank = effectiveBank + holiday + depositRounding;
