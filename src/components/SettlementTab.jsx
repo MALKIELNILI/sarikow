@@ -169,6 +169,10 @@ export default function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMon
             🟡 אני חייב לאברך ({iOweRows.length})
           </div>
           {iOweRows.map(({av,c,paid})=><ARow key={av.id} av={av} c={c} paid={paid}/>)}
+          <div style={{marginTop:10,paddingTop:10,borderTop:"2px solid #fde68a",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <span style={{fontWeight:700,fontSize:13,color:"#d97706"}}>סה״כ שאני חייב:</span>
+            <span style={{fontWeight:800,fontSize:16,color:"#d97706"}}>{fmt(totalIOwe)} ₪</span>
+          </div>
         </div>
       )}
 
@@ -178,6 +182,10 @@ export default function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMon
             🔴 אברך חייב לי ({theyOweRows.length})
           </div>
           {theyOweRows.map(({av,c,paid})=><ARow key={av.id} av={av} c={c} paid={paid}/>)}
+          <div style={{marginTop:10,paddingTop:10,borderTop:"2px solid #fecaca",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <span style={{fontWeight:700,fontSize:13,color:"#dc2626"}}>סה״כ שחסר להם:</span>
+            <span style={{fontWeight:800,fontSize:16,color:"#dc2626"}}>{fmt(totalOwedMe)} ₪</span>
+          </div>
         </div>
       )}
 
