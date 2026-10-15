@@ -11,7 +11,8 @@ export default function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMon
   const rows = avrechim.filter(a=>a.active).map(av=>({
     av,
     c: calcAvrechMonth(av,selKey,prevKey),
-    paid: getAV(selKey,av.id,"settlementPaid")==="1"
+    paid: getAV(selKey,av.id,"settlementPaid")==="1",
+    bankSent: getAV(selKey,av.id,"settlementBankSent")==="1"
   }));
 
   const iOweRows    = rows.filter(({c})=>c.settlementBalance>0 && c.monthly>0);
@@ -181,7 +182,23 @@ export default function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMon
           <div style={{fontWeight:700,fontSize:14,color:"#dc2626",marginBottom:8}}>
             🔴 אברך חייב לי ({theyOweRows.length})
           </div>
-          {theyOweRows.map(({av,c,paid})=><ARow key={av.id} av={av} c={c} paid={paid}/>)}
+          {theyOweRows.map(({av,c,paid,bankSent})=>(
+            <div key={av.id}>
+              <ARow av={av} c={c} paid={paid}/>
+              <div style={{display:"flex",justifyContent:"flex-end",paddingRight:10,marginBottom:8,gap:8}}>
+                <label style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer",
+                  background:bankSent?"#dbeafe":"#f1f5f9",border:`2px solid ${bankSent?"#0369a1":"#cbd5e1"}`,
+                  borderRadius:7,padding:"4px 10px",fontSize:12,fontWeight:600,
+                  color:bankSent?"#0369a1":"#64748b",transition:"all .2s",userSelect:"none"}}>
+                  <input type="checkbox"
+                    checked={bankSent}
+                    onChange={e=>setAvMonthField(selKey,av.id,"settlementBankSent",e.target.checked?"1":"")}
+                    style={{width:14,height:14,cursor:"pointer",accentColor:"#0369a1"}}/>
+                  {bankSent?"✓ העברה בוצעה":"סמן העברה"}
+                </label>
+              </div>
+            </div>
+          ))}
           <div style={{marginTop:10,paddingTop:10,borderTop:"2px solid #fecaca",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <span style={{fontWeight:700,fontSize:13,color:"#dc2626"}}>סה״כ שחסר להם:</span>
             <span style={{fontWeight:800,fontSize:16,color:"#dc2626"}}>{fmt(totalOwedMe)} ₪</span>
