@@ -164,6 +164,32 @@ export default function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMon
         </div>
       </div>
 
+      {theyOweRows.length>0&&(
+        <div style={{...card,borderRight:"4px solid #dc2626",background:"#fef2f2"}}>
+          <div style={{fontWeight:700,fontSize:14,color:"#dc2626",marginBottom:8}}>🔴 עדיין חסר להם ({theyOweRows.length})</div>
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            {theyOweRows.map(({av,c,bankSent})=>(
+              <div key={av.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 10px",borderRadius:8,background:"#fff",border:"1px solid #fecaca"}}>
+                <div>
+                  <span style={{fontWeight:600,fontSize:13}}>{av.name}</span>
+                  <span style={{fontSize:11,color:"#dc2626",marginRight:8,fontWeight:700}}>{fmt(Math.abs(c.settlementBalance))} ₪</span>
+                </div>
+                <label style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer",
+                  background:bankSent?"#dbeafe":"#f1f5f9",border:`2px solid ${bankSent?"#0369a1":"#cbd5e1"}`,
+                  borderRadius:7,padding:"4px 8px",fontSize:11,fontWeight:600,
+                  color:bankSent?"#0369a1":"#64748b",transition:"all .2s",userSelect:"none"}}>
+                  <input type="checkbox"
+                    checked={bankSent}
+                    onChange={e=>setAvMonthField(selKey,av.id,"settlementBankSent",e.target.checked?"1":"")}
+                    style={{width:14,height:14,cursor:"pointer",accentColor:"#0369a1"}}/>
+                  {bankSent?"✓":"סמן"}
+                </label>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {iOweRows.length>0&&(
         <div style={card}>
           <div style={{fontWeight:700,fontSize:14,color:"#d97706",marginBottom:8}}>
