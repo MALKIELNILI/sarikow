@@ -238,6 +238,8 @@ function fbListen(path,cb){
 function App(){
   const [ready,setReady]         = useState(false);
   const [tab,setTab]             = useState("main");
+  const [tocOpen,setTocOpen]     = useState(false);
+  const mainRef = useRef(null);
   // גובה ה-header נמדד בפועל (לא קבוע) — בטלפון עם מסך צר הטאבים עשויים לגלוש ליותר שורות והגובה משתנה
   const headerRef = useRef(null);
   const [headerHeight,setHeaderHeight] = useState(114);
@@ -605,6 +607,7 @@ function App(){
             <button onClick={()=>setTab("bank")}       style={tabS("bank")}>🏦 בנק</button>
             <button onClick={()=>setTab("settlement")} style={tabS("settlement")}>💰 חשבון</button>
             <button onClick={()=>setTab("ravpinchas")} style={{...tabS("ravpinchas"),background:tab==="ravpinchas"?"#064e3b":"#f8fafc",borderColor:tab==="ravpinchas"?"#064e3b":"#e2e8f0",color:tab==="ravpinchas"?"#fff":"#64748b"}}>📿 הרב פנחס</button>
+            <button onClick={()=>setTocOpen(true)} style={{...tabS("toc"),background:"#fef3c7",borderColor:"#f59e0b",color:"#92400e",fontWeight:700}}>📑 תוכן עניינים</button>
           </div>
         </div>
       </header>
@@ -625,7 +628,7 @@ function App(){
         </div>
       </div>
 
-      <main style={{maxWidth:720,margin:"0 auto",padding:"12px 14px"}}>
+      <main ref={mainRef} style={{maxWidth:720,margin:"0 auto",padding:"12px 14px"}}>
         {tab==="main"       && <MainTab selKey={selKey} selYear={selYear} selMonth={selMonth} baseBalance={baseBalance} setBaseBalance={setBaseBalance} liveBalance={liveBalance} curTotals={curTotals} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} syncing={syncing} allDonorNames={allDonorNames} donorHistory={donorHistory} avrechim={avrechim} />}
         {tab==="avrechim"   && <AvrechimTab avrechim={avrechim} setAvrechim={setAvrechim} selKey={selKey} prevKey={prevKey} selYear={selYear} selMonth={selMonth} getAV={getAV} getMD={getMD} setAvMonthField={setAvMonthField} calcAvrechMonth={calcAvrechMonth} totalOwed={totalOwed} attendance={attendance} customVacations={customVacations} beinHazmanims={beinHazmanims} hiddenHols={hiddenHols} allMonthKeys={allMonthKeys()} getPrevMonthKey={getPrevMonthKey} />}
         {tab==="attendance" && <AttendanceTab avrechim={avrechim} selKey={selKey} selYear={selYear} selMonth={selMonth} attendance={attendance} setAttendanceDay={setAttendanceDay} fillMonthBatch={fillMonthBatch} customVacations={customVacations} setCustomVacation={setCustomVacation} removeCustomVacation={removeCustomVacation} beinHazmanims={beinHazmanims} addBeinHazmanim={addBeinHazmanim} removeBeinHazmanim={removeBeinHazmanim} updateBeinHazmanim={updateBeinHazmanim} hiddenHols={hiddenHols} toggleHolidayHidden={toggleHolidayHidden} />}
@@ -634,6 +637,129 @@ function App(){
         {tab==="settlement" && <SettlementTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} getMD={getMD} setMonthField={setMonthField} allMonthKeys={allMonthKeys()} getPrevMonthKey={getPrevMonthKey} headerHeight={stickyTop} />}
         {tab==="ravpinchas" && <RavPinchasTab rpAvrechim={rpAvrechim} setRpAvrechim={setRpAvrechim} rpMonths={rpMonths} setRpMonthField={setRpMonthField} rpBaseBalance={rpBaseBalance} setRpBaseBalance={setRpBaseBalance} rpContact={rpContact} setRpContact={setRpContact} selKey={selKey} selYear={selYear} selMonth={selMonth} allDonorNames={allDonorNames} donorHistory={donorHistory} syncing={syncing} sarikowLiveBalance={liveBalance} headerHeight={stickyTop} />}
       </main>
+      {tocOpen && <TocPanel onClose={()=>setTocOpen(false)} setTab={setTab} mainRef={mainRef} stickyTop={stickyTop} />}
+    </div>
+  );
+}
+
+// ── תוכן עניינים ────────────────────────────────────────────
+// כל שורה: [מה שמוצג ברשימה, טקסטים לחיפוש הכותרת במסך (null = לראש הלשונית)]
+// הקפיצה מחפשת את הכותרת לפי הטקסט שלה, כך שאין צורך לסמן כל כרטיס בקוד
+const TOC = [
+  {tab:"main", name:"🏠 ראשי", items:[
+    ["🏛️ דתות וקרן התורה",["דתות וקרן התורה"]],
+    ["💰 יתרה חיה מצטברת",["יתרה חיה מצטברת"]],
+    ["💝 תורמים",["💝 תורמים"]],
+    ["📤 נשלח לאברכים",["נשלח לאברכים (מתקזז"]],
+    ["⚖️ התאמה ידנית לקופה",["התאמה ידנית לקופה"]],
+    ["📊 סיכום החודש",["📊 סיכום"]]]},
+  {tab:"avrechim", name:"👨‍🎓 אברכים", items:[
+    ["📋 רשימת אברכים",["רשימת אברכים"]],
+    ["🤫 תענית דיבור (בכרטיס של כל אברך)",["תענית דיבור — 15"]],
+    ["👤 קרן ששילמת אישית",["קרן ששילמת אישית"]]]},
+  {tab:"attendance", name:"📋 נוכחות", items:[
+    ["📋 נוכחות החודש",null]]},
+  {tab:"summary", name:"📂 סיכומים", items:[
+    ["📂 כל החודשים",null],
+    ["🔍 בדיקת התאמה מול סריקוב",["בדיקת התאמה מול סריקוב"]],
+    ["⏳ חודשים שממתינים לדתות/קרן",["חודשים ממתינים להעברת"]]]},
+  {tab:"bank", name:"🏦 בנק", items:[
+    ["🏦 הפקדות בנק",null],
+    ["🤫 תענית דיבור — מזומן",["תענית דיבור — מזומן","כל תענית דיבור שולמה"]]]},
+  {tab:"settlement", name:"💰 חשבון", items:[
+    ["⚖️ כמה אני חייב / חייבים לי",["אני חייב לאברכים"]],
+    ["🔴 עדיין חסר להם",["עדיין חסר להם"]],
+    ["🟡 נשאר להם עודף להעביר",["נשאר להם עודף להעביר"]],
+    ["🔀 העברה מהירה",["העברה מהירה"]],
+    ["📋 היסטוריית העברות",["היסטוריית העברות"]]]},
+  {tab:"ravpinchas", name:"📿 הרב פנחס", items:[
+    ["💝 תורמים",["💝 תורמים"]],
+    ["⚖️ התאמה ידנית לקופה",["התאמה ידנית לקופה"]],
+    ["📊 סיכום כל החודשים",["סיכום כל החודשים"]],
+    ["📨 שליחת דו״ח לרב פנחס",["שליחת דו״ח תנועות"]]]},
+];
+
+function TocPanel({ onClose, setTab, mainRef, stickyTop }){
+  const [q,setQ] = useState("");
+  useEffect(()=>{
+    const onKey = e => { if(e.key==="Escape") onClose(); };
+    window.addEventListener("keydown",onKey);
+    return ()=>window.removeEventListener("keydown",onKey);
+  },[]);
+
+  // האלמנט הראשון בלשונית שהטקסט הישיר שלו מכיל את אחד מהטקסטים
+  const findHeading = keys => {
+    const root = mainRef.current;
+    if(!root) return null;
+    for(const el of root.querySelectorAll("*")){
+      let own = "";
+      el.childNodes.forEach(n=>{ if(n.nodeType===3) own+=n.textContent; });
+      if(own && keys.some(k=>own.includes(k))) return el;
+    }
+    return null;
+  };
+
+  const notice = text => {
+    const d = document.createElement("div");
+    d.textContent = text;
+    Object.assign(d.style,{position:"fixed",bottom:"20px",left:"50%",transform:"translateX(-50%)",background:"#1e293b",color:"#fff",
+      padding:"10px 16px",borderRadius:"10px",fontSize:"14px",zIndex:"2000",boxShadow:"0 4px 12px rgba(0,0,0,.25)",maxWidth:"90vw",textAlign:"center"});
+    document.body.appendChild(d);
+    setTimeout(()=>d.remove(),3000);
+  };
+
+  const go = (tab,keys) => {
+    onClose();
+    setTab(tab);
+    let tries = 0;
+    const tick = () => {
+      const el = keys ? findHeading(keys) : null;
+      if(keys && !el && tries++<20){ setTimeout(tick,50); return; }
+      if(!el){
+        window.scrollTo({top:0,behavior:"smooth"});
+        if(keys) notice("החלק הזה לא מוצג כרגע (אולי אין בו נתונים בחודש הזה)");
+        return;
+      }
+      const target = el.closest("div[style*='border-radius']") || el;
+      // בלשוניות חשבון והרב פנחס יש שורה נוספת שנשארת קבועה למעלה
+      const extra = (tab==="settlement"||tab==="ravpinchas") ? 80 : 12;
+      window.scrollTo({top:target.getBoundingClientRect().top + window.scrollY - stickyTop - extra, behavior:"smooth"});
+      target.style.outline = "3px solid #f59e0b";
+      target.style.outlineOffset = "2px";
+      setTimeout(()=>{ target.style.outline=""; target.style.outlineOffset=""; },1800);
+    };
+    setTimeout(tick,0);
+  };
+
+  const groups = TOC.map(g=>({...g, items:g.items.filter(([label])=>!q.trim() || label.includes(q.trim()) || g.name.includes(q.trim()))}))
+                    .filter(g=>g.items.length);
+
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:1000}}>
+      <div onClick={onClose} style={{position:"absolute",inset:0,background:"rgba(15,23,42,0.45)"}}/>
+      <div style={{position:"absolute",top:0,bottom:0,right:0,width:"min(340px,88vw)",background:"#fff",overflowY:"auto",padding:"14px 16px",boxShadow:"-4px 0 16px rgba(0,0,0,0.15)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{fontWeight:800,fontSize:18,color:"#1e3a5f"}}>📑 תוכן עניינים</div>
+          <button onClick={onClose} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:"#64748b"}}>✕</button>
+        </div>
+        <div style={{fontSize:12,color:"#64748b",marginTop:2}}>לחצו על נושא, והאפליקציה תעבור אליו מיד</div>
+        <input autoFocus value={q} onChange={e=>setQ(e.target.value)} placeholder="🔍 חיפוש, למשל: תורמים"
+          style={{...inp,marginTop:10,fontSize:14}}/>
+        {groups.length===0 && <div style={{...empty,marginTop:12}}>לא נמצא</div>}
+        {groups.map(g=>(
+          <div key={g.tab} style={{marginTop:12}}>
+            <div style={{fontWeight:800,fontSize:14,color:"#1e3a5f",borderBottom:"2px solid #e2e8f0",paddingBottom:4,marginBottom:2}}>{g.name}</div>
+            {g.items.map(([label,keys])=>(
+              <button key={label} onClick={()=>go(g.tab,keys)}
+                style={{display:"block",width:"100%",textAlign:"right",background:"none",border:"none",padding:"9px 8px",borderRadius:8,fontSize:14,cursor:"pointer",color:"#0f172a"}}
+                onMouseEnter={e=>e.currentTarget.style.background="#eff6ff"}
+                onMouseLeave={e=>e.currentTarget.style.background="none"}>
+                {label}
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -682,6 +808,51 @@ function MainTab({ selKey, selYear, selMonth, baseBalance, setBaseBalance, liveB
           </div>
         </div>
       )}
+
+      {/* INCOME — דתות וקרן, למעלה כי ממלאים כל חודש */}
+      <div style={card}>
+        <div style={{fontWeight:700,fontSize:14,marginBottom:10}}>🏛️ דתות וקרן התורה (מתווספות לקופה)</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <div>
+            <IField label="🏛️ הכנסת דתות (₪)" value={getMD(selKey,"datot")}  onChange={v=>setMonthField(selKey,"datot",Number(v)||0)} />
+            {datotCount>0 && (
+              <div style={{display:"flex",alignItems:"center",gap:5,marginTop:4}}>
+                <span style={{fontSize:11,color:"#b45309",whiteSpace:"nowrap"}}>לאברך אחד ({datotCount}):</span>
+                <input style={{...iinp,textAlign:"left"}} type="number" value={perDatot||""} placeholder="0"
+                  onChange={e=>setMonthField(selKey,"datot",Math.round((Number(e.target.value)||0)*datotCount))} />
+              </div>
+            )}
+            <BalanceConfirm draft={getMD(selKey,"datot")} confirmed={getMD(selKey,"datotConfirmed")} prevConfirmed={getMD(selKey,"datotConfirmedPrev",null)}
+              onConfirm={()=>{
+                setMonthField(selKey,"datotConfirmedPrev",Number(getMD(selKey,"datotConfirmed"))||0);
+                setMonthField(selKey,"datotConfirmed",Number(getMD(selKey,"datot"))||0);
+              }}
+              onUndo={()=>{
+                setMonthField(selKey,"datotConfirmed",Number(getMD(selKey,"datotConfirmedPrev"))||0);
+                setMonthField(selKey,"datotConfirmedPrev",null);
+              }} />
+          </div>
+          <div>
+            <IField label="📚 קרן התורה (₪)"   value={getMD(selKey,"keren")}  onChange={v=>setMonthField(selKey,"keren",Number(v)||0)} />
+            {kerenCount>0 && (
+              <div style={{display:"flex",alignItems:"center",gap:5,marginTop:4}}>
+                <span style={{fontSize:11,color:"#059669",whiteSpace:"nowrap"}}>לאברך אחד ({kerenCount}):</span>
+                <input style={{...iinp,textAlign:"left"}} type="number" value={perKeren||""} placeholder="0"
+                  onChange={e=>setMonthField(selKey,"keren",Math.round((Number(e.target.value)||0)*kerenCount))} />
+              </div>
+            )}
+            <BalanceConfirm draft={getMD(selKey,"keren")} confirmed={getMD(selKey,"kerenConfirmed")} prevConfirmed={getMD(selKey,"kerenConfirmedPrev",null)}
+              onConfirm={()=>{
+                setMonthField(selKey,"kerenConfirmedPrev",Number(getMD(selKey,"kerenConfirmed"))||0);
+                setMonthField(selKey,"kerenConfirmed",Number(getMD(selKey,"keren"))||0);
+              }}
+              onUndo={()=>{
+                setMonthField(selKey,"kerenConfirmed",Number(getMD(selKey,"kerenConfirmedPrev"))||0);
+                setMonthField(selKey,"kerenConfirmedPrev",null);
+              }} />
+          </div>
+        </div>
+      </div>
 
       {/* DONORS */}
       <datalist id="donor-names-list">
@@ -732,51 +903,6 @@ function MainTab({ selKey, selYear, selMonth, baseBalance, setBaseBalance, liveB
               </tbody>
             </table>
         }
-      </div>
-
-      {/* INCOME */}
-      <div style={card}>
-        <div style={{fontWeight:700,fontSize:14,marginBottom:10}}>📥 הכנסות נוספות (מתווספות לקופה)</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-          <div>
-            <IField label="🏛️ הכנסת דתות (₪)" value={getMD(selKey,"datot")}  onChange={v=>setMonthField(selKey,"datot",Number(v)||0)} />
-            {datotCount>0 && (
-              <div style={{display:"flex",alignItems:"center",gap:5,marginTop:4}}>
-                <span style={{fontSize:11,color:"#b45309",whiteSpace:"nowrap"}}>לאברך אחד ({datotCount}):</span>
-                <input style={{...iinp,textAlign:"left"}} type="number" value={perDatot||""} placeholder="0"
-                  onChange={e=>setMonthField(selKey,"datot",Math.round((Number(e.target.value)||0)*datotCount))} />
-              </div>
-            )}
-            <BalanceConfirm draft={getMD(selKey,"datot")} confirmed={getMD(selKey,"datotConfirmed")} prevConfirmed={getMD(selKey,"datotConfirmedPrev",null)}
-              onConfirm={()=>{
-                setMonthField(selKey,"datotConfirmedPrev",Number(getMD(selKey,"datotConfirmed"))||0);
-                setMonthField(selKey,"datotConfirmed",Number(getMD(selKey,"datot"))||0);
-              }}
-              onUndo={()=>{
-                setMonthField(selKey,"datotConfirmed",Number(getMD(selKey,"datotConfirmedPrev"))||0);
-                setMonthField(selKey,"datotConfirmedPrev",null);
-              }} />
-          </div>
-          <div>
-            <IField label="📚 קרן התורה (₪)"   value={getMD(selKey,"keren")}  onChange={v=>setMonthField(selKey,"keren",Number(v)||0)} />
-            {kerenCount>0 && (
-              <div style={{display:"flex",alignItems:"center",gap:5,marginTop:4}}>
-                <span style={{fontSize:11,color:"#059669",whiteSpace:"nowrap"}}>לאברך אחד ({kerenCount}):</span>
-                <input style={{...iinp,textAlign:"left"}} type="number" value={perKeren||""} placeholder="0"
-                  onChange={e=>setMonthField(selKey,"keren",Math.round((Number(e.target.value)||0)*kerenCount))} />
-              </div>
-            )}
-            <BalanceConfirm draft={getMD(selKey,"keren")} confirmed={getMD(selKey,"kerenConfirmed")} prevConfirmed={getMD(selKey,"kerenConfirmedPrev",null)}
-              onConfirm={()=>{
-                setMonthField(selKey,"kerenConfirmedPrev",Number(getMD(selKey,"kerenConfirmed"))||0);
-                setMonthField(selKey,"kerenConfirmed",Number(getMD(selKey,"keren"))||0);
-              }}
-              onUndo={()=>{
-                setMonthField(selKey,"kerenConfirmed",Number(getMD(selKey,"kerenConfirmedPrev"))||0);
-                setMonthField(selKey,"kerenConfirmedPrev",null);
-              }} />
-          </div>
-        </div>
       </div>
 
       {/* SENT */}
@@ -3908,12 +4034,26 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
           {missingAvs.length>0 && (
             <div style={{...card,borderRight:"4px solid #dc2626"}}>
               <div style={{fontWeight:700,fontSize:13,color:"#dc2626",marginBottom:6}}>🔴 עדיין חסר להם ({missingAvs.length})</div>
-              {missingAvs.map(({av,amount})=>(
-                <div key={av.id} style={{display:"flex",justifyContent:"space-between",padding:"4px 6px",fontSize:12.5}}>
-                  <span>{av.name}</span>
-                  <b style={{color:"#dc2626"}}>{fmt(amount)} ₪</b>
+              {missingAvs.map(({av,amount})=>{
+                // סימון בלבד — לזכור שכבר העברתי לו בבנק. לא משנה שום חישוב או יתרה
+                const bankSent = getAV(selKey,av.id,"settlementBankSent")==="1";
+                return (
+                <div key={av.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:6,padding:"4px 6px",fontSize:12.5}}>
+                  <span style={{textDecoration:bankSent?"line-through":"none",color:bankSent?"#94a3b8":"inherit"}}>{av.name}</span>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <b style={{color:bankSent?"#94a3b8":"#dc2626"}}>{fmt(amount)} ₪</b>
+                    <label style={{display:"flex",alignItems:"center",gap:3,cursor:"pointer",whiteSpace:"nowrap",
+                      background:bankSent?"#dbeafe":"#f1f5f9",border:`1.5px solid ${bankSent?"#0369a1":"#cbd5e1"}`,
+                      borderRadius:6,padding:"2px 6px",fontSize:11,fontWeight:600,color:bankSent?"#0369a1":"#64748b",userSelect:"none"}}>
+                      <input type="checkbox" checked={bankSent}
+                        onChange={e=>setAvMonthField(selKey,av.id,"settlementBankSent",e.target.checked?"1":"")}
+                        style={{width:13,height:13,margin:0,cursor:"pointer",accentColor:"#0369a1"}}/>
+                      {bankSent?"✓ הועבר":"סמן העברה"}
+                    </label>
+                  </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
