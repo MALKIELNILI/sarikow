@@ -1,4 +1,4 @@
-const CACHE = 'sarikow-v20261028-1950';
+const CACHE = 'sarikow-v20261028-2030';
 const FILES = ['./','./index.html','./manifest.json','./icon.jpg'];
 
 self.addEventListener('install', e => {

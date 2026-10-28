@@ -240,6 +240,9 @@ function App(){
   const [tab,setTab]             = useState("main");
   const [tocOpen,setTocOpen]     = useState(false);
   const mainRef = useRef(null);
+  // בקשה לפתוח את מחשבון הפגישה (בלשונית סיכומים) — מהמסך הראשי או מתוכן העניינים
+  const [reconReq,setReconReq]   = useState(0);
+  const openRecon = () => { setTab("summary"); setReconReq(n=>n+1); };
   // גובה ה-header נמדד בפועל (לא קבוע) — בטלפון עם מסך צר הטאבים עשויים לגלוש ליותר שורות והגובה משתנה
   const headerRef = useRef(null);
   const [headerHeight,setHeaderHeight] = useState(114);
@@ -629,15 +632,15 @@ function App(){
       </div>
 
       <main ref={mainRef} style={{maxWidth:720,margin:"0 auto",padding:"12px 14px"}}>
-        {tab==="main"       && <MainTab selKey={selKey} selYear={selYear} selMonth={selMonth} baseBalance={baseBalance} setBaseBalance={setBaseBalance} liveBalance={liveBalance} curTotals={curTotals} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} syncing={syncing} allDonorNames={allDonorNames} donorHistory={donorHistory} avrechim={avrechim} />}
+        {tab==="main"       && <MainTab selKey={selKey} selYear={selYear} selMonth={selMonth} baseBalance={baseBalance} setBaseBalance={setBaseBalance} liveBalance={liveBalance} curTotals={curTotals} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} syncing={syncing} allDonorNames={allDonorNames} donorHistory={donorHistory} avrechim={avrechim} openRecon={openRecon} />}
         {tab==="avrechim"   && <AvrechimTab avrechim={avrechim} setAvrechim={setAvrechim} selKey={selKey} prevKey={prevKey} selYear={selYear} selMonth={selMonth} getAV={getAV} getMD={getMD} setAvMonthField={setAvMonthField} calcAvrechMonth={calcAvrechMonth} totalOwed={totalOwed} attendance={attendance} customVacations={customVacations} beinHazmanims={beinHazmanims} hiddenHols={hiddenHols} allMonthKeys={allMonthKeys()} getPrevMonthKey={getPrevMonthKey} />}
         {tab==="attendance" && <AttendanceTab avrechim={avrechim} selKey={selKey} selYear={selYear} selMonth={selMonth} attendance={attendance} setAttendanceDay={setAttendanceDay} fillMonthBatch={fillMonthBatch} customVacations={customVacations} setCustomVacation={setCustomVacation} removeCustomVacation={removeCustomVacation} beinHazmanims={beinHazmanims} addBeinHazmanim={addBeinHazmanim} removeBeinHazmanim={removeBeinHazmanim} updateBeinHazmanim={updateBeinHazmanim} hiddenHols={hiddenHols} toggleHolidayHidden={toggleHolidayHidden} />}
-        {tab==="summary"    && <SummaryTab avrechim={avrechim} allMonthKeys={allMonthKeys()} calcMonthTotals={calcMonthTotals} calcAvrechMonth={calcAvrechMonth} getPrevMonthKey={getPrevMonthKey} baseBalance={baseBalance} liveBalance={liveBalance} selKey={selKey} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} reconSessions={reconSessions} allDonorNames={allDonorNames} donorHistory={donorHistory} />}
+        {tab==="summary"    && <SummaryTab avrechim={avrechim} allMonthKeys={allMonthKeys()} calcMonthTotals={calcMonthTotals} calcAvrechMonth={calcAvrechMonth} getPrevMonthKey={getPrevMonthKey} baseBalance={baseBalance} liveBalance={liveBalance} selKey={selKey} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} reconSessions={reconSessions} allDonorNames={allDonorNames} donorHistory={donorHistory} reconReq={reconReq} onReconHandled={()=>setReconReq(0)} stickyTop={stickyTop} />}
         {tab==="bank"       && <BankTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} />}
         {tab==="settlement" && <SettlementTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} getMD={getMD} setMonthField={setMonthField} allMonthKeys={allMonthKeys()} getPrevMonthKey={getPrevMonthKey} headerHeight={stickyTop} />}
         {tab==="ravpinchas" && <RavPinchasTab rpAvrechim={rpAvrechim} setRpAvrechim={setRpAvrechim} rpMonths={rpMonths} setRpMonthField={setRpMonthField} rpBaseBalance={rpBaseBalance} setRpBaseBalance={setRpBaseBalance} rpContact={rpContact} setRpContact={setRpContact} selKey={selKey} selYear={selYear} selMonth={selMonth} allDonorNames={allDonorNames} donorHistory={donorHistory} syncing={syncing} sarikowLiveBalance={liveBalance} headerHeight={stickyTop} />}
       </main>
-      {tocOpen && <TocPanel onClose={()=>setTocOpen(false)} setTab={setTab} mainRef={mainRef} stickyTop={stickyTop} />}
+      {tocOpen && <TocPanel onClose={()=>setTocOpen(false)} setTab={setTab} mainRef={mainRef} stickyTop={stickyTop} openRecon={openRecon} />}
     </div>
   );
 }
@@ -647,6 +650,7 @@ function App(){
 // הקפיצה מחפשת את הכותרת לפי הטקסט שלה, כך שאין צורך לסמן כל כרטיס בקוד
 const TOC = [
   {tab:"main", name:"🏠 ראשי", items:[
+    ["🧮 מחשבון פגישה עם סריקוב","recon"],
     ["🏛️ דתות וקרן התורה",["דתות וקרן התורה"]],
     ["💰 יתרה חיה מצטברת",["יתרה חיה מצטברת"]],
     ["💝 תורמים",["💝 תורמים"]],
@@ -661,7 +665,7 @@ const TOC = [
     ["📋 נוכחות החודש",null]]},
   {tab:"summary", name:"📂 סיכומים", items:[
     ["📂 כל החודשים",null],
-    ["🔍 בדיקת התאמה מול סריקוב",["בדיקת התאמה מול סריקוב"]],
+    ["🧮 מחשבון פגישה עם סריקוב","recon"],
     ["⏳ חודשים שממתינים לדתות/קרן",["חודשים ממתינים להעברת"]]]},
   {tab:"bank", name:"🏦 בנק", items:[
     ["🏦 הפקדות בנק",null],
@@ -679,7 +683,7 @@ const TOC = [
     ["📨 שליחת דו״ח לרב פנחס",["שליחת דו״ח תנועות"]]]},
 ];
 
-function TocPanel({ onClose, setTab, mainRef, stickyTop }){
+function TocPanel({ onClose, setTab, mainRef, stickyTop, openRecon }){
   const [q,setQ] = useState("");
   useEffect(()=>{
     const onKey = e => { if(e.key==="Escape") onClose(); };
@@ -710,6 +714,8 @@ function TocPanel({ onClose, setTab, mainRef, stickyTop }){
 
   const go = (tab,keys) => {
     onClose();
+    // המחשבון מוסתר מאחורי "פתח" — פותחים אותו דרך האפליקציה ולא בחיפוש כותרת
+    if(keys==="recon"){ openRecon(); return; }
     setTab(tab);
     let tries = 0;
     const tick = () => {
@@ -765,7 +771,7 @@ function TocPanel({ onClose, setTab, mainRef, stickyTop }){
 }
 
 // ── MAIN TAB ────────────────────────────────────────────────
-function MainTab({ selKey, selYear, selMonth, baseBalance, setBaseBalance, liveBalance, curTotals, allMonths, getMD, setMonthField, allDonorNames, donorHistory, avrechim }){
+function MainTab({ selKey, selYear, selMonth, baseBalance, setBaseBalance, liveBalance, curTotals, allMonths, getMD, setMonthField, allDonorNames, donorHistory, avrechim, openRecon }){
   const [editBase,setEditBase]=useState(false);
   const [tempBase,setTempBase]=useState(baseBalance.amount);
   const [showDonor,setShowDonor]=useState(false);
@@ -797,6 +803,11 @@ function MainTab({ selKey, selYear, selMonth, baseBalance, setBaseBalance, liveB
             onClick={()=>{setTempBase(baseBalance.amount);setEditBase(true);}}>✏️ עדכן בסיס</button>
         </div>
       </div>
+
+      <button onClick={openRecon}
+        style={{...card,border:"1.5px solid #c4b5fd",background:"#f5f3ff",color:"#6d28d9",fontWeight:700,fontSize:14,cursor:"pointer",textAlign:"right"}}>
+        🧮 מחשבון פגישה עם סריקוב <span style={{fontWeight:400,fontSize:12,color:"#7c3aed"}}>— מזינים שורה אחרי שורה, והכול נכנס למקום שלו</span>
+      </button>
 
       {editBase && (
         <div style={card}>
@@ -1844,7 +1855,7 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
 }
 
 // ── SUMMARY TAB ──────────────────────────────────────────────
-function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, getPrevMonthKey, baseBalance, liveBalance, selKey, allMonths, getMD, setMonthField, reconSessions, allDonorNames, donorHistory }){
+function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, getPrevMonthKey, baseBalance, liveBalance, selKey, allMonths, getMD, setMonthField, reconSessions, allDonorNames, donorHistory, reconReq, onReconHandled, stickyTop }){
   const [openMonth,setOpenMonth]=useState(selKey);
   const [pendingInput,setPendingInput]=useState({}); // { "monthKey|datot": "1234", ... }
   const baseMonthKey = baseBalance.monthKey || "0000-00";
@@ -1884,22 +1895,48 @@ function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, 
   const [reconCompareKey,setReconCompareKey]=useState(allMonthKeys[allMonthKeys.length-1]||selKey);
   const [reconSessionName,setReconSessionName]=useState("");
   const [applyTargetKey,setApplyTargetKey]=useState(allMonthKeys[allMonthKeys.length-1]||selKey);
+  const [applyAllPlan,setApplyAllPlan]=useState(null); // תצוגה מקדימה של "החל הכול" — ממתינה לאישור
+  const reconRef = useRef(null);
+
+  // פתיחה מהמסך הראשי / מתוכן העניינים: פותחים את המחשבון וגוללים אליו
+  useEffect(()=>{
+    if(!reconReq) return;
+    setShowRecon(true);
+    onReconHandled();
+    setTimeout(()=>{
+      if(reconRef.current) window.scrollTo({top:reconRef.current.getBoundingClientRect().top + window.scrollY - (stickyTop||0) - 12, behavior:"smooth"});
+    },50);
+  },[reconReq]);
 
   const CATEGORY_SIGN = {"תורמים":1,"דתות":1,"קרן":1,"העברה של סריקוב":-1,"אחר":1};
+  const APPLY_CATS = ["תורמים","דתות","קרן"];
 
-  const addReconRow = () => setReconRows(r=>[...r,{id:Date.now(),category:"תורמים",desc:"",amount:"",sign:1}]);
-  const removeReconRow = (id) => setReconRows(r=>r.filter(x=>x.id!==id));
-  const updateReconRow = (id,field,val) => setReconRows(r=>r.map(x=>{
+  // סכום בשורה: מספר, או כפל כמו במחשבון — "2800×9" / "2800*9" / "2800x9"
+  const parseAmt = s => {
+    const t = String(s??"").replace(/,/g,"").replace(/[×xX]/g,"*").replace(/\s/g,"");
+    if(!t) return 0;
+    const m = t.match(/^(\d+(?:\.\d+)?)(?:\*(\d+(?:\.\d+)?))?$/);
+    if(!m) return 0;
+    return Number(m[1]) * (m[2]!==undefined ? Number(m[2]) : 1);
+  };
+  const isMult = s => /[×xX*]/.test(String(s??""));
+  const keyLabel = k => { const [y,m]=String(k).split("-"); return mkMonthLabel(Number(y),Number(m)-1); };
+  const rowMonth = r => r.monthKey || applyTargetKey;
+
+  const addReconRow = () => { setApplyAllPlan(null); setReconRows(r=>[...r,{id:Date.now(),category:"תורמים",desc:"",amount:"",sign:1,monthKey:applyTargetKey}]); };
+  const removeReconRow = (id) => { setApplyAllPlan(null); setReconRows(r=>r.filter(x=>x.id!==id)); };
+  // כל שינוי בשורות מבטל תצוגה מקדימה של "החל הכול" שכבר לא מעודכנת
+  const updateReconRow = (id,field,val) => (setApplyAllPlan(null), setReconRows(r=>r.map(x=>{
     if(x.id!==id) return x;
     const next = {...x,[field]:val};
     if(field==="category") next.sign = CATEGORY_SIGN[val] ?? 1;
     return next;
-  }));
+  })));
 
   // יתרה מצטברת אחרי כל שורה — בדיוק כמו הקווים המודגשים "+" במחשבון
   let runningBal = Number(reconStart)||0;
   const reconRowsWithRunning = reconRows.map(r=>{
-    runningBal += (Number(r.amount)||0)*r.sign;
+    runningBal += parseAmt(r.amount)*r.sign;
     return {...r, runningBal};
   });
   const reconExpected = runningBal;
@@ -1908,22 +1945,88 @@ function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, 
 
   // מחיל שורה בודדת על המסך הראשי — רק לחודש שנבחר במפורש למעלה, אף פעם לא אוטומטית/בניחוש.
   // תורמים/דתות/קרן בלבד (יש להם שדה יעד חד-משמעי); "העברה של סריקוב"/"אחר" נשארים ידניים בכוונה.
+  const donorExists = (k,name,amt) => (allMonths[k]?.donors||[]).some(d=>d.name===name && Number(d.amount)===amt);
+
   const applyRowToMain = (r) => {
-    const amt = Number(r.amount)||0;
+    const amt = parseAmt(r.amount);
+    const k = rowMonth(r);
     if(amt<=0) return alert("יש להזין סכום לפני ההחלה");
     if(r.category==="תורמים"){
-      const existing = allMonths[applyTargetKey]?.donors || [];
-      setMonthField(applyTargetKey,"donors",[...existing,{name:r.desc||"תורם",amount:amt}]);
+      const name = r.desc||"תורם";
+      // הגנה מכפילות: אותו תורם באותו סכום כבר רשום בחודש הזה
+      if(donorExists(k,name,amt)) return alert(`${name} (${fmt(amt)} ₪) כבר רשום ב${keyLabel(k)} — לא נוסף שוב`);
+      const existing = allMonths[k]?.donors || [];
+      setMonthField(k,"donors",[...existing,{name,amount:amt}]);
     } else if(r.category==="דתות"){
-      setMonthField(applyTargetKey,"datot",amt);
-      setMonthField(applyTargetKey,"datotConfirmed",amt);
+      setMonthField(k,"datot",amt);
+      setMonthField(k,"datotConfirmed",amt);
     } else if(r.category==="קרן"){
-      setMonthField(applyTargetKey,"keren",amt);
-      setMonthField(applyTargetKey,"kerenConfirmed",amt);
+      setMonthField(k,"keren",amt);
+      setMonthField(k,"kerenConfirmed",amt);
     } else {
       return alert(`"${r.category}" אין לו שדה יעד ברור במסך הראשי — יש להזין ידנית (בבנק/התאמה).`);
     }
-    alert(`✓ הוחל על חודש ${applyTargetKey}`);
+    alert(`✓ הוחל על ${keyLabel(k)}`);
+  };
+
+  // "החל הכול" — קודם בונים תוכנית (מה ייכנס לאן, מה ידולג ולמה), ורק אחרי אישור מחילים
+  const buildApplyAllPlan = () => {
+    const lines = [];
+    const seen = {}; // דתות/קרן: אותו חודש פעמיים ברשימה = לא ברור מה הכוונה, לא מחילים
+    reconRows.forEach(r=>{ if(r.category!=="תורמים" && APPLY_CATS.includes(r.category) && parseAmt(r.amount)>0){ const s=r.category+"|"+rowMonth(r); seen[s]=(seen[s]||0)+1; } });
+    const plannedDonors = {};
+    reconRows.forEach(r=>{
+      const amt = parseAmt(r.amount);
+      if(amt<=0) return;
+      const k = rowMonth(r);
+      const what = `${r.category}${r.desc?` (${r.desc})`:""} ${fmt(amt)} ₪`;
+      if(!APPLY_CATS.includes(r.category)){
+        lines.push({row:r, ok:false, text:`${what} — לא נכנס אוטומטית, יש להזין ידנית`});
+        return;
+      }
+      if(r.category==="תורמים"){
+        const name = r.desc||"תורם";
+        const dupKey = k+"|"+name+"|"+amt;
+        if(donorExists(k,name,amt) || plannedDonors[dupKey]){
+          lines.push({row:r, ok:false, text:`${what} — כבר רשום ב${keyLabel(k)}, ידולג`});
+        } else {
+          plannedDonors[dupKey]=true;
+          lines.push({row:r, ok:true, text:`${what} → תורמים של ${keyLabel(k)}`});
+        }
+        return;
+      }
+      const field = r.category==="דתות" ? "datot" : "keren";
+      if(seen[r.category+"|"+k]>1){
+        lines.push({row:r, ok:false, text:`${what} — יש ברשימה כמה שורות ${r.category} ל${keyLabel(k)}. בחרו לכל שורה את החודש שלה`});
+        return;
+      }
+      const curDraft = Number(allMonths[k]?.[field])||0;
+      const curConf  = Number(allMonths[k]?.[field+"Confirmed"])||0;
+      if(curDraft===amt && curConf===amt){
+        lines.push({row:r, ok:false, text:`${what} — כבר מעודכן ב${keyLabel(k)}, ידולג`});
+      } else {
+        lines.push({row:r, ok:true, text:`${r.category} של ${keyLabel(k)}: ${fmt(curConf)} ₪ → ${fmt(amt)} ₪${curConf>0?" ⚠️ מחליף סכום קיים":""}`});
+      }
+    });
+    setApplyAllPlan(lines);
+  };
+
+  const runApplyAll = () => {
+    const donorsByMonth = {};
+    applyAllPlan.filter(l=>l.ok).forEach(({row:r})=>{
+      const amt = parseAmt(r.amount), k = rowMonth(r);
+      if(r.category==="תורמים"){
+        // כמה תורמים לאותו חודש — כותבים פעם אחת את כל הרשימה
+        if(!donorsByMonth[k]) donorsByMonth[k] = [...(allMonths[k]?.donors||[])];
+        donorsByMonth[k].push({name:r.desc||"תורם",amount:amt});
+      } else {
+        const field = r.category==="דתות" ? "datot" : "keren";
+        setMonthField(k,field,amt);
+        setMonthField(k,field+"Confirmed",amt);
+      }
+    });
+    Object.entries(donorsByMonth).forEach(([k,list])=>setMonthField(k,"donors",list));
+    setApplyAllPlan(null);
   };
 
 
@@ -1952,7 +2055,7 @@ function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, 
   const startFreshFromHere = () => {
     setReconStart(String(reconExpected));
     setReconStartLabel(new Date().toLocaleDateString("he-IL"));
-    setReconRows([{id:Date.now(),category:"תורמים",desc:"",amount:"",sign:1}]);
+    setReconRows([{id:Date.now(),category:"תורמים",desc:"",amount:"",sign:1,monthKey:applyTargetKey}]);
     setReconSessionName("");
   };
 
@@ -1965,9 +2068,9 @@ function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, 
       </div>
 
       {/* בדיקת התאמה מול סריקוב */}
-      <div style={{...card,border:"1.5px solid #7c3aed"}}>
+      <div ref={reconRef} style={{...card,border:"1.5px solid #7c3aed"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div style={{fontWeight:700,fontSize:14,color:"#7c3aed"}}>🔍 בדיקת התאמה מול סריקוב</div>
+          <div style={{fontWeight:700,fontSize:14,color:"#7c3aed"}}>🧮 מחשבון פגישה עם סריקוב <span style={{fontWeight:400,fontSize:12}}>(בדיקת התאמה)</span></div>
           <button style={{...smallBtn,color:"#7c3aed",borderColor:"#c4b5fd"}} onClick={()=>setShowRecon(!showRecon)}>
             {showRecon?"סגור":"פתח"}
           </button>
@@ -1979,9 +2082,9 @@ function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, 
             </datalist>
 
             <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:8,padding:8}}>
-              <label style={{fontSize:12,color:"#1d4ed8",fontWeight:700,display:"block",marginBottom:3}}>לאיזה חודש להחיל בלחיצת "✅ החל במסך הראשי"?</label>
+              <label style={{fontSize:12,color:"#1d4ed8",fontWeight:700,display:"block",marginBottom:3}}>חודש רגיל לשורות חדשות (אפשר לשנות בכל שורה לחוד)</label>
               <select style={inp} value={applyTargetKey} onChange={e=>setApplyTargetKey(e.target.value)}>
-                {allMonthKeys.map(k=><option key={k} value={k}>{k}</option>)}
+                {allMonthKeys.map(k=><option key={k} value={k}>{keyLabel(k)}</option>)}
               </select>
             </div>
 
@@ -2038,23 +2141,57 @@ function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, 
                       borderColor:r.sign>0?"#86efac":"#fecaca",background:r.sign>0?"#f0fdf4":"#fef2f2"}}>
                     {r.sign>0?"+":"−"}
                   </button>
-                  <input type="number" placeholder="סכום" style={{...inp,flex:1,textAlign:"left"}}
+                  <input type="text" inputMode="text" placeholder="סכום (או 2800×9)" style={{...inp,flex:1,textAlign:"left",direction:"ltr"}}
                     value={r.amount} onChange={e=>updateReconRow(r.id,"amount",e.target.value)}/>
                   <button style={delBtn} onClick={()=>removeReconRow(r.id)}>✕</button>
                 </div>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"2px 6px"}}>
-                  {Number(r.amount)>0
+                {r.amount!=="" && isMult(r.amount) && (
+                  <div style={{fontSize:11,padding:"2px 6px",color:parseAmt(r.amount)>0?"#7c3aed":"#dc2626",fontWeight:700}}>
+                    {parseAmt(r.amount)>0 ? `= ${fmt(parseAmt(r.amount))} ₪` : "⚠️ לא הבנתי את החשבון — כתבו למשל 2800×9"}
+                  </div>
+                )}
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:6,flexWrap:"wrap",padding:"2px 6px"}}>
+                  {parseAmt(r.amount)>0
                     ? <div style={{fontSize:11,color:"#94a3b8"}}>← יתרה מצטברת: <b style={{color:"#475569"}}>{fmt(r.runningBal)} ₪</b></div>
                     : <span/>
                   }
-                  {["תורמים","דתות","קרן"].includes(r.category) && Number(r.amount)>0 && (
-                    <button style={{...smallBtn,fontSize:10,padding:"2px 8px",background:"#eff6ff",color:"#1d4ed8",border:"1px solid #bfdbfe"}}
-                      onClick={()=>applyRowToMain(r)}>✅ החל במסך הראשי ({applyTargetKey})</button>
+                  {APPLY_CATS.includes(r.category) && (
+                    <div style={{display:"flex",alignItems:"center",gap:4}}>
+                      <span style={{fontSize:11,color:"#64748b"}}>לחודש:</span>
+                      <select style={{...smallBtn,fontSize:11,padding:"2px 4px"}} value={rowMonth(r)} onChange={e=>updateReconRow(r.id,"monthKey",e.target.value)}>
+                        {allMonthKeys.map(k=><option key={k} value={k}>{keyLabel(k)}</option>)}
+                      </select>
+                      {parseAmt(r.amount)>0 && (
+                        <button style={{...smallBtn,fontSize:10,padding:"2px 8px",background:"#eff6ff",color:"#1d4ed8",border:"1px solid #bfdbfe"}}
+                          onClick={()=>applyRowToMain(r)}>✅ החל</button>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
             ))}
-            <button style={{...smallBtn,alignSelf:"flex-start",color:"#7c3aed",borderColor:"#c4b5fd"}} onClick={addReconRow}>+ שורה</button>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              <button style={{...smallBtn,color:"#7c3aed",borderColor:"#c4b5fd"}} onClick={addReconRow}>+ שורה</button>
+              <button style={{...smallBtn,background:"#1d4ed8",color:"#fff",fontWeight:700,border:"none"}} onClick={buildApplyAllPlan}>✅ החל הכול במסך הראשי</button>
+            </div>
+
+            {applyAllPlan && (
+              <div style={{background:"#eff6ff",border:"1.5px solid #93c5fd",borderRadius:8,padding:10}}>
+                <div style={{fontWeight:700,fontSize:13,color:"#1d4ed8",marginBottom:6}}>לפני שמחילים — זה מה שייכנס:</div>
+                {applyAllPlan.length===0 && <div style={{fontSize:12,color:"#64748b"}}>אין שורות עם סכום</div>}
+                {applyAllPlan.map((l,i)=>(
+                  <div key={i} style={{fontSize:12.5,padding:"3px 0",color:l.ok?"#0f172a":"#94a3b8"}}>{l.ok?"✅":"⏭️"} {l.text}</div>
+                ))}
+                <div style={{display:"flex",gap:6,marginTop:8}}>
+                  {applyAllPlan.some(l=>l.ok) && (
+                    <button style={{...smallBtn,background:"#16a34a",color:"#fff",fontWeight:700,border:"none"}} onClick={runApplyAll}>
+                      אשר והחל ({applyAllPlan.filter(l=>l.ok).length})
+                    </button>
+                  )}
+                  <button style={smallBtn} onClick={()=>setApplyAllPlan(null)}>ביטול</button>
+                </div>
+              </div>
+            )}
 
             <div>
               <label style={{fontSize:12,color:"#64748b",display:"block",marginBottom:3}}>להשוות מול יתרת האפליקציה בסוף חודש:</label>
