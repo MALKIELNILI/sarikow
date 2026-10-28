@@ -635,7 +635,7 @@ function App(){
         {tab==="main"       && <MainTab selKey={selKey} selYear={selYear} selMonth={selMonth} baseBalance={baseBalance} setBaseBalance={setBaseBalance} liveBalance={liveBalance} curTotals={curTotals} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} syncing={syncing} allDonorNames={allDonorNames} donorHistory={donorHistory} avrechim={avrechim} openRecon={openRecon} />}
         {tab==="avrechim"   && <AvrechimTab avrechim={avrechim} setAvrechim={setAvrechim} selKey={selKey} prevKey={prevKey} selYear={selYear} selMonth={selMonth} getAV={getAV} getMD={getMD} setAvMonthField={setAvMonthField} calcAvrechMonth={calcAvrechMonth} totalOwed={totalOwed} attendance={attendance} customVacations={customVacations} beinHazmanims={beinHazmanims} hiddenHols={hiddenHols} allMonthKeys={allMonthKeys()} getPrevMonthKey={getPrevMonthKey} />}
         {tab==="attendance" && <AttendanceTab avrechim={avrechim} selKey={selKey} selYear={selYear} selMonth={selMonth} attendance={attendance} setAttendanceDay={setAttendanceDay} fillMonthBatch={fillMonthBatch} customVacations={customVacations} setCustomVacation={setCustomVacation} removeCustomVacation={removeCustomVacation} beinHazmanims={beinHazmanims} addBeinHazmanim={addBeinHazmanim} removeBeinHazmanim={removeBeinHazmanim} updateBeinHazmanim={updateBeinHazmanim} hiddenHols={hiddenHols} toggleHolidayHidden={toggleHolidayHidden} />}
-        {tab==="summary"    && <SummaryTab avrechim={avrechim} allMonthKeys={allMonthKeys()} calcMonthTotals={calcMonthTotals} calcAvrechMonth={calcAvrechMonth} getPrevMonthKey={getPrevMonthKey} baseBalance={baseBalance} liveBalance={liveBalance} selKey={selKey} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} reconSessions={reconSessions} allDonorNames={allDonorNames} donorHistory={donorHistory} reconReq={reconReq} onReconHandled={()=>setReconReq(0)} stickyTop={stickyTop} />}
+        {tab==="summary"    && <SummaryTab avrechim={avrechim} allMonthKeys={allMonthKeys()} calcMonthTotals={calcMonthTotals} calcAvrechMonth={calcAvrechMonth} getPrevMonthKey={getPrevMonthKey} baseBalance={baseBalance} liveBalance={liveBalance} selKey={selKey} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} reconSessions={reconSessions} allDonorNames={allDonorNames} donorHistory={donorHistory} sync={sync} reconReq={reconReq} onReconHandled={()=>setReconReq(0)} stickyTop={stickyTop} />}
         {tab==="bank"       && <BankTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} />}
         {tab==="settlement" && <SettlementTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} getMD={getMD} setMonthField={setMonthField} allMonthKeys={allMonthKeys()} getPrevMonthKey={getPrevMonthKey} headerHeight={stickyTop} />}
         {tab==="ravpinchas" && <RavPinchasTab rpAvrechim={rpAvrechim} setRpAvrechim={setRpAvrechim} rpMonths={rpMonths} setRpMonthField={setRpMonthField} rpBaseBalance={rpBaseBalance} setRpBaseBalance={setRpBaseBalance} rpContact={rpContact} setRpContact={setRpContact} selKey={selKey} selYear={selYear} selMonth={selMonth} allDonorNames={allDonorNames} donorHistory={donorHistory} syncing={syncing} sarikowLiveBalance={liveBalance} headerHeight={stickyTop} />}
@@ -1855,7 +1855,7 @@ function AvrechimTab({ avrechim, setAvrechim, selKey, prevKey, selYear, selMonth
 }
 
 // ── SUMMARY TAB ──────────────────────────────────────────────
-function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, getPrevMonthKey, baseBalance, liveBalance, selKey, allMonths, getMD, setMonthField, reconSessions, allDonorNames, donorHistory, reconReq, onReconHandled, stickyTop }){
+function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, getPrevMonthKey, baseBalance, liveBalance, selKey, allMonths, getMD, setMonthField, reconSessions, allDonorNames, donorHistory, sync, reconReq, onReconHandled, stickyTop }){
   const [openMonth,setOpenMonth]=useState(selKey);
   const [pendingInput,setPendingInput]=useState({}); // { "monthKey|datot": "1234", ... }
   const baseMonthKey = baseBalance.monthKey || "0000-00";
@@ -2037,6 +2037,7 @@ function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, 
       rows: reconRows, compareKey: reconCompareKey, savedAt: new Date().toISOString().slice(0,10)
     }};
     sync(()=>fbSet("reconSessions", sessions));
+    alert(`✓ נשמר: ${reconSessionName.trim()}\nאפשר לטעון אותו שוב מ"📂 רשימות שמורות" למעלה`);
     setReconSessionName("");
   };
   const loadReconSession = (id) => {
@@ -2047,6 +2048,7 @@ function SummaryTab({ avrechim, allMonthKeys, calcMonthTotals, calcAvrechMonth, 
     setReconSessionName(`${s.name} → ${today}`);
   };
   const deleteReconSession = (id) => {
+    if(!confirm(`למחוק את "${reconSessions[id]?.name}"?`)) return;
     const sessions = {...reconSessions}; delete sessions[id];
     sync(()=>fbSet("reconSessions", sessions));
   };
