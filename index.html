@@ -4456,18 +4456,27 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
     setRpMonthField(selKey,"avAmounts",na);
   };
 
+  // סכום של אברך יורד מהיתרה רק כשהצ'ק מוכן (סומן "שולם"), או כשהוא מסומן "יורד אוטומטית" (כמו העמותה)
+  const avCounts = (av, md) => !!av.auto || md.avPaid?.[av.id]==="1";
+  // שורות חופשיות בבקשת צ'קים (בלי אברך מהרשימה) — יורדות מהיתרה רק כשהבקשה סומנה "מוכנים"
+  const extrasSum = (md, ready) => (md.checkReqs||[]).filter(r=>!!r.readyAt===ready)
+    .reduce((s,r)=>s+(r.lines||[]).filter(l=>!l.avId).reduce((a,l)=>a+Number(l.amount||0),0),0);
+
   const calcMonthTotals = (key) => {
     const md = rpMonths[key] || {};
+    const avs    = activeAvrechimForMonth(md);
     const donors = (md.donors||[]).reduce((s,d)=>s+Number(d.amount||0),0);
-    const sent   = activeAvrechimForMonth(md).reduce((s,av)=>s+getAvAmt(av,md),0);
+    const sent   = avs.filter(av=>avCounts(av,md)).reduce((s,av)=>s+getAvAmt(av,md),0) + extrasSum(md,true);
+    const pending= avs.filter(av=>!avCounts(av,md)).reduce((s,av)=>s+getAvAmt(av,md),0) + extrasSum(md,false);
     const adj    = Number(md.adjustment||0);
     const net    = donors - sent + adj;
-    return { donors, sent, adj, net };
+    return { donors, sent, pending, adj, net };
   };
 
   const monthHasData = key => {
     const md = rpMonths[key]||{};
-    return (md.donors||[]).length>0 || Number(md.adjustment||0)!==0;
+    return (md.donors||[]).length>0 || Number(md.adjustment||0)!==0
+      || rpAvrechim.some(av=>!av.auto && md.avPaid?.[av.id]==="1") || extrasSum(md,true)>0;
   };
 
   const sortedMonthKeys = Object.keys(rpMonths)
@@ -4490,7 +4499,9 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
   const combinedTotal = Number(sarikowLiveBalance||0) + liveBalance;
 
   const monthDonors = donors.reduce((s,d)=>s+Number(d.amount||0),0);
-  const monthSent   = activeAvrechim.reduce((s,av)=>s+getAvAmt(av,null),0);
+  const curTotals   = calcMonthTotals(selKey);
+  const monthSent   = curTotals.sent;
+  const monthPending= curTotals.pending;
   const monthNet    = monthDonors - monthSent + adjustment;
 
   // ── דו״ח לשליחה (מייל / סמס) ──
@@ -4509,9 +4520,10 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
     else activeAvrechim.forEach(av=>{
       const amt = getAvAmt(av, md);
       const paid = avPaidMap[av.id]==="1";
-      lines.push(`  ${av.name}: ${fmt(amt)} ₪${paid?" (שולם)":""}`);
+      lines.push(`  ${av.name}: ${fmt(amt)} ₪${paid?" (שולם)":av.auto?"":" (ממתין)"}`);
     });
     lines.push(`  סה״כ לאברכים: ${fmt(t.sent)} ₪`);
+    if(t.pending>0) lines.push(`  ⏳ ממתין לצ'קים: ${fmt(t.pending)} ₪`);
     if(t.adj!==0) lines.push("", `⚖️ התאמה: ${fmtSigned(t.adj)} ₪`);
     lines.push("", `נטו חודש: ${fmtSigned(t.net)} ₪`, `💰 יתרה מצטברת: ${fmt(cum)} ₪`);
     return lines.join("\n");
@@ -4551,6 +4563,64 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
   const clearAvAmt  = avId => { const u={...avAmounts}; delete u[avId]; setRpMonthField(selKey,"avAmounts",u); };
   const setAvPaidF  = (avId,val) => setRpMonthField(selKey,"avPaid",{...avPaid,[avId]:val});
   const updAv       = (id,k,v) => setRpAvrechim(p=>p.map(a=>a.id===id?{...a,[k]:v}:a));
+
+  // ── בקשות צ'קים לרב פנחס — אפשר כמה בקשות בחודש; הסכום יורד מהיתרה רק כשלוחצים "הצ'קים מוכנים" ──
+  const checkReqs = getMD("checkReqs",[]);
+  const [newReq,setNewReq] = useState(null); // { sel:{avId:true}, extra:[{name,amount}] } כשפותחים בקשה חדשה
+  const inPendingReq = new Set(checkReqs.filter(r=>!r.readyAt).flatMap(r=>(r.lines||[]).map(l=>l.avId).filter(Boolean)));
+  const openNewReq = () => {
+    const sel = {};
+    activeAvrechim.forEach(av=>{ if(!av.auto && avPaid[av.id]!=="1" && !inPendingReq.has(av.id)) sel[av.id]=true; });
+    setNewReq({sel, extra:[]});
+  };
+  const newReqLines = () => newReq ? [
+    ...activeAvrechim.filter(av=>newReq.sel[av.id]).map(av=>({avId:av.id,name:av.name,amount:getAvAmt(av)})),
+    ...newReq.extra.filter(x=>x.name&&Number(x.amount)>0).map(x=>({name:x.name,amount:Number(x.amount)})),
+  ] : [];
+  const reqText = lines => [
+    "שלום הרב פנחס,",
+    `נא להכין צ'קים — ${mkMonthLabel(selYear,selMonth)}:`,
+    "",
+    ...lines.map(l=>`• ${l.name}: ${fmt(l.amount)} ₪`),
+    "",
+    `סה״כ: ${fmt(lines.reduce((s,l)=>s+Number(l.amount||0),0))} ₪ (${lines.length} צ'קים)`,
+    "תודה רבה!",
+  ].join("\n");
+  const sendReq = (lines, how) => {
+    const text = reqText(lines);
+    const url = how==="sms"
+      ? `sms:${rpContact.phone||""}?body=${encodeURIComponent(text)}`
+      : `mailto:${rpContact.email||""}?subject=${encodeURIComponent(`בקשת צ'קים — ${mkMonthLabel(selYear,selMonth)}`)}&body=${encodeURIComponent(text)}`;
+    // השהיה קצרה — כדי שהשמירה בענן תספיק לצאת לפני שנפתחת אפליקציית ההודעות
+    setTimeout(()=>{ window.location.href = url; },300);
+  };
+  const saveAndSendReq = how => {
+    const lines = newReqLines();
+    if(lines.length===0){ alert("לא נבחר אף אברך"); return; }
+    const req = {id:Date.now(), createdAt:new Date().toLocaleDateString("he-IL"), lines};
+    setRpMonthField(selKey,"checkReqs",[...checkReqs,req]);
+    setNewReq(null);
+    sendReq(lines, how);
+  };
+  const markReqReady = req => {
+    const total = (req.lines||[]).reduce((s,l)=>s+Number(l.amount||0),0);
+    if(!confirm(`לסמן שהצ'קים מוכנים?\n${fmt(total)} ₪ יירדו מהיתרה.`)) return;
+    const np = {...avPaid};
+    (req.lines||[]).forEach(l=>{ if(l.avId) np[l.avId]="1"; });
+    setRpMonthField(selKey,"avPaid",np);
+    setRpMonthField(selKey,"checkReqs",checkReqs.map(r=>r.id===req.id?{...r,readyAt:new Date().toLocaleDateString("he-IL")}:r));
+  };
+  const undoReqReady = req => {
+    if(!confirm("לבטל את הסימון \"מוכנים\"? הסכום יחזור ליתרה.")) return;
+    const np = {...avPaid};
+    (req.lines||[]).forEach(l=>{ if(l.avId) delete np[l.avId]; });
+    setRpMonthField(selKey,"avPaid",np);
+    setRpMonthField(selKey,"checkReqs",checkReqs.map(r=>r.id===req.id?{...r,readyAt:null}:r));
+  };
+  const deleteReq = req => {
+    if(!confirm("למחוק את הבקשה?")) return;
+    setRpMonthField(selKey,"checkReqs",checkReqs.filter(r=>r.id!==req.id));
+  };
 
   const paidCount   = activeAvrechim.filter(av=>avPaid[av.id]==="1").length;
   const allPaid     = paidCount===activeAvrechim.length && activeAvrechim.length>0;
@@ -4959,6 +5029,12 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
                         value={av.amount||1000} onChange={e=>updAv(av.id,"amount",Number(e.target.value)||1000)}/>
                     </div>
                   )}
+                  {isEdit&&(
+                    <label style={{borderTop:"1px solid #e2e8f0",padding:"8px 12px",background:"#f8fafc",display:"flex",gap:6,alignItems:"center",fontSize:12,color:"#475569",cursor:"pointer"}}>
+                      <input type="checkbox" checked={!!av.auto} onChange={e=>updAv(av.id,"auto",e.target.checked)} style={{width:15,height:15}}/>
+                      🔁 יורד מהיתרה אוטומטית כל חודש (בלי בקשת צ'ק)
+                    </label>
+                  )}
 
                   {/* סכום חודשי + כפתור שולם */}
                   <div style={{borderTop:"1px solid #f1f5f9",padding:"7px 12px",display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
@@ -4973,7 +5049,9 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
                         <button style={{...smallBtn,fontSize:10,padding:"2px 6px"}} onClick={()=>clearAvAmt(av.id)}>↺</button>
                       )}
                     </div>
-                    <label style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer",
+                    {av.auto
+                      ? <span style={{fontSize:12,fontWeight:600,color:"#0369a1",background:"#e0f2fe",borderRadius:7,padding:"5px 10px"}}>🔁 אוטומטי</span>
+                      : <label style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer",
                       background:paid?"#16a34a":"#f1f5f9",border:`2px solid ${paid?"#16a34a":"#cbd5e1"}`,
                       borderRadius:7,padding:"4px 10px",fontSize:12,fontWeight:600,
                       color:paid?"#fff":"#64748b",transition:"all .2s",userSelect:"none"}}>
@@ -4981,7 +5059,7 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
                         onChange={e=>setAvPaidF(av.id,e.target.checked?"1":"")}
                         style={{width:14,height:14,cursor:"pointer",accentColor:"#16a34a"}}/>
                       {paid?"✓ שולם":"סמן שולם"}
-                    </label>
+                    </label>}
                   </div>
                 </div>
               );
@@ -4990,8 +5068,14 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
 
         {activeAvrechim.length>0&&(
           <div style={{display:"flex",justifyContent:"space-between",padding:"8px 12px",background:"#f0fdf4",borderRadius:8,marginTop:4}}>
-            <span style={{fontWeight:700,fontSize:13,color:"#14532d"}}>סה״כ לאברכים:</span>
+            <span style={{fontWeight:700,fontSize:13,color:"#14532d"}}>סה״כ ירד מהיתרה:</span>
             <span style={{fontWeight:800,fontSize:15,color:"#059669"}}>{fmt(monthSent)} ₪</span>
+          </div>
+        )}
+        {monthPending>0&&(
+          <div style={{display:"flex",justifyContent:"space-between",padding:"8px 12px",background:"#fffbeb",borderRadius:8,marginTop:4,border:"1px solid #fde68a"}}>
+            <span style={{fontWeight:700,fontSize:13,color:"#92400e"}}>⏳ ממתין לצ'קים (עוד לא ירד):</span>
+            <span style={{fontWeight:800,fontSize:15,color:"#b45309"}}>{fmt(monthPending)} ₪</span>
           </div>
         )}
 
@@ -5007,6 +5091,79 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
             ))}
           </div>
         )}
+      </div>
+
+      {/* ── בקשות צ'קים ── */}
+      <div style={{...card,border:"1.5px solid #8b5cf6"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:6}}>
+          <div style={{fontWeight:700,fontSize:14,color:"#5b21b6"}}>📝 בקשות צ'קים — {mkMonthLabel(selYear,selMonth)}</div>
+          {!newReq && <button style={{...addBtn,background:"#8b5cf6"}} onClick={openNewReq}>+ בקשה חדשה</button>}
+        </div>
+        <div style={{fontSize:11,color:"#64748b",marginTop:2}}>שולחים לרב פנחס בסמס/מייל. הסכום יורד מהיתרה רק כשלוחצים "✅ הצ'קים מוכנים".</div>
+
+        {newReq && (
+          <div style={{marginTop:10,padding:10,background:"#f5f3ff",borderRadius:8,display:"flex",flexDirection:"column",gap:6}}>
+            <div style={{fontSize:12,fontWeight:700,color:"#5b21b6"}}>סמן למי להכין צ'ק:</div>
+            {activeAvrechim.filter(av=>!av.auto).map(av=>{
+              const note = avPaid[av.id]==="1" ? "כבר שולם" : inPendingReq.has(av.id) ? "כבר בבקשה פתוחה" : "";
+              return (
+                <label key={av.id} style={{display:"flex",alignItems:"center",gap:8,fontSize:13,cursor:"pointer",background:"#fff",borderRadius:7,padding:"6px 10px"}}>
+                  <input type="checkbox" checked={!!newReq.sel[av.id]} style={{width:16,height:16}}
+                    onChange={e=>setNewReq(p=>({...p,sel:{...p.sel,[av.id]:e.target.checked}}))}/>
+                  <span style={{flex:1}}>{av.name}{note&&<span style={{fontSize:11,color:"#94a3b8"}}> ({note})</span>}</span>
+                  <span style={{fontWeight:700}}>{fmt(getAvAmt(av))} ₪</span>
+                </label>
+              );
+            })}
+            {newReq.extra.map((x,i)=>(
+              <div key={i} style={{display:"flex",gap:6}}>
+                <input style={{...iinp,flex:2}} placeholder="שם" value={x.name}
+                  onChange={e=>setNewReq(p=>({...p,extra:p.extra.map((y,j)=>j===i?{...y,name:e.target.value}:y)}))}/>
+                <input style={{...iinp,flex:1,textAlign:"left"}} type="number" placeholder="סכום" value={x.amount}
+                  onChange={e=>setNewReq(p=>({...p,extra:p.extra.map((y,j)=>j===i?{...y,amount:e.target.value}:y)}))}/>
+                <button style={delBtn} onClick={()=>setNewReq(p=>({...p,extra:p.extra.filter((_,j)=>j!==i)}))}>✕</button>
+              </div>
+            ))}
+            <button style={{...smallBtn,alignSelf:"flex-start"}} onClick={()=>setNewReq(p=>({...p,extra:[...p.extra,{name:"",amount:""}]}))}>+ שורה נוספת (שם וסכום)</button>
+            <div style={{fontWeight:800,fontSize:14,color:"#5b21b6"}}>
+              סה״כ בבקשה: {fmt(newReqLines().reduce((s,l)=>s+l.amount,0))} ₪ ({newReqLines().length} צ'קים)
+            </div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              <button style={{...greenBtn,flex:1,background:"#0369a1",opacity:rpContact.phone?1:0.5}} disabled={!rpContact.phone} onClick={()=>saveAndSendReq("sms")}>💬 שמור ושלח בסמס</button>
+              <button style={{...greenBtn,flex:1,opacity:rpContact.email?1:0.5}} disabled={!rpContact.email} onClick={()=>saveAndSendReq("mail")}>📧 שמור ושלח במייל</button>
+              <button style={grayBtn} onClick={()=>setNewReq(null)}>ביטול</button>
+            </div>
+          </div>
+        )}
+
+        {checkReqs.length===0 && !newReq && <div style={{...empty,marginTop:8}}>אין בקשות החודש</div>}
+        {[...checkReqs].reverse().map((r,idx)=>{
+          const total = (r.lines||[]).reduce((s,l)=>s+Number(l.amount||0),0);
+          const ready = !!r.readyAt;
+          return (
+            <div key={r.id} style={{marginTop:8,borderRadius:9,border:`1.5px solid ${ready?"#86efac":"#fcd34d"}`,background:ready?"#f0fdf4":"#fffbeb",padding:"8px 10px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:4}}>
+                <span style={{fontWeight:700,fontSize:13}}>
+                  בקשה {checkReqs.length-idx} · נשלחה {r.createdAt}
+                </span>
+                <span style={{fontWeight:700,fontSize:12,color:ready?"#16a34a":"#b45309"}}>
+                  {ready?`✅ מוכנים (${r.readyAt})`:"⏳ ממתין"}
+                </span>
+              </div>
+              <div style={{fontSize:12,color:"#475569",margin:"4px 0"}}>
+                {(r.lines||[]).map(l=>`${l.name} ${fmt(l.amount)}`).join(" · ")}
+              </div>
+              <div style={{fontWeight:800,fontSize:14}}>סה״כ: {fmt(total)} ₪</div>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}}>
+                {!ready && <button style={{...greenBtn,padding:"6px 12px",fontSize:13}} onClick={()=>markReqReady(r)}>✅ הצ'קים מוכנים</button>}
+                {!ready && rpContact.phone && <button style={{...smallBtn,fontSize:12}} onClick={()=>sendReq(r.lines||[],"sms")}>💬 סמס</button>}
+                {!ready && rpContact.email && <button style={{...smallBtn,fontSize:12}} onClick={()=>sendReq(r.lines||[],"mail")}>📧 מייל</button>}
+                {!ready && <button style={{...delBtn,fontSize:12}} onClick={()=>deleteReq(r)}>מחק</button>}
+                {ready && <button style={{...smallBtn,fontSize:11}} onClick={()=>undoReqReady(r)}>↺ בטל סימון</button>}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* ── סיכום חודש ── */}
