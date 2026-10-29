@@ -5163,7 +5163,27 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
 
         {newReq && (
           <div style={{marginTop:10,padding:10,background:"#f5f3ff",borderRadius:8,display:"flex",flexDirection:"column",gap:6}}>
-            <div style={{fontSize:12,fontWeight:700,color:"#5b21b6"}}>סמן למי להכין צ'ק (זכאי הדתות מסריקוב מסומנים אוטומטית):</div>
+            {/* סכום אחיד — נכנס לכל המסומנים (ולשורות הנוספות); אחר כך אפשר לשנות שם בודד */}
+            <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",background:"#ede9fe",borderRadius:7,padding:"6px 10px"}}>
+              <span style={{fontSize:13,fontWeight:700,color:"#5b21b6"}}>סכום לכולם:</span>
+              <input type="number" inputMode="numeric" value={newReq.all||""} placeholder="סכום"
+                onChange={e=>setNewReq(p=>({...p,all:e.target.value}))}
+                style={{...iinp,width:90,flex:"none",textAlign:"left",fontWeight:700}}/>
+              <span style={{fontSize:12}}>₪</span>
+              <button style={{...smallBtn,background:"#8b5cf6",color:"#fff"}} onClick={()=>{
+                if(!(Number(newReq.all)>0)){ alert("כתוב סכום"); return; }
+                setNewReq(p=>{
+                  const amt = {...p.amt};
+                  reqCandidates.forEach(av=>{ if(p.sel[av.id]) amt[av.id]=p.all; });
+                  return {...p, amt, extra:p.extra.map(x=>x.name?{...x,amount:p.all}:x)};
+                });
+              }}>הכנס לכל המסומנים</button>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+              <div style={{fontSize:12,fontWeight:700,color:"#5b21b6",flex:1}}>סמן למי להכין צ'ק (זכאי הדתות מסריקוב מסומנים אוטומטית):</div>
+              <button style={smallBtn} onClick={()=>setNewReq(p=>({...p,sel:Object.fromEntries(reqCandidates.map(av=>[av.id,true]))}))}>סמן הכול</button>
+              <button style={smallBtn} onClick={()=>setNewReq(p=>({...p,sel:{}}))}>נקה הכול</button>
+            </div>
             {reqCandidates.map((av,i)=>{
               const isDatot = datotRpIds.has(av.id);
               const note = avPaid[av.id]==="1" ? "כבר שולם" : inPendingReq.has(av.id) ? "כבר בבקשה פתוחה" : "";
