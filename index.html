@@ -639,7 +639,7 @@ function App(){
         {tab==="bank"       && <BankTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} />}
         {tab==="bank"       && <SectionDivider>💰 חשבון — התחשבנות עם האברכים</SectionDivider>}
         {tab==="bank"       && <SettlementTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} getMD={getMD} setMonthField={setMonthField} allMonthKeys={allMonthKeys()} getPrevMonthKey={getPrevMonthKey} headerHeight={stickyTop} />}
-        {tab==="ravpinchas" && <RavPinchasTab rpAvrechim={rpAvrechim} setRpAvrechim={setRpAvrechim} rpMonths={rpMonths} setRpMonthField={setRpMonthField} rpBaseBalance={rpBaseBalance} setRpBaseBalance={setRpBaseBalance} rpContact={rpContact} setRpContact={setRpContact} selKey={selKey} selYear={selYear} selMonth={selMonth} allDonorNames={allDonorNames} donorHistory={donorHistory} syncing={syncing} sarikowLiveBalance={liveBalance} headerHeight={stickyTop} />}
+        {tab==="ravpinchas" && <RavPinchasTab rpAvrechim={rpAvrechim} setRpAvrechim={setRpAvrechim} rpMonths={rpMonths} setRpMonthField={setRpMonthField} rpBaseBalance={rpBaseBalance} setRpBaseBalance={setRpBaseBalance} rpContact={rpContact} setRpContact={setRpContact} selKey={selKey} selYear={selYear} selMonth={selMonth} allDonorNames={allDonorNames} donorHistory={donorHistory} syncing={syncing} sarikowLiveBalance={liveBalance} sarikowAvrechim={avrechim} headerHeight={stickyTop} />}
       </main>
       {tocOpen && <TocPanel onClose={()=>setTocOpen(false)} setTab={setTab} mainRef={mainRef} stickyTop={stickyTop} openRecon={openRecon} />}
     </div>
@@ -4400,7 +4400,7 @@ function SettlementTab({ avrechim, selKey, prevKey, calcAvrechMonth, selYear, se
 }
 
 // ── RAV PINCHAS TAB ──────────────────────────────────────────
-function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, rpBaseBalance, setRpBaseBalance, rpContact, setRpContact, selKey, selYear, selMonth, allDonorNames, donorHistory, syncing, sarikowLiveBalance, headerHeight }) {
+function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, rpBaseBalance, setRpBaseBalance, rpContact, setRpContact, selKey, selYear, selMonth, allDonorNames, donorHistory, syncing, sarikowLiveBalance, sarikowAvrechim, headerHeight }) {
   const [editBase,   setEditBase]   = useState(false);
   const [tempBase,   setTempBase]   = useState(rpBaseBalance.amount);
   const [showDonor,  setShowDonor]  = useState(false);
@@ -4568,13 +4568,38 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
   const checkReqs = getMD("checkReqs",[]);
   const [newReq,setNewReq] = useState(null); // { sel:{avId:true}, extra:[{name,amount}] } כשפותחים בקשה חדשה
   const inPendingReq = new Set(checkReqs.filter(r=>!r.readyAt).flatMap(r=>(r.lines||[]).map(l=>l.avId).filter(Boolean)));
+
+  // ── זכאי דתות מסריקוב — מסומנים אוטומטית בבקשה חדשה ──
+  // קישור לאברך של הרב פנחס: לפי sarikowId אם נבחר ידנית, אחרת לפי שם (בלי "הרב", או שם פרטי שמתחיל אותו)
+  const normName = s => String(s||"").replace(/^הרב\s+/,"").replace(/\s+/g," ").trim();
+  const datotAvs = (sarikowAvrechim||[]).filter(a=>a && a.active && (a.incomeGroup||(a.track==="keren"?"keren":"datot"))==="datot");
+  const rpFor = sa => {
+    const byId = rpAvrechim.find(r=>String(r.sarikowId)===String(sa.id));
+    if(byId) return byId;
+    const n = normName(sa.name);
+    const free = rpAvrechim.filter(r=>!r.sarikowId);
+    const exact = free.filter(r=>normName(r.name)===n);
+    if(exact.length===1) return exact[0];
+    const prefix = free.filter(r=>normName(r.name).startsWith(n+" "));
+    return prefix.length===1 ? prefix[0] : null;
+  };
+  const datotRows = datotAvs.map(sa=>({sa, rp:rpFor(sa)}));
+  const datotRpIds = new Set(datotRows.filter(x=>x.rp).map(x=>x.rp.id));
+  // ברשימת הבחירה: זכאי הדתות (כולל מי שלא ברשימת החודש), ואחריהם שאר האברכים של החודש
+  const reqCandidates = [
+    ...datotRows.filter(x=>x.rp && !x.rp.auto).map(x=>x.rp),
+    ...activeAvrechim.filter(av=>!av.auto && !datotRpIds.has(av.id)),
+  ];
+  const datotMissing = datotRows.filter(x=>!x.rp).map(x=>x.sa); // זכאי דתות שאין להם עדיין כרטיס אצל הרב פנחס
+
   const openNewReq = () => {
     const sel = {};
-    activeAvrechim.forEach(av=>{ if(!av.auto && avPaid[av.id]!=="1" && !inPendingReq.has(av.id)) sel[av.id]=true; });
-    setNewReq({sel, extra:[]});
+    reqCandidates.forEach(av=>{ if(datotRpIds.has(av.id) && avPaid[av.id]!=="1" && !inPendingReq.has(av.id)) sel[av.id]=true; });
+    const extra = datotMissing.map(sa=>({name:sa.name, amount:""}));
+    setNewReq({sel, extra});
   };
   const newReqLines = () => newReq ? [
-    ...activeAvrechim.filter(av=>newReq.sel[av.id]).map(av=>({avId:av.id,name:av.name,amount:getAvAmt(av)})),
+    ...reqCandidates.filter(av=>newReq.sel[av.id]).map(av=>({avId:av.id,name:av.name,amount:getAvAmt(av)})),
     ...newReq.extra.filter(x=>x.name&&Number(x.amount)>0).map(x=>({name:x.name,amount:Number(x.amount)})),
   ] : [];
   const reqTotal = lines => (lines||[]).reduce((s,l)=>s+Number(l.amount||0),0);
@@ -4612,6 +4637,14 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
     const lines = newReqLines();
     if(lines.length===0){ alert("לא נבחר אף אברך"); return; }
     const req = {id:Date.now(), createdAt:new Date().toLocaleDateString("he-IL"), lines};
+    // זכאי דתות שלא היו ברשימת החודש — מוסיפים אותם לחודש, כדי שכשהצ'קים מוכנים הסכום שלהם יירד מהיתרה
+    const missing = lines.filter(l=>l.avId && !activeAvrechim.some(a=>a.id===l.avId));
+    if(missing.length){
+      const na = {};
+      activeAvrechim.forEach(a => { na[a.id] = getAvAmt(a, rpMonths[selKey]||{}); });
+      missing.forEach(l => { na[l.avId] = l.amount; });
+      setRpMonthField(selKey,"avAmounts",na);
+    }
     setRpMonthField(selKey,"checkReqs",[...checkReqs,req]);
     setNewReq(null);
     sendReq(lines, how, req.id);
@@ -5049,6 +5082,15 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
                       🔁 יורד מהיתרה אוטומטית כל חודש (בלי בקשת צ'ק)
                     </label>
                   )}
+                  {isEdit&&(
+                    <div style={{borderTop:"1px solid #e2e8f0",padding:"8px 12px",background:"#f8fafc",display:"flex",gap:8,alignItems:"center"}}>
+                      <label style={{fontSize:11,color:"#475569",whiteSpace:"nowrap"}}>🔗 האברך בסריקוב:</label>
+                      <select style={{...iinp,flex:1}} value={av.sarikowId||""} onChange={e=>updAv(av.id,"sarikowId",e.target.value||null)}>
+                        <option value="">{(()=>{ const m=datotRows.find(x=>x.rp&&x.rp.id===av.id); return m?`אוטומטי (${m.sa.name})`:"אוטומטי לפי שם (לא נמצא)"; })()}</option>
+                        {(sarikowAvrechim||[]).filter(Boolean).map(sa=><option key={sa.id} value={sa.id}>{sa.name}</option>)}
+                      </select>
+                    </div>
+                  )}
 
                   {/* סכום חודשי + כפתור שולם */}
                   <div style={{borderTop:"1px solid #f1f5f9",padding:"7px 12px",display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
@@ -5117,18 +5159,26 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
 
         {newReq && (
           <div style={{marginTop:10,padding:10,background:"#f5f3ff",borderRadius:8,display:"flex",flexDirection:"column",gap:6}}>
-            <div style={{fontSize:12,fontWeight:700,color:"#5b21b6"}}>סמן למי להכין צ'ק:</div>
-            {activeAvrechim.filter(av=>!av.auto).map(av=>{
+            <div style={{fontSize:12,fontWeight:700,color:"#5b21b6"}}>סמן למי להכין צ'ק (זכאי הדתות מסריקוב מסומנים אוטומטית):</div>
+            {reqCandidates.map((av,i)=>{
+              const isDatot = datotRpIds.has(av.id);
               const note = avPaid[av.id]==="1" ? "כבר שולם" : inPendingReq.has(av.id) ? "כבר בבקשה פתוחה" : "";
               return (
-                <label key={av.id} style={{display:"flex",alignItems:"center",gap:8,fontSize:13,cursor:"pointer",background:"#fff",borderRadius:7,padding:"6px 10px"}}>
-                  <input type="checkbox" checked={!!newReq.sel[av.id]} style={{width:16,height:16}}
-                    onChange={e=>setNewReq(p=>({...p,sel:{...p.sel,[av.id]:e.target.checked}}))}/>
-                  <span style={{flex:1}}>{av.name}{note&&<span style={{fontSize:11,color:"#94a3b8"}}> ({note})</span>}</span>
-                  <span style={{fontWeight:700}}>{fmt(getAvAmt(av))} ₪</span>
-                </label>
+                <React.Fragment key={av.id}>
+                  {i>0 && isDatot!==datotRpIds.has(reqCandidates[i-1].id) && <div style={{fontSize:11,fontWeight:700,color:"#64748b",marginTop:4}}>אחרים (לא זכאי דתות):</div>}
+                  <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,cursor:"pointer",background:"#fff",borderRadius:7,padding:"6px 10px"}}>
+                    <input type="checkbox" checked={!!newReq.sel[av.id]} style={{width:16,height:16}}
+                      onChange={e=>setNewReq(p=>({...p,sel:{...p.sel,[av.id]:e.target.checked}}))}/>
+                    <span style={{flex:1}}>
+                      {isDatot && <span style={{fontSize:10,fontWeight:700,color:"#fff",background:"#2563eb",borderRadius:5,padding:"1px 5px",marginLeft:5}}>דתות</span>}
+                      {av.name}{note&&<span style={{fontSize:11,color:"#94a3b8"}}> ({note})</span>}
+                    </span>
+                    <span style={{fontWeight:700}}>{fmt(getAvAmt(av))} ₪</span>
+                  </label>
+                </React.Fragment>
               );
             })}
+            {datotMissing.length>0 && <div style={{fontSize:11,color:"#b45309"}}>זכאי דתות שאין להם עדיין סכום אצל הרב פנחס — מלא סכום (או מחק את השורה):</div>}
             {newReq.extra.map((x,i)=>(
               <div key={i} style={{display:"flex",gap:6}}>
                 <input style={{...iinp,flex:2}} placeholder="שם" value={x.name}
