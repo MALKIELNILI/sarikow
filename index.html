@@ -242,7 +242,7 @@ function App(){
   const mainRef = useRef(null);
   // בקשה לפתוח את מחשבון הפגישה (בלשונית סיכומים) — מהמסך הראשי או מתוכן העניינים
   const [reconReq,setReconReq]   = useState(0);
-  const openRecon = () => { setTab("summary"); setReconReq(n=>n+1); };
+  const openRecon = () => { setTab("main"); setReconReq(n=>n+1); };
   // גובה ה-header נמדד בפועל (לא קבוע) — בטלפון עם מסך צר הטאבים עשויים לגלוש ליותר שורות והגובה משתנה
   const headerRef = useRef(null);
   const [headerHeight,setHeaderHeight] = useState(114);
@@ -606,9 +606,7 @@ function App(){
             <button onClick={()=>setTab("main")}       style={tabS("main")}>🏠 ראשי</button>
             <button onClick={()=>setTab("avrechim")}   style={tabS("avrechim")}>👨‍🎓 אברכים</button>
             <button onClick={()=>setTab("attendance")} style={tabS("attendance")}>📋 נוכחות</button>
-            <button onClick={()=>setTab("summary")}    style={tabS("summary")}>📂 סיכומים</button>
-            <button onClick={()=>setTab("bank")}       style={tabS("bank")}>🏦 בנק</button>
-            <button onClick={()=>setTab("settlement")} style={tabS("settlement")}>💰 חשבון</button>
+            <button onClick={()=>setTab("bank")}       style={tabS("bank")}>🏦 בנק וחשבון</button>
             <button onClick={()=>setTab("ravpinchas")} style={{...tabS("ravpinchas"),background:tab==="ravpinchas"?"#064e3b":"#f8fafc",borderColor:tab==="ravpinchas"?"#064e3b":"#e2e8f0",color:tab==="ravpinchas"?"#fff":"#64748b"}}>📿 הרב פנחס</button>
             <button onClick={()=>setTocOpen(true)} style={{...tabS("toc"),background:"#fef3c7",borderColor:"#f59e0b",color:"#92400e",fontWeight:700}}>📑 תוכן עניינים</button>
           </div>
@@ -632,12 +630,15 @@ function App(){
       </div>
 
       <main ref={mainRef} style={{maxWidth:720,margin:"0 auto",padding:"12px 14px"}}>
+        {/* ראשי כולל גם את הסיכומים, ובנק כולל גם את החשבון — אותם רכיבים בדיוק, אחד אחרי השני */}
         {tab==="main"       && <MainTab selKey={selKey} selYear={selYear} selMonth={selMonth} baseBalance={baseBalance} setBaseBalance={setBaseBalance} liveBalance={liveBalance} curTotals={curTotals} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} syncing={syncing} allDonorNames={allDonorNames} donorHistory={donorHistory} avrechim={avrechim} openRecon={openRecon} />}
         {tab==="avrechim"   && <AvrechimTab avrechim={avrechim} setAvrechim={setAvrechim} selKey={selKey} prevKey={prevKey} selYear={selYear} selMonth={selMonth} getAV={getAV} getMD={getMD} setAvMonthField={setAvMonthField} calcAvrechMonth={calcAvrechMonth} totalOwed={totalOwed} attendance={attendance} customVacations={customVacations} beinHazmanims={beinHazmanims} hiddenHols={hiddenHols} allMonthKeys={allMonthKeys()} getPrevMonthKey={getPrevMonthKey} />}
         {tab==="attendance" && <AttendanceTab avrechim={avrechim} selKey={selKey} selYear={selYear} selMonth={selMonth} attendance={attendance} setAttendanceDay={setAttendanceDay} fillMonthBatch={fillMonthBatch} customVacations={customVacations} setCustomVacation={setCustomVacation} removeCustomVacation={removeCustomVacation} beinHazmanims={beinHazmanims} addBeinHazmanim={addBeinHazmanim} removeBeinHazmanim={removeBeinHazmanim} updateBeinHazmanim={updateBeinHazmanim} hiddenHols={hiddenHols} toggleHolidayHidden={toggleHolidayHidden} />}
-        {tab==="summary"    && <SummaryTab avrechim={avrechim} allMonthKeys={allMonthKeys()} calcMonthTotals={calcMonthTotals} calcAvrechMonth={calcAvrechMonth} getPrevMonthKey={getPrevMonthKey} baseBalance={baseBalance} liveBalance={liveBalance} selKey={selKey} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} reconSessions={reconSessions} allDonorNames={allDonorNames} donorHistory={donorHistory} sync={sync} reconReq={reconReq} onReconHandled={()=>setReconReq(0)} stickyTop={stickyTop} />}
+        {tab==="main"       && <SectionDivider>📂 סיכומים — כל החודשים</SectionDivider>}
+        {tab==="main"       && <SummaryTab avrechim={avrechim} allMonthKeys={allMonthKeys()} calcMonthTotals={calcMonthTotals} calcAvrechMonth={calcAvrechMonth} getPrevMonthKey={getPrevMonthKey} baseBalance={baseBalance} liveBalance={liveBalance} selKey={selKey} allMonths={allMonths} getMD={getMD} setMonthField={setMonthField} reconSessions={reconSessions} allDonorNames={allDonorNames} donorHistory={donorHistory} sync={sync} reconReq={reconReq} onReconHandled={()=>setReconReq(0)} stickyTop={stickyTop} />}
         {tab==="bank"       && <BankTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} />}
-        {tab==="settlement" && <SettlementTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} getMD={getMD} setMonthField={setMonthField} allMonthKeys={allMonthKeys()} getPrevMonthKey={getPrevMonthKey} headerHeight={stickyTop} />}
+        {tab==="bank"       && <SectionDivider>💰 חשבון — התחשבנות עם האברכים</SectionDivider>}
+        {tab==="bank"       && <SettlementTab avrechim={avrechim} selKey={selKey} prevKey={prevKey} calcAvrechMonth={calcAvrechMonth} selYear={selYear} selMonth={selMonth} getAV={getAV} setAvMonthField={setAvMonthField} getMD={getMD} setMonthField={setMonthField} allMonthKeys={allMonthKeys()} getPrevMonthKey={getPrevMonthKey} headerHeight={stickyTop} />}
         {tab==="ravpinchas" && <RavPinchasTab rpAvrechim={rpAvrechim} setRpAvrechim={setRpAvrechim} rpMonths={rpMonths} setRpMonthField={setRpMonthField} rpBaseBalance={rpBaseBalance} setRpBaseBalance={setRpBaseBalance} rpContact={rpContact} setRpContact={setRpContact} selKey={selKey} selYear={selYear} selMonth={selMonth} allDonorNames={allDonorNames} donorHistory={donorHistory} syncing={syncing} sarikowLiveBalance={liveBalance} headerHeight={stickyTop} />}
       </main>
       {tocOpen && <TocPanel onClose={()=>setTocOpen(false)} setTab={setTab} mainRef={mainRef} stickyTop={stickyTop} openRecon={openRecon} />}
@@ -663,20 +664,21 @@ const TOC = [
     ["👤 קרן ששילמת אישית",["קרן ששילמת אישית"]]]},
   {tab:"attendance", name:"📋 נוכחות", items:[
     ["📋 נוכחות החודש",null]]},
-  {tab:"summary", name:"📂 סיכומים", items:[
-    ["📂 כל החודשים",null],
+  {tab:"main", name:"📂 סיכומים (בתוך ראשי)", items:[
+    ["📂 כל החודשים",["📂 סיכומים — כל החודשים"]],
     ["🧮 מחשבון פגישה עם סריקוב","recon"],
     ["⏳ חודשים שממתינים לדתות/קרן",["חודשים ממתינים להעברת"]]]},
   {tab:"bank", name:"🏦 בנק", items:[
     ["🏦 הפקדות בנק",null],
     ["🤫 תענית דיבור — מזומן",["תענית דיבור — מזומן","כל תענית דיבור שולמה"]]]},
-  {tab:"settlement", name:"💰 חשבון", items:[
+  {tab:"bank", sticky:true, name:"💰 חשבון (בתוך בנק)", items:[
+    ["💰 תחילת החשבון",["💰 חשבון — התחשבנות"]],
     ["⚖️ כמה אני חייב / חייבים לי",["אני חייב לאברכים"]],
     ["🔴 עדיין חסר להם",["עדיין חסר להם"]],
     ["🟡 נשאר להם עודף להעביר",["נשאר להם עודף להעביר"]],
     ["🔀 העברה מהירה",["העברה מהירה"]],
     ["📋 היסטוריית העברות",["היסטוריית העברות"]]]},
-  {tab:"ravpinchas", name:"📿 הרב פנחס", items:[
+  {tab:"ravpinchas", sticky:true, name:"📿 הרב פנחס", items:[
     ["💝 תורמים",["💝 תורמים"]],
     ["⚖️ התאמה ידנית לקופה",["התאמה ידנית לקופה"]],
     ["📊 סיכום כל החודשים",["סיכום כל החודשים"]],
@@ -712,11 +714,11 @@ function TocPanel({ onClose, setTab, mainRef, stickyTop, openRecon }){
     setTimeout(()=>d.remove(),3000);
   };
 
-  const go = (tab,keys) => {
+  const go = (g,keys) => {
     onClose();
     // המחשבון מוסתר מאחורי "פתח" — פותחים אותו דרך האפליקציה ולא בחיפוש כותרת
     if(keys==="recon"){ openRecon(); return; }
-    setTab(tab);
+    setTab(g.tab);
     let tries = 0;
     const tick = () => {
       const el = keys ? findHeading(keys) : null;
@@ -727,8 +729,8 @@ function TocPanel({ onClose, setTab, mainRef, stickyTop, openRecon }){
         return;
       }
       const target = el.closest("div[style*='border-radius']") || el;
-      // בלשוניות חשבון והרב פנחס יש שורה נוספת שנשארת קבועה למעלה
-      const extra = (tab==="settlement"||tab==="ravpinchas") ? 80 : 12;
+      // בחשבון ובהרב פנחס יש שורה נוספת שנשארת קבועה למעלה
+      const extra = g.sticky ? 80 : 12;
       window.scrollTo({top:target.getBoundingClientRect().top + window.scrollY - stickyTop - extra, behavior:"smooth"});
       target.style.outline = "3px solid #f59e0b";
       target.style.outlineOffset = "2px";
@@ -753,10 +755,10 @@ function TocPanel({ onClose, setTab, mainRef, stickyTop, openRecon }){
           style={{...inp,marginTop:10,fontSize:14}}/>
         {groups.length===0 && <div style={{...empty,marginTop:12}}>לא נמצא</div>}
         {groups.map(g=>(
-          <div key={g.tab} style={{marginTop:12}}>
+          <div key={g.name} style={{marginTop:12}}>
             <div style={{fontWeight:800,fontSize:14,color:"#1e3a5f",borderBottom:"2px solid #e2e8f0",paddingBottom:4,marginBottom:2}}>{g.name}</div>
             {g.items.map(([label,keys])=>(
-              <button key={label} onClick={()=>go(g.tab,keys)}
+              <button key={label} onClick={()=>go(g,keys)}
                 style={{display:"block",width:"100%",textAlign:"right",background:"none",border:"none",padding:"9px 8px",borderRadius:8,fontSize:14,cursor:"pointer",color:"#0f172a"}}
                 onMouseEnter={e=>e.currentTarget.style.background="#eff6ff"}
                 onMouseLeave={e=>e.currentTarget.style.background="none"}>
@@ -766,6 +768,15 @@ function TocPanel({ onClose, setTab, mainRef, stickyTop, openRecon }){
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+// כותרת מפרידה בין שני חלקים באותה לשונית (ראשי+סיכומים, בנק+חשבון)
+function SectionDivider({ children }){
+  return (
+    <div style={{margin:"28px 0 12px",padding:"10px 14px",background:"#1e3a5f",color:"#fff",borderRadius:10,fontWeight:800,fontSize:16}}>
+      {children}
     </div>
   );
 }
