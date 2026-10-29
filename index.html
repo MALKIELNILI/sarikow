@@ -4596,10 +4596,12 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
     const sel = {};
     reqCandidates.forEach(av=>{ if(datotRpIds.has(av.id) && avPaid[av.id]!=="1" && !inPendingReq.has(av.id)) sel[av.id]=true; });
     const extra = datotMissing.map(sa=>({name:sa.name, amount:""}));
-    setNewReq({sel, extra});
+    setNewReq({sel, extra, amt:{}});
   };
+  // סכום הצ'ק: מה שהוקלד בבקשה, אחרת הסכום של האברך לחודש
+  const reqAmt = av => newReq?.amt?.[av.id]!==undefined ? newReq.amt[av.id] : getAvAmt(av);
   const newReqLines = () => newReq ? [
-    ...reqCandidates.filter(av=>newReq.sel[av.id]).map(av=>({avId:av.id,name:av.name,amount:getAvAmt(av)})),
+    ...reqCandidates.filter(av=>newReq.sel[av.id]).map(av=>({avId:av.id,name:av.name,amount:Number(reqAmt(av))||0})),
     ...newReq.extra.filter(x=>x.name&&Number(x.amount)>0).map(x=>({name:x.name,amount:Number(x.amount)})),
   ] : [];
   const reqTotal = lines => (lines||[]).reduce((s,l)=>s+Number(l.amount||0),0);
@@ -4637,12 +4639,14 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
     const lines = newReqLines();
     if(lines.length===0){ alert("לא נבחר אף אברך"); return; }
     const req = {id:Date.now(), createdAt:new Date().toLocaleDateString("he-IL"), lines};
-    // זכאי דתות שלא היו ברשימת החודש — מוסיפים אותם לחודש, כדי שכשהצ'קים מוכנים הסכום שלהם יירד מהיתרה
-    const missing = lines.filter(l=>l.avId && !activeAvrechim.some(a=>a.id===l.avId));
-    if(missing.length){
+    if(lines.some(l=>l.avId && !(l.amount>0))){ alert("יש אברך מסומן בלי סכום"); return; }
+    // סכום הצ'ק נרשם גם כסכום של האברך לחודש (וזכאי דתות שלא היו ברשימת החודש נוספים אליו),
+    // כדי שכשהצ'קים מוכנים יירד מהיתרה בדיוק הסכום שנשלח
+    const changed = lines.filter(l=>l.avId && (!activeAvrechim.some(a=>a.id===l.avId) || getAvAmt(activeAvrechim.find(a=>a.id===l.avId))!==l.amount));
+    if(changed.length){
       const na = {};
       activeAvrechim.forEach(a => { na[a.id] = getAvAmt(a, rpMonths[selKey]||{}); });
-      missing.forEach(l => { na[l.avId] = l.amount; });
+      changed.forEach(l => { na[l.avId] = l.amount; });
       setRpMonthField(selKey,"avAmounts",na);
     }
     setRpMonthField(selKey,"checkReqs",[...checkReqs,req]);
@@ -5173,7 +5177,10 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
                       {isDatot && <span style={{fontSize:10,fontWeight:700,color:"#fff",background:"#2563eb",borderRadius:5,padding:"1px 5px",marginLeft:5}}>דתות</span>}
                       {av.name}{note&&<span style={{fontSize:11,color:"#94a3b8"}}> ({note})</span>}
                     </span>
-                    <span style={{fontWeight:700}}>{fmt(getAvAmt(av))} ₪</span>
+                    <input type="number" inputMode="numeric" value={reqAmt(av)}
+                      onChange={e=>setNewReq(p=>({...p,amt:{...p.amt,[av.id]:e.target.value},sel:{...p.sel,[av.id]:true}}))}
+                      style={{...iinp,width:90,flex:"none",textAlign:"left",fontWeight:700}}/>
+                    <span style={{fontSize:12}}>₪</span>
                   </label>
                 </React.Fragment>
               );
