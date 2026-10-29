@@ -4577,17 +4577,31 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
     ...activeAvrechim.filter(av=>newReq.sel[av.id]).map(av=>({avId:av.id,name:av.name,amount:getAvAmt(av)})),
     ...newReq.extra.filter(x=>x.name&&Number(x.amount)>0).map(x=>({name:x.name,amount:Number(x.amount)})),
   ] : [];
-  const reqText = lines => [
-    "שלום הרב פנחס,",
-    `נא להכין צ'קים — ${mkMonthLabel(selYear,selMonth)}:`,
-    "",
-    ...lines.map(l=>`• ${l.name}: ${fmt(l.amount)} ₪`),
-    "",
-    `סה״כ: ${fmt(lines.reduce((s,l)=>s+Number(l.amount||0),0))} ₪ (${lines.length} צ'קים)`,
-    "תודה רבה!",
-  ].join("\n");
-  const sendReq = (lines, how) => {
-    const text = reqText(lines);
+  const reqTotal = lines => (lines||[]).reduce((s,l)=>s+Number(l.amount||0),0);
+  // נוסח ההודעה, כולל סיכום הכנסות ויתרה; reqId = הבקשה עצמה (כדי לא לספור אותה פעמיים בין הממתינות)
+  const reqText = (lines, reqId) => {
+    const total = reqTotal(lines);
+    const otherPending = checkReqs.filter(r=>!r.readyAt && r.id!==reqId).reduce((s,r)=>s+reqTotal(r.lines),0);
+    return [
+      "שלום הרב פנחס,",
+      `נא להכין צ'קים — ${mkMonthLabel(selYear,selMonth)}:`,
+      "",
+      ...lines.map(l=>`• ${l.name}: ${fmt(l.amount)} ₪`),
+      "",
+      `סה״כ: ${fmt(total)} ₪ (${lines.length} צ'קים)`,
+      "",
+      "📊 סיכום:",
+      `הכנסות החודש (תרומות): ${fmt(monthDonors)} ₪`,
+      `יתרה בקופה כרגע: ${fmt(liveBalance)} ₪`,
+      `בקשה זו: −${fmt(total)} ₪`,
+      ...(otherPending>0 ? [`בקשות קודמות שעוד ממתינות: −${fmt(otherPending)} ₪`] : []),
+      `יתרה אחרי הצ'קים: ${fmt(liveBalance-total-otherPending)} ₪`,
+      "",
+      "תודה רבה!",
+    ].join("\n");
+  };
+  const sendReq = (lines, how, reqId) => {
+    const text = reqText(lines, reqId);
     const url = how==="sms"
       ? `sms:${rpContact.phone||""}?body=${encodeURIComponent(text)}`
       : `mailto:${rpContact.email||""}?subject=${encodeURIComponent(`בקשת צ'קים — ${mkMonthLabel(selYear,selMonth)}`)}&body=${encodeURIComponent(text)}`;
@@ -4600,7 +4614,7 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
     const req = {id:Date.now(), createdAt:new Date().toLocaleDateString("he-IL"), lines};
     setRpMonthField(selKey,"checkReqs",[...checkReqs,req]);
     setNewReq(null);
-    sendReq(lines, how);
+    sendReq(lines, how, req.id);
   };
   const markReqReady = req => {
     const total = (req.lines||[]).reduce((s,l)=>s+Number(l.amount||0),0);
@@ -5156,8 +5170,8 @@ function RavPinchasTab({ rpAvrechim, setRpAvrechim, rpMonths, setRpMonthField, r
               <div style={{fontWeight:800,fontSize:14}}>סה״כ: {fmt(total)} ₪</div>
               <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}}>
                 {!ready && <button style={{...greenBtn,padding:"6px 12px",fontSize:13}} onClick={()=>markReqReady(r)}>✅ הצ'קים מוכנים</button>}
-                {!ready && rpContact.phone && <button style={{...smallBtn,fontSize:12}} onClick={()=>sendReq(r.lines||[],"sms")}>💬 סמס</button>}
-                {!ready && rpContact.email && <button style={{...smallBtn,fontSize:12}} onClick={()=>sendReq(r.lines||[],"mail")}>📧 מייל</button>}
+                {!ready && rpContact.phone && <button style={{...smallBtn,fontSize:12}} onClick={()=>sendReq(r.lines||[],"sms",r.id)}>💬 סמס</button>}
+                {!ready && rpContact.email && <button style={{...smallBtn,fontSize:12}} onClick={()=>sendReq(r.lines||[],"mail",r.id)}>📧 מייל</button>}
                 {!ready && <button style={{...delBtn,fontSize:12}} onClick={()=>deleteReq(r)}>מחק</button>}
                 {ready && <button style={{...smallBtn,fontSize:11}} onClick={()=>undoReqReady(r)}>↺ בטל סימון</button>}
               </div>
